@@ -1,8 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Plus, X, Upload, Download, Save, FileText, RotateCcw, ChevronDown, ChevronUp, Maximize2 } from 'lucide-react';
+import { Plus, X, Upload, Download, Save, FileText, RotateCcw, ChevronDown, ChevronUp, Maximize2, ArrowRight } from 'lucide-react'; 
+import { useAssessment } from './SharedContext';
 
 const RubricCreator = () => {
     // Default rubric levels (5+2 design)
+    const { setSharedRubric, transferRubricToGrading } = useAssessment();
+    
     const defaultLevels = [
         { level: 'incomplete', name: 'Incomplete', description: 'No submission or unusable', color: '#95a5a6', multiplier: 0 },
         { level: 'unacceptable', name: 'Unacceptable', description: 'Below minimum standards', color: '#e74c3c', multiplier: 0.3 },
@@ -237,6 +240,10 @@ const RubricCreator = () => {
             )
         }));
 
+        // Save to shared context for grading tool
+        setSharedRubric(exportData);
+
+        // Also download as before
         const dataStr = JSON.stringify(exportData, null, 2);
         const dataBlob = new Blob([dataStr], { type: 'application/json' });
         const url = URL.createObjectURL(dataBlob);
@@ -244,6 +251,26 @@ const RubricCreator = () => {
         link.href = url;
         link.download = `rubric_${rubricData.assignmentInfo.title.replace(/\s+/g, '_')}_final.json`;
         link.click();
+    };
+
+    // Transfer to grading tool directly
+    const transferToGrading = () => {
+        const exportData = { ...rubricData };
+
+        exportData.criteria = exportData.criteria.map(criterion => ({
+            ...criterion,
+            levels: Object.fromEntries(
+                rubricData.rubricLevels.map(level => [
+                    level.level,
+                    {
+                        pointRange: calculatePointRange(criterion, level.level),
+                        description: criterion.levels[level.level]?.description || ''
+                    }
+                ])
+            )
+        }));
+
+        transferRubricToGrading(exportData);
     };
 
     // Import rubric data
@@ -371,6 +398,14 @@ const RubricCreator = () => {
                             >
                                 <Upload size={14} />
                                 Import
+                            </button>
+                            <button
+                                onClick={transferToGrading}
+                                className="bg-blue-700 hover:bg-blue-600 px-3 py-2 rounded flex items-center gap-1 text-sm"
+                                title="Send rubric directly to grading tool"
+                            >
+                                <ArrowRight size={14} />
+                                Use for Grading
                             </button>
                             <button
                                 onClick={saveRubric}
