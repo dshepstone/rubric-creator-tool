@@ -1,1187 +1,651 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Download, Upload, FileText, Video, Plus, X, Save, FileDown } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Upload, Download, FileText, Video, Plus, X, Save, FileDown, Bot, ArrowRight } from 'lucide-react';
 import { useAssessment } from './SharedContext';
+import { generatePDF } from '../utils/pdfFunctions';
 
-// Built-in Course Modules
+const baseLevels = [
+  { level: 'incomplete', name: 'Incomplete', multiplier: 0, color: '#94a3b8' },
+  { level: 'unacceptable', name: 'Unacceptable', multiplier: 0.3, color: '#ef4444' },
+  { level: 'developing', name: 'Developing', multiplier: 0.6, color: '#f97316' },
+  { level: 'acceptable', name: 'Acceptable', multiplier: 0.8, color: '#22c55e' },
+  { level: 'exceptional', name: 'Exceptional', multiplier: 1.0, color: '#3b82f6' },
+];
+
 const courseModules = {
-    "2d-animation": {
-        courseType: "2D Animation",
-        version: "1.0",
-        gradingSettings: {
-            maxPoints: 100,
-            passingGrade: 70,
-            fileTypes: ['.mp4', '.mov', '.gif', '.jpg', '.png'],
-            submissionRequirements: ['Animation file', 'Process documentation'],
-            supportedVideoLinks: ['SyncSketch', 'Panopto', 'YouTube', 'Vimeo']
-        },
-        rubric: [
-            { criteria: 'Animation Principles', maxPoints: 30, score: 0, comments: '', description: 'Timing, spacing, squash & stretch, anticipation' },
-            { criteria: 'Technical Execution', maxPoints: 25, score: 0, comments: '', description: 'Frame rate, resolution, file quality' },
-            { criteria: 'Creativity & Storytelling', maxPoints: 25, score: 0, comments: '', description: 'Original concept, narrative clarity' },
-            { criteria: 'Process & Documentation', maxPoints: 20, score: 0, comments: '', description: 'Planning sketches, workflow organization' }
-        ],
-        feedbackLibrary: {
-            strengths: [
-                'Excellent timing and spacing throughout the animation',
-                'Strong understanding of squash and stretch principles',
-                'Creative and engaging storytelling approach',
-                'Professional frame-by-frame animation technique'
-            ],
-            improvements: [
-                'Work on timing consistency in key sequences',
-                'Add more anticipation before major actions',
-                'Improve lip sync accuracy and mouth shapes',
-                'Consider adding more secondary animation'
-            ],
-            general: [
-                'This shows strong progress in animation fundamentals',
-                'Consider studying reference footage for realistic motion',
-                'Excellent creative problem-solving in animation challenges'
-            ]
-        }
-    }
+  '2d-animation': {
+    courseType: '2D Animation',
+    version: '1.0',
+    gradingSettings: { maxPoints: 100 },
+    rubric: {
+      assignmentInfo: {
+        title: 'Animation Project',
+        description: 'Create a short animated clip',
+        weight: 25,
+        passingThreshold: 60,
+        totalPoints: 100,
+      },
+      rubricLevels: baseLevels,
+      criteria: [
+        { id: 'design', name: 'Animation Principles', description: 'Timing and spacing', maxPoints: 40 },
+        { id: 'technical', name: 'Technical Execution', description: 'File quality and format', maxPoints: 30 },
+        { id: 'story', name: 'Storytelling', description: 'Narrative and creativity', maxPoints: 30 },
+      ],
+    },
+    feedbackLibrary: {
+      strengths: ['Great timing', 'Smooth transitions'],
+      improvements: ['More anticipation', 'Check spacing'],
+      general: ['Good overall progress'],
+    },
+  },
+  '3d-modeling': {
+    courseType: '3D Modeling',
+    version: '1.0',
+    gradingSettings: { maxPoints: 100 },
+    rubric: {
+      assignmentInfo: {
+        title: 'Modeling Project',
+        description: 'Model a detailed object',
+        weight: 30,
+        passingThreshold: 60,
+        totalPoints: 100,
+      },
+      rubricLevels: baseLevels,
+      criteria: [
+        { id: 'topology', name: 'Topology', description: 'Clean edge flow', maxPoints: 35 },
+        { id: 'uv', name: 'UV Mapping', description: 'Efficient layout', maxPoints: 35 },
+        { id: 'texture', name: 'Texturing', description: 'Material and shading quality', maxPoints: 30 },
+      ],
+    },
+    feedbackLibrary: {
+      strengths: ['Clean topology', 'Good shading'],
+      improvements: ['Check UV stretching'],
+      general: ['Nice modelling work'],
+    },
+  },
 };
+
+const allowedVideoDomains = ['syncsketch', 'panopto', 'youtube.com', 'youtu.be', 'vimeo.com'];
 
 const GradingTemplate = () => {
-    // Get shared context
-    const {
-        sharedRubric,
-        sharedCourseDetails,
-        clearSharedRubric,
-        updateStudentInfo,
-        updateCourseInfo,
-        updateAssignmentInfo
-    } = useAssessment();
+  const {
+    sharedRubric,
+    sharedCourseDetails,
+    setSharedRubric,
+    transferRubricToGrading,
+    clearSharedRubric,
+    updateStudentInfo,
+    updateCourseInfo,
+    updateAssignmentInfo,
+  } = useAssessment();
 
-    // Current active course module
-    const [activeModule, setActiveModule] = useState("2d-animation");
-    const [customModules, setCustomModules] = useState({});
+  const defaultModule = Object.keys(courseModules)[0];
+  const [activeModule, setActiveModule] = useState(defaultModule);
+  const [loadedRubric, setLoadedRubric] = useState(courseModules[defaultModule].rubric);
+  const [rubricGrading, setRubricGrading] = useState({});
+  const [attachments, setAttachments] = useState([]);
+  const [videoLinks, setVideoLinks] = useState([]);
+  const [videoInput, setVideoInput] = useState('');
+  const [videoTitle, setVideoTitle] = useState('');
+  const [aiAssist, setAiAssist] = useState(false);
+  const jsonInputRef = useRef(null);
 
-    // All available modules (built-in + custom)
-    const allModules = { ...courseModules, ...customModules };
-    const currentModule = allModules[activeModule];
+  const [gradingData, setGradingData] = useState({
+    student: { name: '', id: '', email: '' },
+    course: { code: '', name: '', term: '' },
+    assignment: {
+      title: courseModules[defaultModule].rubric.assignmentInfo.title,
+      dueDate: '',
+      maxPoints: courseModules[defaultModule].gradingSettings.maxPoints,
+    },
+    feedback: { general: '', strengths: '', improvements: '' },
+    latePolicy: 'none',
+  });
 
-    // State for all grading data
-    const [gradingData, setGradingData] = useState({
-        student: {
-            name: sharedCourseDetails?.student?.name || '',
-            id: sharedCourseDetails?.student?.id || '',
-            email: sharedCourseDetails?.student?.email || ''
-        },
-        course: {
-            code: sharedCourseDetails?.course?.code || '',
-            name: sharedCourseDetails?.course?.name || '',
-            instructor: sharedCourseDetails?.course?.instructor || '',
-            term: sharedCourseDetails?.course?.term || ''
-        },
-        assignment: {
-            name: sharedCourseDetails?.assignment?.name || '',
-            dueDate: sharedCourseDetails?.assignment?.dueDate || '',
-            maxPoints: sharedCourseDetails?.assignment?.maxPoints || currentModule?.gradingSettings?.maxPoints || 100
-        },
-        rubric: currentModule?.rubric ? [...currentModule.rubric] : [],
-        feedback: {
-            general: '',
-            strengths: '',
-            improvements: ''
-        },
-        attachments: [],
-        videoLinks: [],
-        latePolicy: {
-            level: 'none', // 'none', 'within24', 'after24'
-            penaltyApplied: false
-        },
-        metadata: {
-            moduleUsed: activeModule,
-            moduleVersion: currentModule?.version || "1.0",
-            gradedBy: '',
-            gradedDate: '',
-            aiAssisted: false,
-            rubricIntegrated: !!sharedRubric
-        }
+  const initRubricGrading = (rubric) => {
+    const obj = {};
+    rubric.criteria.forEach((c) => {
+      obj[c.id] = { level: null, comments: '' };
     });
+    setRubricGrading(obj);
+  };
 
-    // Rubric-specific state initialized from any shared rubric
-    const initialRubricGrading = sharedRubric
-        ? Object.fromEntries(
-            sharedRubric.criteria.map(c => [
-                c.id,
-                { criterionId: c.id, selectedLevel: null, customComments: '' }
-            ])
-        )
-        : {};
-    const [loadedRubric, setLoadedRubric] = useState(sharedRubric);
-    const [rubricGrading, setRubricGrading] = useState(initialRubricGrading);
-    const [showRubricComments, setShowRubricComments] = useState({});
+  // Initialize with module rubric
+  useEffect(() => {
+    initRubricGrading(loadedRubric);
+    setSharedRubric(loadedRubric);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-    const fileInputRef = useRef(null);
-    const rubricInputRef = useRef(null);
-
-    // Video link management
-    const [videoLinkInput, setVideoLinkInput] = useState('');
-    const [videoTitle, setVideoTitle] = useState('');
-
-    // Late Policy Levels
-    const latePolicyLevels = {
-        none: {
-            name: 'On Time',
-            multiplier: 1.0,
-            description: 'Assignment submitted on or before due date and time - marked out of 100%',
-            color: '#16a34a'
+  // Update from shared rubric
+  useEffect(() => {
+    if (sharedRubric) {
+      setLoadedRubric(sharedRubric);
+      initRubricGrading(sharedRubric);
+      updateAssignmentInfo({
+        name: sharedRubric.assignmentInfo.title,
+        maxPoints: sharedRubric.assignmentInfo.totalPoints,
+      });
+      setGradingData((prev) => ({
+        ...prev,
+        assignment: {
+          ...prev.assignment,
+          title: sharedRubric.assignmentInfo.title,
+          maxPoints: sharedRubric.assignmentInfo.totalPoints,
         },
-        within24: {
-            name: '1-24 Hours Late',
-            multiplier: 0.8,
-            description: 'Assignment received within 24 hours of due date - 20% reduction (marked out of 80%)',
-            color: '#ea580c'
+      }));
+    }
+  }, [sharedRubric]);
+
+  // Update from shared course details
+  useEffect(() => {
+    if (sharedCourseDetails) {
+      setGradingData((prev) => ({
+        ...prev,
+        student: { ...prev.student, ...sharedCourseDetails.student },
+        course: { ...prev.course, ...sharedCourseDetails.course },
+      }));
+    }
+  }, [sharedCourseDetails]);
+
+  // Module change
+  useEffect(() => {
+    const mod = courseModules[activeModule];
+    if (mod) {
+      setLoadedRubric(mod.rubric);
+      setSharedRubric(mod.rubric);
+      initRubricGrading(mod.rubric);
+      updateAssignmentInfo({
+        name: mod.rubric.assignmentInfo.title,
+        maxPoints: mod.gradingSettings.maxPoints,
+      });
+      setGradingData((prev) => ({
+        ...prev,
+        assignment: {
+          ...prev.assignment,
+          title: mod.rubric.assignmentInfo.title,
+          maxPoints: mod.gradingSettings.maxPoints,
         },
-        after24: {
-            name: 'More than 24 Hours Late',
-            multiplier: 0.0,
-            description: 'Assignment received after 24 hours from due date - mark of zero (0)',
-            color: '#dc2626'
-        }
-    };
+      }));
+    }
+  }, [activeModule, setSharedRubric]);
 
-    // Sync with shared rubric when it changes
-    useEffect(() => {
-        if (sharedRubric) {
-            setLoadedRubric(sharedRubric);
+  const handleLevelChange = (id, level) => {
+    setRubricGrading((prev) => ({
+      ...prev,
+      [id]: { ...prev[id], level },
+    }));
+  };
 
-            const initialGrading = {};
-            sharedRubric.criteria.forEach(c => {
-                initialGrading[c.id] = { criterionId: c.id, selectedLevel: null, customComments: '' };
-            });
-            setRubricGrading(initialGrading);
+  const handleCommentChange = (id, text) => {
+    setRubricGrading((prev) => ({
+      ...prev,
+      [id]: { ...prev[id], comments: text },
+    }));
+  };
 
-            updateAssignmentInfo({
-                name: sharedRubric.assignmentInfo?.title || '',
-                maxPoints: sharedRubric.assignmentInfo?.totalPoints || 0
-            });
+  const totalRawScore = () => {
+    return loadedRubric.criteria.reduce((acc, c) => {
+      const grade = rubricGrading[c.id];
+      if (!grade || !grade.level) return acc;
+      const levelObj = loadedRubric.rubricLevels.find((l) => l.level === grade.level);
+      return acc + c.maxPoints * levelObj.multiplier;
+    }, 0);
+  };
 
-            setGradingData(prev => ({
-                ...prev,
-                assignment: {
-                    ...prev.assignment,
-                    name: sharedRubric.assignmentInfo?.title || '',
-                    maxPoints: sharedRubric.assignmentInfo?.totalPoints || prev.assignment.maxPoints
-                },
-                feedback: { general: '', strengths: '', improvements: '' },
-                attachments: [],
-                videoLinks: [],
-                latePolicy: { level: 'none', penaltyApplied: false },
-                metadata: { ...prev.metadata, rubricIntegrated: true }
-            }));
-        } else {
-            setLoadedRubric(null);
-            setRubricGrading({});
-            setGradingData(prev => ({
-                ...prev,
-                metadata: { ...prev.metadata, rubricIntegrated: false }
-            }));
-        }
-    }, [sharedRubric]);
+  const lateMultiplier = () => {
+    if (gradingData.latePolicy === 'none') return 1;
+    if (gradingData.latePolicy === 'within24') return 0.8;
+    return 0;
+  };
 
-    // Sync with shared course details
-    useEffect(() => {
-        if (sharedCourseDetails) {
-            setGradingData(prev => ({
-                ...prev,
-                student: {
-                    name: sharedCourseDetails.student?.name || prev.student.name,
-                    id: sharedCourseDetails.student?.id || prev.student.id,
-                    email: sharedCourseDetails.student?.email || prev.student.email
-                },
-                course: {
-                    code: sharedCourseDetails.course?.code || prev.course.code,
-                    name: sharedCourseDetails.course?.name || prev.course.name,
-                    instructor: sharedCourseDetails.course?.instructor || prev.course.instructor,
-                    term: sharedCourseDetails.course?.term || prev.course.term
-                },
-                assignment: {
-                    ...prev.assignment,
-                    name: sharedCourseDetails.assignment?.name || prev.assignment.name,
-                    dueDate: sharedCourseDetails.assignment?.dueDate || prev.assignment.dueDate
-                }
-            }));
-        }
-    }, [sharedCourseDetails]);
+  const finalScore = () => totalRawScore() * lateMultiplier();
 
-    // Calculate total score with late policy applied
-    const calculateTotalScore = () => {
-        let rawScore = 0;
+  const handleFileUpload = (files) => {
+    const list = Array.from(files).map((file) => ({
+      id: Date.now() + Math.random(),
+      file,
+      name: file.name,
+      type: file.type,
+      size: file.size,
+    }));
 
-        if (loadedRubric) {
-            // Calculate score from rubric grading
-            rawScore = Object.values(rubricGrading).reduce((total, grading) => {
-                const criterion = loadedRubric.criteria.find(c => c.id === grading.criterionId);
-                if (criterion && grading.selectedLevel) {
-                    const level = loadedRubric.rubricLevels.find(l => l.level === grading.selectedLevel);
-                    return total + (criterion.maxPoints * level.multiplier);
-                }
-                return total;
-            }, 0);
-        } else {
-            rawScore = gradingData.rubric.reduce((total, item) => total + item.score, 0);
-        }
-
-        // Apply late policy penalty
-        const latePolicyLevel = latePolicyLevels[gradingData.latePolicy.level];
-        const finalScore = rawScore * latePolicyLevel.multiplier;
-
-        return {
-            rawScore: rawScore,
-            finalScore: finalScore,
-            penaltyApplied: gradingData.latePolicy.level !== 'none',
-            latePolicyDescription: latePolicyLevel.description
-        };
-    };
-
-    // Update late policy
-    const updateLatePolicy = (level) => {
-        setGradingData(prev => ({
-            ...prev,
-            latePolicy: {
-                level: level,
-                penaltyApplied: level !== 'none'
+    Promise.all(
+      list.map(
+        (item) =>
+          new Promise((res) => {
+            if (item.type.startsWith('image/')) {
+              const reader = new FileReader();
+              reader.onload = (e) => {
+                item.base64 = e.target.result;
+                res(item);
+              };
+              reader.readAsDataURL(item.file);
+            } else {
+              res(item);
             }
-        }));
-    };
+          })
+      )
+    ).then((newList) => setAttachments((prev) => [...prev, ...newList]));
+  };
 
-    // Load rubric file (for external rubrics)
-    const loadRubric = (event) => {
-        const file = event.target.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                try {
-                    const rubricData = JSON.parse(e.target.result);
+  const removeAttachment = (id) => {
+    setAttachments((prev) => prev.filter((a) => a.id !== id));
+  };
 
-                    if (!rubricData.criteria || !rubricData.rubricLevels) {
-                        alert('Invalid rubric format. Please check the rubric structure.');
-                        return;
-                    }
+  const addVideoLink = () => {
+    if (!videoInput.trim()) return;
+    if (!allowedVideoDomains.some((d) => videoInput.includes(d))) {
+      alert('Unsupported video provider');
+      return;
+    }
+    setVideoLinks((prev) => [
+      ...prev,
+      { id: Date.now(), url: videoInput.trim(), title: videoTitle || 'Video' },
+    ]);
+    setVideoInput('');
+    setVideoTitle('');
+  };
 
-                    setLoadedRubric(rubricData);
+  const removeVideo = (id) => setVideoLinks((prev) => prev.filter((v) => v.id !== id));
 
-                    // Initialize rubric grading state
-                    const initialGrading = {};
-                    rubricData.criteria.forEach(criterion => {
-                        initialGrading[criterion.id] = {
-                            criterionId: criterion.id,
-                            selectedLevel: null,
-                            customComments: ''
-                        };
-                    });
-                    setRubricGrading(initialGrading);
+  const generateHTML = () => {
+    const score = finalScore().toFixed(1);
+    const raw = totalRawScore().toFixed(1);
+    const max = loadedRubric.assignmentInfo.totalPoints;
+    const percentage = ((score / max) * 100).toFixed(1);
 
-                    // Update assignment details if provided
-                    if (rubricData.assignmentInfo) {
-                        setGradingData(prev => ({
-                            ...prev,
-                            assignment: {
-                                ...prev.assignment,
-                                name: rubricData.assignmentInfo.title || prev.assignment.name,
-                                maxPoints: rubricData.assignmentInfo.totalPoints || prev.assignment.maxPoints
-                            },
-                            metadata: {
-                                ...prev.metadata,
-                                rubricIntegrated: false // This is an external rubric
-                            }
-                        }));
-                    }
+    const rubricRows = loadedRubric.criteria
+      .map((c) => {
+        const g = rubricGrading[c.id];
+        const level = g && g.level ? loadedRubric.rubricLevels.find((l) => l.level === g.level) : null;
+        const pts = level ? (c.maxPoints * level.multiplier).toFixed(1) : '0';
+        return `<tr><td>${c.name}</td><td>${c.maxPoints}</td><td>${level ? level.name : ''}</td><td>${pts}</td><td>${g?.comments || ''}</td></tr>`;
+      })
+      .join('');
 
-                } catch (error) {
-                    alert('Error loading rubric. Please check the JSON format.');
-                }
-            };
-            reader.readAsText(file);
+    const attachHTML = attachments
+      .map((att) => {
+        if (att.type.startsWith('image/')) {
+          return `<img src="${att.base64}" alt="${att.name}" style="max-width:300px;margin:10px;"/>`;
         }
+        return `<div>${att.name}</div>`;
+      })
+      .join('');
+
+    const videoHTML = videoLinks
+      .map((v) => `<div><strong>${v.title}</strong><br/><iframe src="${v.url}" width="480" height="270"></iframe></div>`) 
+      .join('');
+
+    return `<!DOCTYPE html><html><head><meta charset="UTF-8" /><title>Grade Report</title></head><body>
+<h1>Grade Report</h1>
+<p><strong>Student:</strong> ${gradingData.student.name}</p>
+<p><strong>Course:</strong> ${gradingData.course.code} - ${gradingData.course.name}</p>
+<p><strong>Assignment:</strong> ${gradingData.assignment.title}</p>
+<table border="1" cellpadding="5" cellspacing="0"><thead><tr><th>Criterion</th><th>Max</th><th>Level</th><th>Score</th><th>Comments</th></tr></thead><tbody>${rubricRows}</tbody></table>
+<p><strong>Raw Score:</strong> ${raw} / ${max}</p>
+<p><strong>Final Score:</strong> ${score} (${percentage}%)</p>
+${gradingData.latePolicy !== 'none' ? `<p>Late penalty applied.</p>` : ''}
+${attachHTML}
+${videoHTML}
+<p>Generated on ${new Date().toLocaleString()}</p>
+</body></html>`;
+  };
+
+  const exportHTML = () => {
+    const html = generateHTML();
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'grade_report.html';
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportPDF = () => {
+    const html = generateHTML();
+    generatePDF(html);
+  };
+
+  const saveJSON = () => {
+    const data = {
+      gradingData,
+      rubricGrading,
+      rubricInfo: loadedRubric,
+      attachments,
+      videoLinks,
+      aiAssist,
     };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'grading_data.json';
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
-    // Clear loaded rubric and reset state
-    const clearRubric = () => {
-        clearSharedRubric();
-        setLoadedRubric(null);
-        setRubricGrading({});
-        setGradingData(prev => ({
-            ...prev,
-            feedback: { general: '', strengths: '', improvements: '' },
-            attachments: [],
-            videoLinks: [],
-            latePolicy: { level: 'none', penaltyApplied: false },
-            metadata: { ...prev.metadata, rubricIntegrated: false }
-        }));
-    };
-
-    // Update rubric grading
-    const updateRubricGrading = (criterionId, level, comments = null) => {
-        setRubricGrading(prev => {
-            const existingGrading = prev[criterionId];
-            const existingComments = existingGrading?.customComments || '';
-
-            return {
-                ...prev,
-                [criterionId]: {
-                    criterionId,
-                    selectedLevel: level,
-                    customComments: comments !== null ? comments : existingComments
-                }
-            };
-        });
-    };
-
-    // Handle file uploads
-    const handleFileUpload = (files) => {
-        const newAttachments = Array.from(files).map(file => ({
-            id: Date.now() + Math.random(),
-            name: file.name,
-            size: file.size,
-            type: file.type,
-            file: file
-        }));
-
-        Promise.all(newAttachments.map(attachment => {
-            return new Promise((resolve) => {
-                if (attachment.type.startsWith('image/')) {
-                    const reader = new FileReader();
-                    reader.onload = (e) => {
-                        attachment.base64Data = e.target.result;
-                        resolve(attachment);
-                    };
-                    reader.readAsDataURL(attachment.file);
-                } else {
-                    resolve(attachment);
-                }
-            });
-        })).then(processedAttachments => {
-            setGradingData(prev => ({
-                ...prev,
-                attachments: [...prev.attachments, ...processedAttachments]
-            }));
-        });
-    };
-
-    // Remove attachment
-    const removeAttachment = (id) => {
-        setGradingData(prev => ({
-            ...prev,
-            attachments: prev.attachments.filter(att => att.id !== id)
-        }));
-    };
-
-    // Add video link
-    const addVideoLink = () => {
-        if (videoLinkInput.trim()) {
-            setGradingData(prev => ({
-                ...prev,
-                videoLinks: [...prev.videoLinks, {
-                    id: Date.now(),
-                    url: videoLinkInput.trim(),
-                    title: videoTitle.trim() || 'Video Link'
-                }]
-            }));
-            setVideoLinkInput('');
-            setVideoTitle('');
+  const loadJSON = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        if (data.rubricInfo) {
+          setLoadedRubric(data.rubricInfo);
+          initRubricGrading(data.rubricInfo);
         }
+        setGradingData(data.gradingData || gradingData);
+        setAttachments(data.attachments || []);
+        setVideoLinks(data.videoLinks || []);
+      } catch (err) {
+        alert('Invalid JSON file');
+      }
     };
+    reader.readAsText(file);
+  };
 
-    // Remove video link
-    const removeVideoLink = (id) => {
-        setGradingData(prev => ({
-            ...prev,
-            videoLinks: prev.videoLinks.filter(link => link.id !== id)
-        }));
-    };
+  const clearRubric = () => {
+    clearSharedRubric();
+    setLoadedRubric(null);
+    setRubricGrading({});
+  };
 
-    // Export to HTML for D2L
-    const exportToHTML = () => {
-        const scoreCalculation = calculateTotalScore();
-        const totalScore = scoreCalculation.finalScore;
-        const rawScore = scoreCalculation.rawScore;
-        const maxPoints = loadedRubric ? loadedRubric.assignmentInfo.totalPoints : gradingData.assignment.maxPoints;
-        const percentage = ((totalScore / maxPoints) * 100).toFixed(1);
-        const penaltyApplied = scoreCalculation.penaltyApplied;
-
-        // Generate rubric table HTML if rubric is loaded
-        const rubricTableHTML = loadedRubric ? `
-    <div class="rubric-section" style="margin-top: 30px;">
-        <h3>📋 Detailed Rubric Assessment</h3>
-        <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-            <strong>Assignment:</strong> ${loadedRubric.assignmentInfo.title}<br>
-            <strong>Weight:</strong> ${loadedRubric.assignmentInfo.weight}% of Final Grade<br>
-            <strong>Passing Threshold:</strong> ${loadedRubric.assignmentInfo.passingThreshold}%  
+  return (
+    <div className="p-6 space-y-6">
+      {/* Header Bar */}
+      <div className="bg-white rounded-lg shadow-sm p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <select
+            className="border rounded p-2"
+            value={activeModule}
+            onChange={(e) => setActiveModule(e.target.value)}
+          >
+            {Object.entries(courseModules).map(([key, mod]) => (
+              <option key={key} value={key}>
+                {mod.courseType}
+              </option>
+            ))}
+          </select>
+          <span className="text-sm text-gray-600">v{courseModules[activeModule].version}</span>
+          <button
+            onClick={() => setAiAssist((v) => !v)}
+            className={`ml-4 p-2 rounded-full border ${aiAssist ? 'bg-blue-600 text-white' : 'bg-gray-50 text-gray-600'}`}
+          >
+            <Bot size={18} />
+          </button>
         </div>
-        
-        <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px; font-size: 0.9rem;">
+        <div className="flex gap-3">
+          <input type="file" accept=".json" ref={jsonInputRef} onChange={loadJSON} className="hidden" />
+          <button onClick={() => jsonInputRef.current?.click()} className="flex items-center gap-1 border px-3 py-2 rounded hover:bg-gray-100">
+            <Upload size={16} /> Load Rubric JSON
+          </button>
+          <button onClick={saveJSON} className="flex items-center gap-1 border px-3 py-2 rounded hover:bg-gray-100">
+            <Save size={16} /> Save Grading JSON
+          </button>
+          <button onClick={exportHTML} className="flex items-center gap-1 border px-3 py-2 rounded hover:bg-gray-100">
+            <FileDown size={16} /> Export HTML Report
+          </button>
+          <button onClick={exportPDF} className="flex items-center gap-1 border px-3 py-2 rounded hover:bg-gray-100">
+            <Download size={16} /> Export PDF
+          </button>
+          <button onClick={() => transferRubricToGrading(loadedRubric)} className="flex items-center gap-1 border px-3 py-2 rounded hover:bg-gray-100">
+            <ArrowRight size={16} /> Transfer to Grading
+          </button>
+        </div>
+      </div>
+
+      {/* Student & Assignment Info */}
+      <div className="bg-white rounded-lg shadow-sm p-4 space-y-4">
+        <h2 className="text-lg font-semibold">Student & Course Info</h2>
+        <div className="grid md:grid-cols-3 gap-3">
+          <input
+            type="text"
+            placeholder="Student Name"
+            value={gradingData.student.name}
+            onChange={(e) => {
+              const val = e.target.value;
+              setGradingData((p) => ({ ...p, student: { ...p.student, name: val } }));
+              updateStudentInfo({ name: val });
+            }}
+            className="border rounded p-2"
+          />
+          <input
+            type="text"
+            placeholder="Student ID"
+            value={gradingData.student.id}
+            onChange={(e) => {
+              const val = e.target.value;
+              setGradingData((p) => ({ ...p, student: { ...p.student, id: val } }));
+              updateStudentInfo({ id: val });
+            }}
+            className="border rounded p-2"
+          />
+          <input
+            type="email"
+            placeholder="Student Email"
+            value={gradingData.student.email}
+            onChange={(e) => {
+              const val = e.target.value;
+              setGradingData((p) => ({ ...p, student: { ...p.student, email: val } }));
+              updateStudentInfo({ email: val });
+            }}
+            className="border rounded p-2"
+          />
+        </div>
+        <div className="grid md:grid-cols-3 gap-3">
+          <input
+            type="text"
+            placeholder="Course Code"
+            value={gradingData.course.code}
+            onChange={(e) => {
+              const val = e.target.value;
+              setGradingData((p) => ({ ...p, course: { ...p.course, code: val } }));
+              updateCourseInfo({ code: val });
+            }}
+            className="border rounded p-2"
+          />
+          <input
+            type="text"
+            placeholder="Course Name"
+            value={gradingData.course.name}
+            onChange={(e) => {
+              const val = e.target.value;
+              setGradingData((p) => ({ ...p, course: { ...p.course, name: val } }));
+              updateCourseInfo({ name: val });
+            }}
+            className="border rounded p-2"
+          />
+          <input
+            type="text"
+            placeholder="Term"
+            value={gradingData.course.term}
+            onChange={(e) => {
+              const val = e.target.value;
+              setGradingData((p) => ({ ...p, course: { ...p.course, term: val } }));
+              updateCourseInfo({ term: val });
+            }}
+            className="border rounded p-2"
+          />
+        </div>
+        <div className="grid md:grid-cols-3 gap-3">
+          <input
+            type="text"
+            placeholder="Assignment Title"
+            value={gradingData.assignment.title}
+            onChange={(e) => {
+              const val = e.target.value;
+              setGradingData((p) => ({ ...p, assignment: { ...p.assignment, title: val } }));
+              updateAssignmentInfo({ name: val });
+            }}
+            className="border rounded p-2"
+          />
+          <input
+            type="date"
+            value={gradingData.assignment.dueDate}
+            onChange={(e) => {
+              const val = e.target.value;
+              setGradingData((p) => ({ ...p, assignment: { ...p.assignment, dueDate: val } }));
+              updateAssignmentInfo({ dueDate: val });
+            }}
+            className="border rounded p-2"
+          />
+          <input
+            type="number"
+            value={gradingData.assignment.maxPoints}
+            onChange={(e) => {
+              const val = parseInt(e.target.value) || 0;
+              setGradingData((p) => ({ ...p, assignment: { ...p.assignment, maxPoints: val } }));
+              updateAssignmentInfo({ maxPoints: val });
+            }}
+            className="border rounded p-2"
+          />
+        </div>
+      </div>
+
+      {/* Rubric Table */}
+      {loadedRubric && (
+        <div className="bg-white rounded-lg shadow-sm p-4 space-y-4">
+          <h2 className="text-lg font-semibold">Rubric Assessment</h2>
+          <table className="w-full text-sm border">
             <thead>
-                <tr style="background: #2c3e50; color: white;">
-                    <th style="border: 1px solid #ddd; padding: 12px; text-align: left;">Criterion</th>
-                    <th style="border: 1px solid #ddd; padding: 12px; text-align: center;">Max Points</th>
-                    <th style="border: 1px solid #ddd; padding: 12px; text-align: center;">Level Achieved</th>
-                    <th style="border: 1px solid #ddd; padding: 12px; text-align: center;">Points Earned</th>
-                    <th style="border: 1px solid #ddd; padding: 12px; text-align: left;">Comments</th>
-                </tr>
+              <tr className="bg-gray-100">
+                <th className="border p-2 text-left">Criterion</th>
+                <th className="border p-2 text-center">Max</th>
+                <th className="border p-2 text-center">Level</th>
+                <th className="border p-2 text-center">Score</th>
+                <th className="border p-2 text-left">Comments</th>
+              </tr>
             </thead>
             <tbody>
-                ${loadedRubric.criteria.map(criterion => {
-            const grading = rubricGrading[criterion.id];
-            const level = grading?.selectedLevel ? loadedRubric.rubricLevels.find(l => l.level === grading.selectedLevel) : null;
-            const points = level ? (criterion.maxPoints * level.multiplier).toFixed(1) : '0';
-            return `
-                        <tr>
-                            <td style="border: 1px solid #ddd; padding: 8px; vertical-align: top;">
-                                <strong>${criterion.name}</strong><br>
-                                <small style="color: #666;">${criterion.description}</small>
-                            </td>
-                            <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${criterion.maxPoints}</td>
-                            <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${level ? level.name : 'Not Assessed'}</td>
-                            <td style="border: 1px solid #ddd; padding: 8px; text-align: center; font-weight: bold;">${points}</td>
-                            <td style="border: 1px solid #ddd; padding: 8px;">${grading?.customComments || 'No additional comments'}</td>
-                        </tr>
-                    `;
-        }).join('')}
+              {loadedRubric.criteria.map((c) => {
+                const grade = rubricGrading[c.id] || {};
+                const levelObj = grade.level && loadedRubric.rubricLevels.find((l) => l.level === grade.level);
+                const points = levelObj ? (c.maxPoints * levelObj.multiplier).toFixed(1) : '0';
+                return (
+                  <tr key={c.id} className="border-b">
+                    <td className="border p-2">
+                      <div className="font-medium">{c.name}</div>
+                      <div className="text-xs text-gray-500">{c.description}</div>
+                    </td>
+                    <td className="border p-2 text-center">{c.maxPoints}</td>
+                    <td className="border p-2 text-center">
+                      <select
+                        value={grade.level || ''}
+                        onChange={(e) => handleLevelChange(c.id, e.target.value)}
+                        className="border rounded p-1"
+                      >
+                        <option value="">-</option>
+                        {loadedRubric.rubricLevels.map((l) => (
+                          <option key={l.level} value={l.level} style={{ backgroundColor: l.color }}>
+                            {l.name}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="border p-2 text-center">{points}</td>
+                    <td className="border p-2">
+                      <textarea
+                        value={grade.comments || ''}
+                        onChange={(e) => handleCommentChange(c.id, e.target.value)}
+                        className="w-full border rounded p-1 text-sm"
+                        rows="2"
+                      />
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
-        </table>
-    </div>
-        ` : '';
-
-        const htmlContent = `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Grade Report - ${gradingData.student.name}</title>
-    <style>
-        body { font-family: Arial, sans-serif; max-width: 800px; margin: 20px auto; padding: 20px; line-height: 1.6; }
-        .header { background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 30px; }
-        .score-summary { background: #e8f5e8; border: 2px solid #4caf50; border-radius: 8px; padding: 20px; margin: 20px 0; text-align: center; }
-        .late-policy-section { margin: 30px 0; background: #fff5f5; border: 1px solid #f87171; border-radius: 8px; padding: 20px; }
-        .feedback-section { margin: 20px 0; padding: 15px; background: #f9f9f9; border-radius: 8px; }
-        .attachments { margin: 20px 0; }
-        .attachment-item { display: inline-block; background: #e3f2fd; padding: 8px 12px; margin: 4px; border-radius: 4px; }
-        .image-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 15px; }
-        .image-card { border: 1px solid #ddd; border-radius: 8px; overflow: hidden; }
-        .image-info { padding: 10px; background: #f8f9fa; }
-        .image-name { font-weight: bold; margin: 0; }
-        .image-size { margin: 5px 0 0 0; color: #666; font-size: 0.8rem; }
-        h1, h2, h3 { color: #333; }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        th { background-color: #f2f2f2; }
-    </style>
-</head>
-<body>
-    <div class="header">
-        <h1>📋 Grade Report</h1>
-        <p><strong>Student:</strong> ${gradingData.student.name} (${gradingData.student.id})</p>
-        <p><strong>Course:</strong> ${gradingData.course.code} - ${gradingData.course.name}</p>
-        <p><strong>Assignment:</strong> ${gradingData.assignment.name}</p>
-        <p><strong>Instructor:</strong> ${gradingData.course.instructor}</p>
-        <p><strong>Term:</strong> ${gradingData.course.term}</p>
-    </div>
-
-    <div class="score-summary">
-        <h2>📊 Final Score</h2>
-        <div style="font-size: 2rem; font-weight: bold; color: #2e7d32; margin: 15px 0;">
-            ${totalScore.toFixed(1)} / ${maxPoints} (${percentage}%)
+          </table>
+          <div className="text-right font-semibold">Raw Score: {totalRawScore().toFixed(1)} / {loadedRubric.assignmentInfo.totalPoints}</div>
         </div>
-        <p style="margin: 10px 0; color: #555;">
-            ${loadedRubric ? `Rubric: ${loadedRubric.assignmentInfo.title}` : `Module: ${currentModule?.courseType} v${currentModule?.version || '1.0'}`}
-            ${penaltyApplied ? ` | Late Policy: ${latePolicyLevels[gradingData.latePolicy.level].name}` : ''}
-        </p>
+      )}
+
+      {/* Late Policy */}
+      <div className="bg-white rounded-lg shadow-sm p-4 space-y-2">
+        <h2 className="text-lg font-semibold">Late Submission Policy</h2>
+        <div className="flex flex-col md:flex-row gap-3">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="radio" name="late" value="none" checked={gradingData.latePolicy === 'none'} onChange={() => setGradingData((p) => ({ ...p, latePolicy: 'none' }))} />
+            On Time
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="radio" name="late" value="within24" checked={gradingData.latePolicy === 'within24'} onChange={() => setGradingData((p) => ({ ...p, latePolicy: 'within24' }))} />
+            Within 24 Hours (×0.8)
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="radio" name="late" value="after24" checked={gradingData.latePolicy === 'after24'} onChange={() => setGradingData((p) => ({ ...p, latePolicy: 'after24' }))} />
+            After 24 Hours (×0)
+          </label>
+        </div>
+        <div className="text-sm text-gray-500">Final Score: {finalScore().toFixed(1)}</div>
+      </div>
+
+      {/* Attachments */}
+      <div className="bg-white rounded-lg shadow-sm p-4 space-y-3">
+        <h2 className="text-lg font-semibold">Attachments</h2>
+        <input type="file" multiple onChange={(e) => handleFileUpload(e.target.files)} className="border p-2 rounded" />
+        {attachments.length > 0 && (
+          <div className="space-y-2">
+            {attachments.map((att) => (
+              <div key={att.id} className="flex items-center gap-2 text-sm border p-2 rounded">
+                <FileText size={14} />
+                <span className="flex-1">{att.name}</span>
+                <button onClick={() => removeAttachment(att.id)} className="text-red-600">
+                  <X size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Video Links */}
+      <div className="bg-white rounded-lg shadow-sm p-4 space-y-3">
+        <h2 className="text-lg font-semibold">Video Links</h2>
+        <div className="flex flex-col md:flex-row gap-2">
+          <input
+            type="url"
+            placeholder="Video URL"
+            value={videoInput}
+            onChange={(e) => setVideoInput(e.target.value)}
+            className="border p-2 rounded flex-1"
+          />
+          <input
+            type="text"
+            placeholder="Title"
+            value={videoTitle}
+            onChange={(e) => setVideoTitle(e.target.value)}
+            className="border p-2 rounded flex-1"
+          />
+          <button onClick={addVideoLink} className="border px-3 py-2 rounded bg-blue-50 flex items-center gap-1">
+            <Plus size={16} /> Add
+          </button>
+        </div>
+        {videoLinks.length > 0 && (
+          <div className="space-y-2">
+            {videoLinks.map((v) => (
+              <div key={v.id} className="flex items-center gap-2 text-sm border p-2 rounded">
+                <Video size={14} />
+                <span className="flex-1">{v.title}</span>
+                <button onClick={() => removeVideo(v.id)} className="text-red-600">
+                  <X size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Clear Rubric */}
+      <div className="text-right">
+        {loadedRubric && (
+          <button onClick={clearRubric} className="mt-2 px-3 py-2 border rounded text-red-600">
+            Clear Rubric
+          </button>
+        )}
+      </div>
     </div>
-
-    ${penaltyApplied ? `
-    <div class="late-policy-section">
-        <h3 style="color: #dc2626; border-bottom: 1px solid #f87171; padding-bottom: 5px;">📅 Late Submission Policy Applied</h3>
-        <div style="margin-top: 15px;">
-            <h4 style="color: #991b1b; margin-bottom: 10px;">Policy Status: ${latePolicyLevels[gradingData.latePolicy.level].name}</h4>
-            <p style="margin-bottom: 15px; color: #7f1d1d;">${latePolicyLevels[gradingData.latePolicy.level].description}</p>
-            
-            <div style="background: white; border: 1px solid #fecaca; border-radius: 6px; padding: 15px;">
-                <h5 style="margin: 0 0 10px 0; color: #991b1b;">Institutional Late Assignment Policy:</h5>
-                <ul style="margin: 0; padding-left: 20px; color: #7f1d1d; font-size: 0.9rem;">
-                    <li style="margin-bottom: 5px;"><strong>On Time:</strong> Assignments submitted on or before due date and time are marked out of 100%</li>
-                    <li style="margin-bottom: 5px;"><strong>1-24 Hours Late:</strong> Assignments receive a 20% reduction and are marked out of 80%</li>
-                    <li style="margin-bottom: 5px;"><strong>After 24 Hours:</strong> Assignments receive a mark of zero (0)</li>
-                </ul>
-            </div>
-        </div>
-    </div>
-    ` : ''}
-
-    ${rubricTableHTML}
-    
-    ${Object.entries(gradingData.feedback).filter(([key, value]) => value).map(([key, value]) => `
-        <div class="feedback-section">
-            <h3>${key.charAt(0).toUpperCase() + key.slice(1)} Feedback</h3>
-            <p>${value.replace(/\n/g, '<br>')}</p>
-        </div>
-    `).join('')}
-    
-    ${gradingData.attachments.length > 0 ? `
-    <div class="attachments">
-        <h3>File Attachments</h3>
-        ${gradingData.attachments.filter(att => !att.type.startsWith('image/')).map(att => `<span class="attachment-item">${att.name}</span>`).join('')}
-        
-        ${gradingData.attachments.filter(att => att.type.startsWith('image/')).length > 0 ? `
-        <div style="margin-top: 20px;">
-            <h4>📸 Images (${gradingData.attachments.filter(att => att.type.startsWith('image/')).length})</h4>
-            <div class="image-grid">
-                ${gradingData.attachments
-                        .filter(att => att.type.startsWith('image/'))
-                        .map(att => `
-                    <div class="image-card">
-                        <div style="background: #f9f9f9; display: flex; align-items: center; justify-content: center; min-height: 150px;">
-                            <img src="${att.base64Data || att.url}" alt="${att.name}" style="max-width: 100%; max-height: 150px; object-fit: contain;">
-                        </div>
-                        <div class="image-info">
-                            <p class="image-name">${att.name}</p>
-                            <p class="image-size">${(att.size / 1024).toFixed(1)} KB</p>
-                        </div>
-                    </div>
-                `).join('')}
-            </div>
-        </div>
-        ` : ''}
-    </div>
-    ` : ''}
-
-    <p style="margin-top: 40px; text-align: center; color: #666; font-size: 0.9rem;">
-        Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}
-    </p>
-</body>
-</html>`;
-
-        const htmlBlob = new Blob([htmlContent], { type: 'text/html' });
-        const url = URL.createObjectURL(htmlBlob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `grade_report_${gradingData.student.name || 'student'}_${gradingData.assignment.name || 'assignment'}.html`;
-        link.click();
-        URL.revokeObjectURL(url);
-    };
-
-    // Save grading data to JSON
-    const saveToJSON = () => {
-        const dataToSave = {
-            ...gradingData,
-            rubricData: loadedRubric ? {
-                rubricInfo: loadedRubric,
-                rubricGrading: rubricGrading
-            } : null,
-            timestamp: new Date().toISOString()
-        };
-
-        const jsonBlob = new Blob([JSON.stringify(dataToSave, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(jsonBlob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `grading_data_${gradingData.student.name || 'student'}_${gradingData.assignment.name || 'assignment'}.json`;
-        link.click();
-        URL.revokeObjectURL(url);
-    };
-
-    // Load grading data from JSON
-    const loadFromJSON = (event) => {
-        const file = event.target.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                try {
-                    const loadedData = JSON.parse(e.target.result);
-                    setGradingData(loadedData);
-
-                    // Handle rubric data if present
-                    if (loadedData.rubricData) {
-                        setLoadedRubric(loadedData.rubricData.rubricInfo);
-                        setRubricGrading(loadedData.rubricData.rubricGrading || {});
-                    }
-
-                    if (loadedData.metadata?.moduleUsed && allModules[loadedData.metadata.moduleUsed]) {
-                        setActiveModule(loadedData.metadata.moduleUsed);
-                    }
-                } catch (error) {
-                    alert('Error loading file. Please check the JSON format.');
-                }
-            };
-            reader.readAsText(file);
-        }
-    };
-
-    return (
-        <div className="min-h-screen bg-gray-50 p-6">
-            <div className="max-w-6xl mx-auto">
-                {/* Header */}
-                <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <h1 className="text-3xl font-bold text-gray-900">📋 Grading Template</h1>
-                            <p className="text-gray-600">Streamlined grading with late policy enforcement</p>
-                            {sharedRubric && (
-                                <p className="text-green-600 font-medium mt-1">
-                                    ✓ Using shared rubric: {sharedRubric.assignmentInfo?.title}
-                                </p>
-                            )}
-                        </div>
-                        <div className="flex gap-3">
-                            <button
-                                onClick={saveToJSON}
-                                className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-                            >
-                                <Save size={20} />
-                                Save Progress
-                            </button>
-                            <button
-                                onClick={exportToHTML}
-                                className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
-                            >
-                                <FileDown size={20} />
-                                Export Report
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-                    {/* Main Content */}
-                    <div className="xl:col-span-2 space-y-6">
-
-                        {/* Course Information */}
-                        <div className="bg-white rounded-lg shadow-sm p-6">
-                            <h2 className="text-xl font-semibold text-gray-800 mb-4">Course Information</h2>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                                <input
-                                    type="text"
-                                    placeholder="Course Code (e.g., ART101)"
-                                    value={gradingData.course.code}
-                                    onChange={(e) => {
-                                        const newValue = e.target.value;
-                                        setGradingData(prev => ({
-                                            ...prev,
-                                            course: { ...prev.course, code: newValue }
-                                        }));
-                                        updateCourseInfo({ code: newValue });
-                                    }}
-                                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                />
-                                <input
-                                    type="text"
-                                    placeholder="Course Name"
-                                    value={gradingData.course.name}
-                                    onChange={(e) => {
-                                        const newValue = e.target.value;
-                                        setGradingData(prev => ({
-                                            ...prev,
-                                            course: { ...prev.course, name: newValue }
-                                        }));
-                                        updateCourseInfo({ name: newValue });
-                                    }}
-                                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                />
-                                <input
-                                    type="text"
-                                    placeholder="Instructor Name"
-                                    value={gradingData.course.instructor}
-                                    onChange={(e) => {
-                                        const newValue = e.target.value;
-                                        setGradingData(prev => ({
-                                            ...prev,
-                                            course: { ...prev.course, instructor: newValue }
-                                        }));
-                                        updateCourseInfo({ instructor: newValue });
-                                    }}
-                                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                />
-                                <input
-                                    type="text"
-                                    placeholder="Term (e.g., Fall 2024)"
-                                    value={gradingData.course.term}
-                                    onChange={(e) => {
-                                        const newValue = e.target.value;
-                                        setGradingData(prev => ({
-                                            ...prev,
-                                            course: { ...prev.course, term: newValue }
-                                        }));
-                                        updateCourseInfo({ term: newValue });
-                                    }}
-                                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                />
-                            </div>
-
-                            <h3 className="text-lg font-semibold text-gray-800 mb-3">Student Information</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <input
-                                    type="text"
-                                    placeholder="Student Name"
-                                    value={gradingData.student.name}
-                                    onChange={(e) => {
-                                        const newValue = e.target.value;
-                                        setGradingData(prev => ({
-                                            ...prev,
-                                            student: { ...prev.student, name: newValue }
-                                        }));
-                                        updateStudentInfo({ name: newValue });
-                                    }}
-                                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                />
-                                <input
-                                    type="text"
-                                    placeholder="Student ID"
-                                    value={gradingData.student.id}
-                                    onChange={(e) => {
-                                        const newValue = e.target.value;
-                                        setGradingData(prev => ({
-                                            ...prev,
-                                            student: { ...prev.student, id: newValue }
-                                        }));
-                                        updateStudentInfo({ id: newValue });
-                                    }}
-                                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                />
-                                <input
-                                    type="email"
-                                    placeholder="Student Email"
-                                    value={gradingData.student.email}
-                                    onChange={(e) => {
-                                        const newValue = e.target.value;
-                                        setGradingData(prev => ({
-                                            ...prev,
-                                            student: { ...prev.student, email: newValue }
-                                        }));
-                                        updateStudentInfo({ email: newValue });
-                                    }}
-                                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                />
-                            </div>
-
-                            <h3 className="text-lg font-semibold text-gray-800 mb-3 mt-6">Assignment Details</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <input
-                                    type="text"
-                                    placeholder="Assignment Name"
-                                    value={gradingData.assignment.name}
-                                    onChange={(e) => {
-                                        const newValue = e.target.value;
-                                        setGradingData(prev => ({
-                                            ...prev,
-                                            assignment: { ...prev.assignment, name: newValue }
-                                        }));
-                                        updateAssignmentInfo({ name: newValue });
-                                    }}
-                                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                />
-                                <input
-                                    type="date"
-                                    placeholder="Due Date"
-                                    value={gradingData.assignment.dueDate}
-                                    onChange={(e) => {
-                                        const newValue = e.target.value;
-                                        setGradingData(prev => ({
-                                            ...prev,
-                                            assignment: { ...prev.assignment, dueDate: newValue }
-                                        }));
-                                        updateAssignmentInfo({ dueDate: newValue });
-                                    }}
-                                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                />
-                                <input
-                                    type="number"
-                                    placeholder="Max Points"
-                                    value={gradingData.assignment.maxPoints}
-                                    onChange={(e) => {
-                                        const newValue = parseInt(e.target.value) || 0;
-                                        setGradingData(prev => ({
-                                            ...prev,
-                                            assignment: { ...prev.assignment, maxPoints: newValue }
-                                        }));
-                                        updateAssignmentInfo({ maxPoints: newValue });
-                                    }}
-                                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                />
-                            </div>
-                        </div>
-
-                        {/* Shared Rubric Section */}
-                        {loadedRubric && (
-                            <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 p-6 rounded-lg">
-                                <div className="flex justify-between items-start mb-4">
-                                    <div>
-                                        <h3 className="text-lg font-bold text-green-800 mb-2">📋 Active Assignment Rubric</h3>
-                                        <p className="text-green-700 font-semibold">{loadedRubric.assignmentInfo.title}</p>
-                                        <p className="text-sm text-green-600">{loadedRubric.assignmentInfo.description}</p>
-                                    </div>
-                                    <div className="text-right">
-                                        <div className="text-sm text-green-600">
-                                            <p><strong>Weight:</strong> {loadedRubric.assignmentInfo.weight}% of Final Grade</p>
-                                            <p><strong>Passing:</strong> {loadedRubric.assignmentInfo.passingThreshold}%</p>
-                                            <p><strong>Total Points:</strong> {loadedRubric.assignmentInfo.totalPoints}</p>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Rubric Grading Interface */}
-                                <div className="space-y-6">
-                                    {loadedRubric.criteria.map((criterion) => {
-                                        const currentGrading = rubricGrading[criterion.id];
-                                        const showComments = showRubricComments[criterion.id];
-
-                                        return (
-                                            <div key={criterion.id} className="bg-white border border-gray-200 rounded-lg p-5 shadow-sm">
-                                                <div className="flex justify-between items-start mb-4">
-                                                    <div className="flex-1">
-                                                        <h4 className="text-lg font-semibold text-gray-800">
-                                                            {criterion.name}
-                                                            <span className="text-blue-600 ml-2">({criterion.maxPoints} pts)</span>
-                                                        </h4>
-                                                        <p className="text-sm text-gray-600 mt-1">{criterion.description}</p>
-                                                    </div>
-                                                </div>
-
-                                                {/* Level Selection */}
-                                                <div className="grid grid-cols-1 md:grid-cols-7 gap-2 mb-4">
-                                                    {loadedRubric.rubricLevels.map((level) => {
-                                                        const isSelected = currentGrading?.selectedLevel === level.level;
-                                                        const points = Math.round(criterion.maxPoints * level.multiplier);
-
-                                                        return (
-                                                            <button
-                                                                key={level.level}
-                                                                onClick={() => updateRubricGrading(criterion.id, level.level)}
-                                                                className={`p-3 rounded-lg border-2 text-sm font-medium transition-all ${isSelected
-                                                                    ? 'border-current text-white transform scale-105 shadow-md'
-                                                                    : 'border-gray-300 text-gray-700 hover:border-gray-400 hover:shadow-sm'
-                                                                    }`}
-                                                                style={{
-                                                                    backgroundColor: isSelected ? level.color : 'white',
-                                                                    borderColor: isSelected ? level.color : undefined,
-                                                                }}
-                                                            >
-                                                                <div className="font-semibold">{level.name}</div>
-                                                                <div className="text-xs mt-1">
-                                                                    {level.level === 'incomplete' ? '0' : points} pts
-                                                                </div>
-                                                            </button>
-                                                        );
-                                                    })}
-                                                </div>
-
-                                                {/* Custom Comments */}
-                                                <div>
-                                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                        Additional Comments:
-                                                    </label>
-                                                    <textarea
-                                                        value={currentGrading?.customComments || ''}
-                                                        onChange={(e) => updateRubricGrading(criterion.id, currentGrading?.selectedLevel, e.target.value)}
-                                                        className="w-full p-3 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                                        rows="3"
-                                                        placeholder="Add specific feedback for this criterion..."
-                                                    />
-                                                </div>
-
-                                                {/* Selected Level Feedback */}
-                                                {currentGrading?.selectedLevel && (
-                                                    <div className="mt-3 p-3 bg-blue-50 rounded border border-blue-200">
-                                                        <div className="text-sm">
-                                                            <strong>Selected Level:</strong> {loadedRubric.rubricLevels.find(l => l.level === currentGrading.selectedLevel)?.name}
-                                                            {' '}({criterion.levels[currentGrading.selectedLevel]?.pointRange} pts)
-                                                        </div>
-                                                        <div className="text-sm text-gray-700 mt-1">
-                                                            {criterion.levels[currentGrading.selectedLevel]?.description}
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-
-                                {/* Rubric Summary */}
-                                <div className="mt-6 bg-white border border-gray-200 rounded-lg p-4">
-                                    <div className="flex justify-between items-center">
-                                        <div>
-                                            <h4 className="text-lg font-semibold text-gray-800">Rubric Score Summary</h4>
-                                            <p className="text-sm text-gray-600">
-                                                Based on selected levels across all criteria
-                                            </p>
-                                        </div>
-                                        <div className="text-right">
-                                            <div className="text-2xl font-bold text-blue-600">
-                                                {Math.round(calculateTotalScore().finalScore * 10) / 10}/{loadedRubric.assignmentInfo.totalPoints}
-                                            </div>
-                                            <div className="text-lg text-gray-600">
-                                                ({Math.round((calculateTotalScore().finalScore / loadedRubric.assignmentInfo.totalPoints) * 1000) / 10}%)
-                                            </div>
-                                            {calculateTotalScore().penaltyApplied && (
-                                                <div className="text-sm text-red-600 mt-1">
-                                                    Raw: {Math.round(calculateTotalScore().rawScore * 10) / 10} (Late Penalty Applied)
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Late Policy Section */}
-                        <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-                            <div className="late-policy-container">
-                                <h3 className="text-lg font-semibold text-gray-800 mb-4">📅 Late Submission Policy</h3>
-                                <div className="late-policy-info-box">
-                                    <p className="font-medium mb-2 text-gray-800">Institutional Late Assignment Policy:</p>
-                                    <ul className="space-y-1 text-sm text-gray-700">
-                                        <li>• <strong>On Time:</strong> Assignments submitted on or before due date and time are marked out of 100%</li>
-                                        <li>• <strong>1-24 Hours Late:</strong> Assignments receive a 20% reduction and are marked out of 80%</li>
-                                        <li>• <strong>After 24 Hours:</strong> Assignments receive a mark of zero (0)</li>
-                                    </ul>
-                                </div>
-
-                                <div className="space-y-3">
-                                    <h4 className="font-medium text-gray-800 mb-3">Select submission status:</h4>
-
-                                    {Object.entries(latePolicyLevels).map(([level, policy]) => (
-                                        <div
-                                            key={level}
-                                            className={`late-policy-card ${level} ${gradingData.latePolicy.level === level ? 'selected' : ''}`}
-                                            onClick={() => updateLatePolicy(level)}
-                                        >
-                                            <div className="late-policy-header">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={gradingData.latePolicy.level === level}
-                                                    onChange={() => updateLatePolicy(level)}
-                                                    className="late-policy-checkbox"
-                                                    onClick={(e) => e.stopPropagation()}
-                                                />
-                                                <span
-                                                    className="late-policy-icon"
-                                                    style={{ backgroundColor: policy.color }}
-                                                ></span>
-                                                <h5 className="late-policy-title" style={{ color: policy.color }}>
-                                                    {policy.name}
-                                                </h5>
-                                                {level !== 'none' && (
-                                                    <span className="late-policy-multiplier">
-                                                        (×{policy.multiplier === 0 ? '0' : policy.multiplier})
-                                                    </span>
-                                                )}
-                                            </div>
-                                            <p className="late-policy-description">{policy.description}</p>
-                                        </div>
-                                    ))}
-                                </div>
-
-                                {calculateTotalScore().penaltyApplied && (
-                                    <div className="late-policy-calculation">
-                                        <h5 className="font-medium text-red-800 mb-2">⚠️ Late Penalty Calculation</h5>
-                                        <div className="text-sm text-red-700 space-y-1">
-                                            <p><strong>Raw Score:</strong> {Math.round(calculateTotalScore().rawScore * 10) / 10} / {loadedRubric ? loadedRubric.assignmentInfo.totalPoints : gradingData.assignment.maxPoints}</p>
-                                            <p><strong>Late Penalty:</strong> ×{latePolicyLevels[gradingData.latePolicy.level].multiplier}</p>
-                                            <p><strong>Final Score:</strong> {Math.round(calculateTotalScore().finalScore * 10) / 10} / {loadedRubric ? loadedRubric.assignmentInfo.totalPoints : gradingData.assignment.maxPoints}</p>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Score Summary */}
-                        <div className="bg-white rounded-lg shadow-sm p-6">
-                            <div className="text-center">
-                                <h2 className="text-2xl font-bold text-gray-800 mb-4">📊 Final Score</h2>
-                                <div className="text-6xl font-bold text-green-600 mb-4">
-                                    {Math.round(calculateTotalScore().finalScore * 10) / 10}
-                                    <span className="text-2xl text-gray-500">
-                                        / {loadedRubric ? loadedRubric.assignmentInfo.totalPoints : gradingData.assignment.maxPoints}
-                                    </span>
-                                </div>
-                                <div className="text-xl text-gray-600 mb-4">
-                                    ({Math.round((calculateTotalScore().finalScore / (loadedRubric ? loadedRubric.assignmentInfo.totalPoints : gradingData.assignment.maxPoints)) * 1000) / 10}%)
-                                </div>
-                                <div className="flex justify-center gap-4 flex-wrap">
-                                    {loadedRubric && (
-                                        <div className="text-sm bg-green-100 text-green-700 px-3 py-1 rounded">
-                                            📋 Rubric Assessment Active
-                                        </div>
-                                    )}
-                                    {calculateTotalScore().penaltyApplied && (
-                                        <div className="text-sm bg-red-100 text-red-600 px-3 py-1 rounded">
-                                            ⏰ Late Penalty Applied
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Feedback Section */}
-                        <div className="bg-white rounded-lg shadow-sm p-6">
-                            <h2 className="text-xl font-semibold text-gray-800 mb-4">💬 Feedback</h2>
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">General Feedback</label>
-                                    <textarea
-                                        value={gradingData.feedback.general}
-                                        onChange={(e) => setGradingData(prev => ({
-                                            ...prev,
-                                            feedback: { ...prev.feedback, general: e.target.value }
-                                        }))}
-                                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                        rows="4"
-                                        placeholder="Enter general feedback for the student..."
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Strengths</label>
-                                    <textarea
-                                        value={gradingData.feedback.strengths}
-                                        onChange={(e) => setGradingData(prev => ({
-                                            ...prev,
-                                            feedback: { ...prev.feedback, strengths: e.target.value }
-                                        }))}
-                                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                        rows="3"
-                                        placeholder="What did the student do well?"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Areas for Improvement</label>
-                                    <textarea
-                                        value={gradingData.feedback.improvements}
-                                        onChange={(e) => setGradingData(prev => ({
-                                            ...prev,
-                                            feedback: { ...prev.feedback, improvements: e.target.value }
-                                        }))}
-                                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                        rows="3"
-                                        placeholder="What areas need improvement?"
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Sidebar */}
-                    <div className="space-y-6">
-                        {/* File Attachments */}
-                        <div className="bg-white rounded-lg shadow-sm p-6">
-                            <h3 className="text-lg font-semibold text-gray-800 mb-4">📎 Attachments</h3>
-                            <div className="space-y-3">
-                                <button
-                                    onClick={() => fileInputRef.current?.click()}
-                                    className="w-full flex items-center justify-center gap-2 bg-blue-50 text-blue-700 p-3 rounded-lg border border-blue-200 hover:bg-blue-100 transition-colors"
-                                >
-                                    <Upload size={20} />
-                                    Upload Files
-                                </button>
-                                <input
-                                    ref={fileInputRef}
-                                    type="file"
-                                    multiple
-                                    onChange={(e) => handleFileUpload(e.target.files)}
-                                    className="hidden"
-                                />
-
-                                {gradingData.attachments.length > 0 && (
-                                    <div className="space-y-2">
-                                        {gradingData.attachments.map((attachment) => (
-                                            <div key={attachment.id} className="flex items-center gap-2 p-2 bg-gray-50 rounded border">
-                                                <FileText size={16} className="text-gray-500" />
-                                                <span className="flex-1 text-sm">{attachment.name}</span>
-                                                <button
-                                                    onClick={() => removeAttachment(attachment.id)}
-                                                    className="text-red-500 hover:text-red-700"
-                                                >
-                                                    <X size={16} />
-                                                </button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Video Links */}
-                        <div className="bg-white rounded-lg shadow-sm p-6">
-                            <h3 className="text-lg font-semibold text-gray-800 mb-4">🎥 Video Links</h3>
-                            <div className="space-y-3">
-                                <input
-                                    type="url"
-                                    value={videoLinkInput}
-                                    onChange={(e) => setVideoLinkInput(e.target.value)}
-                                    placeholder="Video URL"
-                                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                />
-                                <input
-                                    type="text"
-                                    value={videoTitle}
-                                    onChange={(e) => setVideoTitle(e.target.value)}
-                                    placeholder="Video Title (optional)"
-                                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                />
-                                <button
-                                    onClick={addVideoLink}
-                                    disabled={!videoLinkInput.trim()}
-                                    className="w-full flex items-center justify-center gap-2 bg-purple-50 text-purple-700 p-3 rounded-lg border border-purple-200 hover:bg-purple-100 transition-colors disabled:opacity-50"
-                                >
-                                    <Plus size={20} />
-                                    Add Video
-                                </button>
-
-                                {gradingData.videoLinks.length > 0 && (
-                                    <div className="space-y-2">
-                                        {gradingData.videoLinks.map((link) => (
-                                            <div key={link.id} className="flex items-center gap-2 p-2 bg-gray-50 rounded border">
-                                                <Video size={16} className="text-gray-500" />
-                                                <span className="flex-1 text-sm">{link.title}</span>
-                                                <button
-                                                    onClick={() => removeVideoLink(link.id)}
-                                                    className="text-red-500 hover:text-red-700"
-                                                >
-                                                    <X size={16} />
-                                                </button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Quick Actions */}
-                        <div className="bg-white rounded-lg shadow-sm p-6">
-                            <h3 className="text-lg font-semibold text-gray-800 mb-4">⚡ Quick Actions</h3>
-                            <div className="space-y-3">
-                                <input
-                                    type="file"
-                                    accept=".json"
-                                    onChange={loadFromJSON}
-                                    ref={rubricInputRef}
-                                    className="hidden"
-                                />
-                                <button
-                                    onClick={() => rubricInputRef.current?.click()}
-                                    className="w-full flex items-center justify-center gap-2 bg-purple-50 text-purple-700 p-3 rounded-lg border border-purple-200 hover:bg-purple-100 transition-colors"
-                                >
-                                    <Upload size={20} />
-                                    Load Saved Data
-                                </button>
-                                {loadedRubric && (
-                                    <button
-                                        onClick={clearRubric}
-                                        className="w-full flex items-center justify-center gap-2 bg-red-50 text-red-700 p-3 rounded-lg border border-red-200 hover:bg-red-100 transition-colors"
-                                    >
-                                        <X size={20} />
-                                        Clear Rubric
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
+  );
 };
-
 export default GradingTemplate;
