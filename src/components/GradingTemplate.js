@@ -1,6 +1,5 @@
-// Fixed GradingTemplate.jsx with Proper Shared Context Integration
 import React, { useState, useRef, useEffect } from 'react';
-import { Download, Upload, FileText, Video, Plus, X, Save, FileDown, Bot } from 'lucide-react';
+import { Download, Upload, FileText, Video, Plus, X, Save, FileDown } from 'lucide-react';
 import { useAssessment } from './SharedContext';
 
 // Built-in Course Modules
@@ -49,8 +48,6 @@ const GradingTemplate = () => {
         sharedRubric,
         sharedCourseDetails,
         clearSharedRubric,
-        setSharedCourseDetails,
-        updateCourseDetails,
         updateStudentInfo,
         updateCourseInfo,
         updateAssignmentInfo
@@ -104,9 +101,17 @@ const GradingTemplate = () => {
         }
     });
 
-    // Rubric-specific state
+    // Rubric-specific state initialized from any shared rubric
+    const initialRubricGrading = sharedRubric
+        ? Object.fromEntries(
+            sharedRubric.criteria.map(c => [
+                c.id,
+                { criterionId: c.id, selectedLevel: null, customComments: '' }
+            ])
+        )
+        : {};
     const [loadedRubric, setLoadedRubric] = useState(sharedRubric);
-    const [rubricGrading, setRubricGrading] = useState({});
+    const [rubricGrading, setRubricGrading] = useState(initialRubricGrading);
     const [showRubricComments, setShowRubricComments] = useState({});
 
     const fileInputRef = useRef(null);
@@ -116,7 +121,7 @@ const GradingTemplate = () => {
     const [videoLinkInput, setVideoLinkInput] = useState('');
     const [videoTitle, setVideoTitle] = useState('');
 
-    // Late Policy Levels - FIXED CONFIGURATION
+    // Late Policy Levels
     const latePolicyLevels = {
         none: {
             name: 'On Time',
@@ -138,42 +143,46 @@ const GradingTemplate = () => {
         }
     };
 
-    // FIXED: Sync with shared rubric when it changes
+    // Sync with shared rubric when it changes
     useEffect(() => {
         if (sharedRubric) {
             setLoadedRubric(sharedRubric);
 
-            // Initialize rubric grading state
             const initialGrading = {};
-            sharedRubric.criteria.forEach(criterion => {
-                initialGrading[criterion.id] = {
-                    criterionId: criterion.id,
-                    selectedLevel: null,
-                    customComments: ''
-                };
+            sharedRubric.criteria.forEach(c => {
+                initialGrading[c.id] = { criterionId: c.id, selectedLevel: null, customComments: '' };
             });
             setRubricGrading(initialGrading);
 
-            // Update assignment details
+            updateAssignmentInfo({
+                name: sharedRubric.assignmentInfo?.title || '',
+                maxPoints: sharedRubric.assignmentInfo?.totalPoints || 0
+            });
+
             setGradingData(prev => ({
                 ...prev,
                 assignment: {
                     ...prev.assignment,
-                    name: sharedRubric.assignmentInfo?.title || prev.assignment.name,
+                    name: sharedRubric.assignmentInfo?.title || '',
                     maxPoints: sharedRubric.assignmentInfo?.totalPoints || prev.assignment.maxPoints
                 },
-                metadata: {
-                    ...prev.metadata,
-                    rubricIntegrated: true
-                }
+                feedback: { general: '', strengths: '', improvements: '' },
+                attachments: [],
+                videoLinks: [],
+                latePolicy: { level: 'none', penaltyApplied: false },
+                metadata: { ...prev.metadata, rubricIntegrated: true }
             }));
         } else {
             setLoadedRubric(null);
             setRubricGrading({});
+            setGradingData(prev => ({
+                ...prev,
+                metadata: { ...prev.metadata, rubricIntegrated: false }
+            }));
         }
     }, [sharedRubric]);
 
-    // FIXED: Sync with shared course details
+    // Sync with shared course details
     useEffect(() => {
         if (sharedCourseDetails) {
             setGradingData(prev => ({
@@ -198,7 +207,7 @@ const GradingTemplate = () => {
         }
     }, [sharedCourseDetails]);
 
-    // FIXED: Calculate total score with late policy applied
+    // Calculate total score with late policy applied
     const calculateTotalScore = () => {
         let rawScore = 0;
 
@@ -228,7 +237,7 @@ const GradingTemplate = () => {
         };
     };
 
-    // FIXED: Update late policy
+    // Update late policy
     const updateLatePolicy = (level) => {
         setGradingData(prev => ({
             ...prev,
@@ -290,16 +299,19 @@ const GradingTemplate = () => {
         }
     };
 
-    // Clear loaded rubric
+    // Clear loaded rubric and reset state
     const clearRubric = () => {
-        if (sharedRubric) {
-            // Clear from shared context
-            clearSharedRubric();
-        } else {
-            // Clear local rubric
-            setLoadedRubric(null);
-            setRubricGrading({});
-        }
+        clearSharedRubric();
+        setLoadedRubric(null);
+        setRubricGrading({});
+        setGradingData(prev => ({
+            ...prev,
+            feedback: { general: '', strengths: '', improvements: '' },
+            attachments: [],
+            videoLinks: [],
+            latePolicy: { level: 'none', penaltyApplied: false },
+            metadata: { ...prev.metadata, rubricIntegrated: false }
+        }));
     };
 
     // Update rubric grading
@@ -914,7 +926,7 @@ const GradingTemplate = () => {
                             </div>
                         )}
 
-                        {/* FIXED Late Policy Section */}
+                        {/* Late Policy Section */}
                         <div className="bg-white rounded-lg shadow-sm overflow-hidden">
                             <div className="late-policy-container">
                                 <h3 className="text-lg font-semibold text-gray-800 mb-4">📅 Late Submission Policy</h3>
