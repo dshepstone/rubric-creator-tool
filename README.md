@@ -1,70 +1,67 @@
-# Getting Started with Create React App
+# Rubric Creator Tool
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+A professional React-based rubric creation tool for educational assessment.
 
-## Available Scripts
+## 🎯 Features
 
-In the project directory, you can run:
+- ✅ **7-Level Assessment System** (Incomplete → Exceptional)
+- ✅ **Dynamic Criterion Management** (add/remove, customize)
+- ✅ **Automatic Point Calculation** (multiplier-based)
+- ✅ **Feedback Library Management** (per-criterion feedback banks)
+- ✅ **Full-Page Text Editor** (for detailed descriptions)
+- ✅ **Multiple Export Options** (JSON for grading, HTML for students)
+- ✅ **Professional UI** with guided workflow
 
-### `npm start`
+## 🚀 Quick Start
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+```bash
+# Install dependencies
+npm install
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+# Start development server
+npm start
+```
 
-### `npm test`
+## 🔧 Dependencies
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+- React 18+
+- Tailwind CSS
+- Lucide React (icons)
 
-### `npm run build`
+## 📋 Usage
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+1. **Create Assignment Info** - Title, weight, passing threshold
+2. **Add Criteria** - Define assessment categories and point values
+3. **Set Level Descriptions** - Define expectations for each performance level
+4. **Add Feedback Libraries** - Pre-written comments for efficient grading
+5. **Export** - JSON for grading systems, HTML for student distribution
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+## 🎓 Integration
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+This tool integrates with the Modular Grading System for complete assessment workflow:
 
-### `npm run eject`
+1. **Create Rubric** → Export JSON
+2. **Import to Grading Template** → Load rubric file
+3. **Grade Students** → Level-based assessment
+4. **Export Reports** → Generate HTML for LMS
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+## 📁 Example Files
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+- `test-portfolio-rubric.json` - Complete example rubric for testing
+- `rubric-example.json` - Basic template structure
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+## 🤝 Contributing
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-## Learn More
+## 📄 License
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+This project is licensed under the MIT License.
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+## 🆘 Support
 
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+For questions or support, please open an issue in the GitHub repository.
