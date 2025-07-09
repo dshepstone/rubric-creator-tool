@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useCallback } from 'react';
 
 const AssessmentContext = createContext();
 
@@ -14,127 +14,357 @@ export const AssessmentProvider = ({ children }) => {
     // Shared rubric state
     const [sharedRubric, setSharedRubric] = useState(null);
 
-    // Shared course details state
+    // Shared course-details state (for your GradingTemplate’s setSharedCourseDetails)
     const [sharedCourseDetails, setSharedCourseDetails] = useState(null);
-
-    // Grading data state
-    const [gradingData, setGradingData] = useState(null);
 
     // Active tab state
     const [activeTab, setActiveTab] = useState('rubric-creator');
 
+    // Comprehensive persistent form data for grading tool
+    const [gradingFormData, setGradingFormData] = useState({
+        student: { name: '', id: '', email: '' },
+        course: { code: '', name: '', instructor: '', term: '' },
+        assignment: { name: '', dueDate: '', maxPoints: 100 },
+        feedback: { general: '', strengths: '', improvements: '' },
+        attachments: [],
+        videoLinks: [],
+        latePolicy: { level: 'none', penaltyApplied: false },
+        rubricGrading: {},
+        metadata: {
+            gradedBy: '',
+            gradedDate: '',
+            aiAssisted: false,
+            rubricIntegrated: false
+        }
+    });
+
+    // Persistent form data for rubric creator
+    const [rubricFormData, setRubricFormData] = useState({
+        assignmentInfo: {
+            title: '',
+            description: '',
+            weight: 25,
+            passingThreshold: 60,
+            totalPoints: 100
+        },
+        rubricLevels: [
+            { level: 'incomplete', name: 'Incomplete', description: 'No submission or unusable', color: '#95a5a6', multiplier: 0 },
+            { level: 'unacceptable', name: 'Unacceptable', description: 'Below minimum standards', color: '#e74c3c', multiplier: 0.3 },
+            { level: 'developing', name: 'Developing', description: 'Approaching standards', color: '#f39c12', multiplier: 0.55 },
+            { level: 'acceptable', name: 'Acceptable (PASS)', description: 'Meets minimum standards', color: '#27ae60', multiplier: 0.7 },
+            { level: 'emerging', name: 'Emerging', description: 'Above standard expectations', color: '#2980b9', multiplier: 0.82 },
+            { level: 'accomplished', name: 'Accomplished', description: 'Strong professional quality', color: '#16a085', multiplier: 0.92 },
+            { level: 'exceptional', name: 'Exceptional', description: 'Outstanding professional quality', color: '#8e44ad', multiplier: 1.0 }
+        ],
+        criteria: [
+            {
+                id: 'criterion-1',
+                name: '',
+                description: '',
+                maxPoints: 20,
+                weight: 20,
+                levels: {},
+                feedbackLibrary: {
+                    strengths: [],
+                    improvements: [],
+                    general: []
+                }
+            }
+        ],
+        pointingSystem: 'multiplier',
+        reversedOrder: false,
+        expandedFeedback: {},
+        modalEdit: { show: false, content: '', field: null, onSave: null }
+    });
+
     // Transfer rubric to grading tool and switch tabs
-    const transferRubricToGrading = (rubricData) => {
+    const transferRubricToGrading = useCallback((rubricData) => {
         setSharedRubric(rubricData);
-        setActiveTab('grading-tool');
-    };
 
-    // Clear shared rubric
-    const clearSharedRubric = () => {
-        setSharedRubric(null);
-    };
-
-    // Clear shared course details
-    const clearSharedCourseDetails = () => {
-        setSharedCourseDetails(null);
-    };
-
-    // Clear all shared data
-    const clearAllSharedData = () => {
-        setSharedRubric(null);
-        setSharedCourseDetails(null);
-        setGradingData(null);
-    };
-
-    // Update course details
-    const updateCourseDetails = (courseDetails) => {
-        setSharedCourseDetails(prev => ({
+        // Update grading form data with rubric information
+        setGradingFormData(prev => ({
             ...prev,
-            ...courseDetails
+            assignment: {
+                ...prev.assignment,
+                name: rubricData.assignmentInfo?.title || prev.assignment.name,
+                maxPoints: rubricData.assignmentInfo?.totalPoints || prev.assignment.maxPoints
+            },
+            metadata: {
+                ...prev.metadata,
+                rubricIntegrated: true
+            }
         }));
-    };
 
-    // Update specific sections of course details
-    const updateStudentInfo = (studentInfo) => {
-        setSharedCourseDetails(prev => ({
+        setActiveTab('grading-tool');
+    }, []);
+
+    // Enhanced transfer function that preserves all form data
+    const transferRubricToGradingWithDetails = useCallback((rubricData) => {
+        setSharedRubric(rubricData);
+
+        // Update grading form data with rubric information
+        setGradingFormData(prev => ({
+            ...prev,
+            assignment: {
+                ...prev.assignment,
+                name: rubricData.assignmentInfo?.title || prev.assignment.name,
+                maxPoints: rubricData.assignmentInfo?.totalPoints || prev.assignment.maxPoints
+            },
+            metadata: {
+                ...prev.metadata,
+                rubricIntegrated: true
+            }
+        }));
+
+        setActiveTab('grading-tool');
+    }, []);
+
+    // Update functions for grading form data
+    const updateGradingFormData = useCallback((updates) => {
+        setGradingFormData(prev => ({
+            ...prev,
+            ...updates
+        }));
+    }, []);
+
+    const updateStudentInfo = useCallback((studentInfo) => {
+        setGradingFormData(prev => ({
             ...prev,
             student: {
-                ...prev?.student,
+                ...prev.student,
                 ...studentInfo
             }
         }));
-    };
+    }, []);
 
-    const updateCourseInfo = (courseInfo) => {
-        setSharedCourseDetails(prev => ({
+    const updateCourseInfo = useCallback((courseInfo) => {
+        setGradingFormData(prev => ({
             ...prev,
             course: {
-                ...prev?.course,
+                ...prev.course,
                 ...courseInfo
             }
         }));
-    };
+    }, []);
 
-    const updateAssignmentInfo = (assignmentInfo) => {
-        setSharedCourseDetails(prev => ({
+    const updateAssignmentInfo = useCallback((assignmentInfo) => {
+        setGradingFormData(prev => ({
             ...prev,
             assignment: {
-                ...prev?.assignment,
+                ...prev.assignment,
                 ...assignmentInfo
             }
         }));
-    };
+    }, []);
 
-    // Extract course details from rubric if available
-    const extractCourseDetailsFromRubric = (rubricData) => {
-        if (rubricData?.assignmentInfo) {
-            const courseDetails = {
-                assignment: {
-                    name: rubricData.assignmentInfo.title,
-                    maxPoints: rubricData.assignmentInfo.totalPoints,
-                    weight: rubricData.assignmentInfo.weight,
-                    passingThreshold: rubricData.assignmentInfo.passingThreshold
+    const updateFeedbackInfo = useCallback((feedbackInfo) => {
+        setGradingFormData(prev => ({
+            ...prev,
+            feedback: {
+                ...prev.feedback,
+                ...feedbackInfo
+            }
+        }));
+    }, []);
+
+    const updateAttachments = useCallback((attachments) => {
+        setGradingFormData(prev => ({
+            ...prev,
+            attachments
+        }));
+    }, []);
+
+    const updateVideoLinks = useCallback((videoLinks) => {
+        setGradingFormData(prev => ({
+            ...prev,
+            videoLinks
+        }));
+    }, []);
+
+    const updateLatePolicy = useCallback((latePolicy) => {
+        setGradingFormData(prev => ({
+            ...prev,
+            latePolicy
+        }));
+    }, []);
+
+    const updateRubricGrading = useCallback((rubricGrading) => {
+        setGradingFormData(prev => ({
+            ...prev,
+            rubricGrading
+        }));
+    }, []);
+
+    const updateMetadata = useCallback((metadata) => {
+        setGradingFormData(prev => ({
+            ...prev,
+            metadata: {
+                ...prev.metadata,
+                ...metadata
+            }
+        }));
+    }, []);
+
+    // Update functions for rubric form data
+    const updateRubricFormData = useCallback((updates) => {
+        setRubricFormData(prev => ({
+            ...prev,
+            ...updates
+        }));
+    }, []);
+
+    const updateRubricAssignmentInfo = useCallback((assignmentInfo) => {
+        setRubricFormData(prev => ({
+            ...prev,
+            assignmentInfo: {
+                ...prev.assignmentInfo,
+                ...assignmentInfo
+            }
+        }));
+    }, []);
+
+    const updateRubricCriteria = useCallback((criteria) => {
+        setRubricFormData(prev => ({
+            ...prev,
+            criteria
+        }));
+    }, []);
+
+    const updateRubricLevels = useCallback((rubricLevels) => {
+        setRubricFormData(prev => ({
+            ...prev,
+            rubricLevels
+        }));
+    }, []);
+
+    const updateRubricSettings = useCallback((settings) => {
+        setRubricFormData(prev => ({
+            ...prev,
+            ...settings
+        }));
+    }, []);
+
+    // Clear functions
+    const clearSharedRubric = useCallback(() => {
+        setSharedRubric(null);
+    }, []);
+
+    const clearGradingFormData = useCallback(() => {
+        setGradingFormData({
+            student: { name: '', id: '', email: '' },
+            course: { code: '', name: '', instructor: '', term: '' },
+            assignment: { name: '', dueDate: '', maxPoints: 100 },
+            feedback: { general: '', strengths: '', improvements: '' },
+            attachments: [],
+            videoLinks: [],
+            latePolicy: { level: 'none', penaltyApplied: false },
+            rubricGrading: {},
+            metadata: {
+                gradedBy: '',
+                gradedDate: '',
+                aiAssisted: false,
+                rubricIntegrated: false
+            }
+        });
+    }, []);
+
+    const clearRubricFormData = useCallback(() => {
+        setRubricFormData({
+            assignmentInfo: {
+                title: '',
+                description: '',
+                weight: 25,
+                passingThreshold: 60,
+                totalPoints: 100
+            },
+            rubricLevels: [
+                { level: 'incomplete', name: 'Incomplete', description: 'No submission or unusable', color: '#95a5a6', multiplier: 0 },
+                { level: 'unacceptable', name: 'Unacceptable', description: 'Below minimum standards', color: '#e74c3c', multiplier: 0.3 },
+                { level: 'developing', name: 'Developing', description: 'Approaching standards', color: '#f39c12', multiplier: 0.55 },
+                { level: 'acceptable', name: 'Acceptable (PASS)', description: 'Meets minimum standards', color: '#27ae60', multiplier: 0.7 },
+                { level: 'emerging', name: 'Emerging', description: 'Above standard expectations', color: '#2980b9', multiplier: 0.82 },
+                { level: 'accomplished', name: 'Accomplished', description: 'Strong professional quality', color: '#16a085', multiplier: 0.92 },
+                { level: 'exceptional', name: 'Exceptional', description: 'Outstanding professional quality', color: '#8e44ad', multiplier: 1.0 }
+            ],
+            criteria: [
+                {
+                    id: 'criterion-1',
+                    name: '',
+                    description: '',
+                    maxPoints: 20,
+                    weight: 20,
+                    levels: {},
+                    feedbackLibrary: {
+                        strengths: [],
+                        improvements: [],
+                        general: []
+                    }
                 }
-            };
-            setSharedCourseDetails(courseDetails);
-        }
-    };
+            ],
+            pointingSystem: 'multiplier',
+            reversedOrder: false,
+            expandedFeedback: {},
+            modalEdit: { show: false, content: '', field: null, onSave: null }
+        });
+    }, []);
 
-    // Enhanced transfer function that also extracts course details
-    const transferRubricToGradingWithDetails = (rubricData) => {
-        setSharedRubric(rubricData);
-        extractCourseDetailsFromRubric(rubricData);
-        setActiveTab('grading-tool');
-    };
+    const clearAllData = useCallback(() => {
+        setSharedRubric(null);
+        clearGradingFormData();
+        clearRubricFormData();
+    }, [clearGradingFormData, clearRubricFormData]);
+
+    // Legacy compatibility - map persistent form data
+    const persistentFormData = gradingFormData;
+    const updatePersistentFormData = updateGradingFormData;
 
     const value = {
         // Shared state
         sharedRubric,
         setSharedRubric,
-        sharedCourseDetails,
-        setSharedCourseDetails,
-        gradingData,
-        setGradingData,
 
         // Navigation
         activeTab,
         setActiveTab,
+
+        // Grading form data
+        gradingData: gradingFormData,
+        setGradingFormData,
+        setGradingData: setGradingFormData,
+        updateStudentInfo,
+        updateCourseInfo,
+        updateAssignmentInfo,
+        updateFeedbackInfo,
+        updateAttachments,
+        updateVideoLinks,
+        updateLatePolicy,
+        updateRubricGrading,
+        updateMetadata,
+
+        // Rubric form data
+        rubricFormData,
+        setRubricFormData,
+        updateRubricFormData,
+        updateRubricAssignmentInfo,
+        updateRubricCriteria,
+        updateRubricLevels,
+        updateRubricSettings,
 
         // Actions - rubric management
         transferRubricToGrading,
         transferRubricToGradingWithDetails,
         clearSharedRubric,
 
-        // Actions - course details management
-        clearSharedCourseDetails,
-        updateCourseDetails,
-        updateStudentInfo,
-        updateCourseInfo,
-        updateAssignmentInfo,
-        extractCourseDetailsFromRubric,
+        // Actions - clear functions
+        clearGradingFormData,
+        clearRubricFormData,
+        clearAllData,
 
-        // Actions - general
-        clearAllSharedData
+        // Legacy compatibility
+        persistentFormData,
+        updatePersistentFormData,
+        sharedCourseDetails,
+        setSharedCourseDetails,
     };
 
     return (
