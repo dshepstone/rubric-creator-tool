@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Plus, X, Upload, Download, Save, FileText, RotateCcw, ChevronDown, ChevronUp, Maximize2, ArrowRight } from 'lucide-react';
+import { Plus, X, Upload, Download, Save, FileText, RotateCcw, ChevronDown, ChevronUp, Maximize2, ArrowRight, Minimize2 } from 'lucide-react';
 import { useAssessment } from './SharedContext';
 
 const RubricCreator = () => {
@@ -58,11 +58,65 @@ const RubricCreator = () => {
     const [reversedOrder, setReversedOrder] = useState(false);
     const [showGuide, setShowGuide] = useState(false);
     const [expandedFeedback, setExpandedFeedback] = useState({});
-    const [modalEdit, setModalEdit] = useState({ show: false, content: '', field: null, onSave: null });
+    const [inlineEditor, setInlineEditor] = useState({
+        show: false,
+        content: '',
+        field: null,
+        onSave: null,
+        criterionId: null,
+        level: null,
+        type: null // 'assignment', 'criterion', or 'level'
+    });
     const [autoSaveTimeout, setAutoSaveTimeout] = useState(null);
+
+    // FIXED: Use refs instead of state for rich text content to prevent cursor jumping
+    const richTextContentRef = useRef('');
+    const editorRef = useRef(null);
 
     // Refs for file inputs
     const importInputRef = useRef(null);
+
+    // FIXED: Cursor position management functions
+    const saveCursorPosition = () => {
+        const editor = editorRef.current;
+        if (!editor) return null;
+
+        const selection = window.getSelection();
+        if (selection.rangeCount === 0) return null;
+
+        const range = selection.getRangeAt(0);
+        return {
+            startContainer: range.startContainer,
+            startOffset: range.startOffset,
+            endContainer: range.endContainer,
+            endOffset: range.endOffset
+        };
+    };
+
+    const restoreCursorPosition = (savedPosition) => {
+        if (!savedPosition || !editorRef.current) return;
+
+        try {
+            const selection = window.getSelection();
+            const range = document.createRange();
+
+            range.setStart(savedPosition.startContainer, savedPosition.startOffset);
+            range.setEnd(savedPosition.endContainer, savedPosition.endOffset);
+
+            selection.removeAllRanges();
+            selection.addRange(range);
+        } catch (error) {
+            // If cursor restoration fails, place cursor at end
+            const editor = editorRef.current;
+            const range = document.createRange();
+            const selection = window.getSelection();
+
+            range.selectNodeContents(editor);
+            range.collapse(false);
+            selection.removeAllRanges();
+            selection.addRange(range);
+        }
+    };
 
     // Auto-save to shared context whenever rubricData changes
     useEffect(() => {
@@ -98,22 +152,153 @@ const RubricCreator = () => {
         }));
     };
 
-    // Open modal for text editing
-    const openModalEdit = (content, field, onSave) => {
-        setModalEdit({
+    // FIXED: Open inline editor for text editing
+    const openInlineEditor = (content, field, onSave, criterionId = null, level = null, type = 'assignment') => {
+        // Initialize the ref with current content
+        richTextContentRef.current = content || '';
+
+        setInlineEditor({
             show: true,
-            content,
+            content: content || '',
             field,
-            onSave
+            onSave,
+            criterionId,
+            level,
+            type
         });
+
+        // Focus the editor after it's rendered
+        setTimeout(() => {
+            const editor = editorRef.current;
+            if (editor) {
+                editor.innerHTML = content || '';
+                editor.focus();
+                // Place cursor at end
+                const range = document.createRange();
+                const selection = window.getSelection();
+                range.selectNodeContents(editor);
+                range.collapse(false);
+                selection.removeAllRanges();
+                selection.addRange(range);
+            }
+        }, 100);
     };
 
-    // Close modal and save if needed
-    const closeModalEdit = (save = false) => {
-        if (save && modalEdit.onSave) {
-            modalEdit.onSave(modalEdit.content);
+    // FIXED: Enhanced rich text editor functions
+    const handleRichTextCommand = (command, value = null) => {
+        const editor = editorRef.current;
+        if (editor) {
+            editor.focus();
+
+            // Save cursor position before command
+            const cursorPos = saveCursorPosition();
+
+            document.execCommand(command, false, value);
+
+            // Update our ref content
+            richTextContentRef.current = editor.innerHTML;
+
+            // Restore cursor position if needed
+            setTimeout(() => {
+                if (cursorPos && editor.contains(cursorPos.startContainer)) {
+                    restoreCursorPosition(cursorPos);
+                }
+            }, 0);
         }
-        setModalEdit({ show: false, content: '', field: null, onSave: null });
+    };
+
+    // FIXED: Handle rich text changes without state updates
+    const handleRichTextChange = (e) => {
+        const editor = editorRef.current;
+        if (editor) {
+            // Simply update our ref, don't trigger state update
+            richTextContentRef.current = editor.innerHTML;
+        }
+    };
+
+    // FIXED: Handle key events properly
+    const handleKeyDown = (e) => {
+        const editor = editorRef.current;
+        if (!editor) return;
+
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            // Insert proper line break
+            document.execCommand('insertHTML', false, '<br><br>');
+            richTextContentRef.current = editor.innerHTML;
+        } else if (e.key === 'Tab') {
+            e.preventDefault();
+            document.execCommand('insertHTML', false, '&nbsp;&nbsp;&nbsp;&nbsp;');
+            richTextContentRef.current = editor.innerHTML;
+        }
+
+        // Handle common keyboard shortcuts
+        if (e.ctrlKey || e.metaKey) {
+            switch (e.key) {
+                case 'b':
+                    e.preventDefault();
+                    handleRichTextCommand('bold');
+                    break;
+                case 'i':
+                    e.preventDefault();
+                    handleRichTextCommand('italic');
+                    break;
+                case 'u':
+                    e.preventDefault();
+                    handleRichTextCommand('underline');
+                    break;
+            }
+        }
+    };
+
+    const convertHtmlToPlainText = (html) => {
+        // Create a temporary div to parse HTML
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = html;
+        return tempDiv.textContent || tempDiv.innerText || '';
+    };
+
+    // FIXED: Close inline editor and save if needed
+    const closeInlineEditor = (save = false) => {
+        if (save && inlineEditor.onSave) {
+            // Get the current content from ref (most up-to-date)
+            const finalContent = richTextContentRef.current;
+            const plainText = convertHtmlToPlainText(finalContent);
+            inlineEditor.onSave(plainText);
+        }
+
+        setInlineEditor({
+            show: false,
+            content: '',
+            field: null,
+            onSave: null,
+            criterionId: null,
+            level: null,
+            type: null
+        });
+        richTextContentRef.current = '';
+    };
+
+    // Reset textarea sizes to original dimensions
+    const resetTextareaSizes = () => {
+        const textareas = document.querySelectorAll('textarea');
+        textareas.forEach(textarea => {
+            // Reset to default sizes based on context
+            if (textarea.closest('.assignment-info')) {
+                textarea.style.height = '80px';
+                textarea.style.maxHeight = '200px';
+            } else if (textarea.closest('td')) {
+                // Criterion or level descriptions
+                if (textarea.rows <= 2) {
+                    textarea.style.height = '48px';
+                    textarea.style.maxHeight = '200px';
+                } else {
+                    textarea.style.height = '80px';
+                    textarea.style.maxHeight = '300px';
+                }
+            }
+            textarea.style.width = '100%';
+        });
     };
 
     // Calculate total points based on current settings
@@ -493,6 +678,289 @@ const RubricCreator = () => {
         URL.revokeObjectURL(url);
     };
 
+    // Enhanced Rich Text Toolbar Component
+    const RichTextToolbar = () => (
+        <div className="border-b bg-gray-50 p-3">
+            {/* Main Toolbar */}
+            <div className="flex flex-wrap gap-1 mb-2">
+                {/* Headings */}
+                <div className="flex border-r border-gray-300 pr-2 mr-2">
+                    <select
+                        onChange={(e) => {
+                            if (e.target.value) {
+                                handleRichTextCommand('formatBlock', e.target.value);
+                                e.target.value = '';
+                            }
+                        }}
+                        className="p-1 text-xs border rounded"
+                        title="Text Format"
+                    >
+                        <option value="">Format</option>
+                        <option value="h1">Heading 1</option>
+                        <option value="h2">Heading 2</option>
+                        <option value="h3">Heading 3</option>
+                        <option value="p">Paragraph</option>
+                        <option value="blockquote">Quote</option>
+                        <option value="pre">Code Block</option>
+                    </select>
+                </div>
+
+                {/* Font Size */}
+                <div className="flex border-r border-gray-300 pr-2 mr-2">
+                    <select
+                        onChange={(e) => {
+                            if (e.target.value) {
+                                handleRichTextCommand('fontSize', e.target.value);
+                                e.target.value = '';
+                            }
+                        }}
+                        className="p-1 text-xs border rounded"
+                        title="Font Size"
+                    >
+                        <option value="">Size</option>
+                        <option value="1">Small</option>
+                        <option value="3">Normal</option>
+                        <option value="4">Medium</option>
+                        <option value="5">Large</option>
+                        <option value="6">X-Large</option>
+                    </select>
+                </div>
+
+                {/* Text Formatting */}
+                <div className="flex border-r border-gray-300 pr-2 mr-2">
+                    <button
+                        type="button"
+                        onClick={() => handleRichTextCommand('bold')}
+                        className="p-2 hover:bg-gray-200 rounded transition-colors"
+                        title="Bold (Ctrl+B)"
+                    >
+                        <span className="font-bold">B</span>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => handleRichTextCommand('italic')}
+                        className="p-2 hover:bg-gray-200 rounded transition-colors"
+                        title="Italic (Ctrl+I)"
+                    >
+                        <span className="italic">I</span>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => handleRichTextCommand('underline')}
+                        className="p-2 hover:bg-gray-200 rounded transition-colors"
+                        title="Underline (Ctrl+U)"
+                    >
+                        <span className="underline">U</span>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => handleRichTextCommand('strikeThrough')}
+                        className="p-2 hover:bg-gray-200 rounded transition-colors"
+                        title="Strikethrough"
+                    >
+                        <span className="line-through">S</span>
+                    </button>
+                </div>
+
+                {/* Colors */}
+                <div className="flex border-r border-gray-300 pr-2 mr-2">
+                    <input
+                        type="color"
+                        onChange={(e) => handleRichTextCommand('foreColor', e.target.value)}
+                        className="w-8 h-8 border rounded cursor-pointer"
+                        title="Text Color"
+                    />
+                    <input
+                        type="color"
+                        onChange={(e) => handleRichTextCommand('hiliteColor', e.target.value)}
+                        className="w-8 h-8 border rounded cursor-pointer ml-1"
+                        title="Highlight Color"
+                    />
+                </div>
+
+                {/* Lists */}
+                <div className="flex border-r border-gray-300 pr-2 mr-2">
+                    <button
+                        type="button"
+                        onClick={() => handleRichTextCommand('insertUnorderedList')}
+                        className="p-2 hover:bg-gray-200 rounded transition-colors"
+                        title="Bullet List"
+                    >
+                        • List
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => handleRichTextCommand('insertOrderedList')}
+                        className="p-2 hover:bg-gray-200 rounded transition-colors"
+                        title="Numbered List"
+                    >
+                        1. List
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => handleRichTextCommand('outdent')}
+                        className="p-2 hover:bg-gray-200 rounded transition-colors"
+                        title="Decrease Indent"
+                    >
+                        ⇤
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => handleRichTextCommand('indent')}
+                        className="p-2 hover:bg-gray-200 rounded transition-colors"
+                        title="Increase Indent"
+                    >
+                        ⇥
+                    </button>
+                </div>
+
+                {/* Alignment */}
+                <div className="flex border-r border-gray-300 pr-2 mr-2">
+                    <button
+                        type="button"
+                        onClick={() => handleRichTextCommand('justifyLeft')}
+                        className="p-2 hover:bg-gray-200 rounded transition-colors"
+                        title="Align Left"
+                    >
+                        ⫷
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => handleRichTextCommand('justifyCenter')}
+                        className="p-2 hover:bg-gray-200 rounded transition-colors"
+                        title="Align Center"
+                    >
+                        ≡
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => handleRichTextCommand('justifyRight')}
+                        className="p-2 hover:bg-gray-200 rounded transition-colors"
+                        title="Align Right"
+                    >
+                        ⫸
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => handleRichTextCommand('justifyFull')}
+                        className="p-2 hover:bg-gray-200 rounded transition-colors"
+                        title="Justify"
+                    >
+                        ⫼
+                    </button>
+                </div>
+
+                {/* Special */}
+                <div className="flex border-r border-gray-300 pr-2 mr-2">
+                    <button
+                        type="button"
+                        onClick={() => {
+                            const url = prompt('Enter URL:');
+                            if (url) handleRichTextCommand('createLink', url);
+                        }}
+                        className="p-2 hover:bg-gray-200 rounded transition-colors"
+                        title="Insert Link"
+                    >
+                        🔗
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => handleRichTextCommand('insertHorizontalRule')}
+                        className="p-2 hover:bg-gray-200 rounded transition-colors"
+                        title="Insert Line"
+                    >
+                        ─
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => handleRichTextCommand('superscript')}
+                        className="p-2 hover:bg-gray-200 rounded transition-colors"
+                        title="Superscript"
+                    >
+                        x²
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => handleRichTextCommand('subscript')}
+                        className="p-2 hover:bg-gray-200 rounded transition-colors"
+                        title="Subscript"
+                    >
+                        x₂
+                    </button>
+                </div>
+
+                {/* Actions */}
+                <div className="flex">
+                    <button
+                        type="button"
+                        onClick={() => handleRichTextCommand('undo')}
+                        className="p-2 hover:bg-gray-200 rounded transition-colors"
+                        title="Undo"
+                    >
+                        ↶
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => handleRichTextCommand('redo')}
+                        className="p-2 hover:bg-gray-200 rounded transition-colors"
+                        title="Redo"
+                    >
+                        ↷
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => handleRichTextCommand('removeFormat')}
+                        className="p-2 hover:bg-gray-200 rounded transition-colors"
+                        title="Clear Formatting"
+                    >
+                        Clear
+                    </button>
+                </div>
+            </div>
+
+            {/* Quick Actions Row */}
+            <div className="pt-2 border-t border-gray-200">
+                <div className="flex flex-wrap gap-1 text-xs">
+                    <span className="text-gray-600 mr-2">Quick Insert:</span>
+                    <button
+                        type="button"
+                        onClick={() => handleRichTextCommand('insertHTML', '<strong>Example:</strong> ')}
+                        className="px-2 py-1 bg-blue-100 hover:bg-blue-200 rounded transition-colors"
+                    >
+                        Add "Example:"
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => handleRichTextCommand('insertHTML', '<em>Note:</em> ')}
+                        className="px-2 py-1 bg-green-100 hover:bg-green-200 rounded transition-colors"
+                    >
+                        Add "Note:"
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => handleRichTextCommand('insertHTML', '<strong>Requirements:</strong><br>• <br>• <br>• ')}
+                        className="px-2 py-1 bg-purple-100 hover:bg-purple-200 rounded transition-colors"
+                    >
+                        Add Requirements List
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            const editor = editorRef.current;
+                            if (editor) {
+                                editor.innerHTML = '';
+                                richTextContentRef.current = '';
+                            }
+                        }}
+                        className="px-2 py-1 bg-red-100 hover:bg-red-200 rounded transition-colors"
+                    >
+                        Clear All
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+
     return (
         <div className="min-h-screen bg-gray-50 p-6">
             <div className="max-w-7xl mx-auto bg-white rounded-lg shadow-lg">
@@ -583,6 +1051,7 @@ const RubricCreator = () => {
                                         <h4 className="font-semibold text-gray-800 mb-2">🔧 Building Your Rubric</h4>
                                         <ul className="space-y-1 text-gray-700">
                                             <li><strong>Reset:</strong> Clear all data and start fresh</li>
+                                            <li><strong>Reset Sizes:</strong> Return all text boxes to original size</li>
                                             <li><strong>Import:</strong> Load AI-generated or existing rubric files</li>
                                             <li><strong>Use for Grading:</strong> Send directly to grading tool</li>
                                             <li><strong>Save Draft:</strong> Download work-in-progress (JSON)</li>
@@ -605,7 +1074,9 @@ const RubricCreator = () => {
                                 <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
                                     <p className="text-blue-800 text-sm">
                                         <strong>💡 Tip:</strong> Work is auto-saved every second. Switch between tabs freely - your progress is preserved.
-                                        Right-click any text area for full-page editing mode.
+                                    </p>
+                                    <p className="text-blue-800 text-sm mt-2">
+                                        <strong>📝 Rich Text Editing:</strong> Type directly in any description box for quick editing, OR click the blue expand button (⤢) for powerful inline rich text editor with full formatting toolbar including headings, colors, links, lists, and more!
                                     </p>
                                 </div>
                             </div>
@@ -613,7 +1084,7 @@ const RubricCreator = () => {
                     </div>
 
                     {/* Assignment Information */}
-                    <div className="bg-blue-50 border border-blue-200 p-6 rounded-lg mb-6">
+                    <div className="assignment-info bg-blue-50 border border-blue-200 p-6 rounded-lg mb-6">
                         <h3 className="text-lg font-semibold text-blue-800 mb-4">Assignment Information</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
@@ -639,23 +1110,36 @@ const RubricCreator = () => {
                             </div>
                             <div className="md:col-span-2">
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                                <textarea
-                                    value={rubricData.assignmentInfo.description}
-                                    onChange={(e) => updateAssignmentInfo('description', e.target.value)}
-                                    onContextMenu={(e) => {
-                                        e.preventDefault();
-                                        openModalEdit(
-                                            rubricData.assignmentInfo.description,
-                                            'Assignment Description',
-                                            (newContent) => updateAssignmentInfo('description', newContent)
-                                        );
-                                    }}
-                                    className="w-full p-3 border rounded-lg resize-both"
-                                    rows="3"
-                                    placeholder="Detailed description of assignment requirements and expectations..."
-                                    title="Right-click for full-page editor"
-                                    style={{ minHeight: '80px', maxHeight: '200px', resize: 'both' }}
-                                />
+                                <div className="relative">
+                                    <textarea
+                                        value={rubricData.assignmentInfo.description}
+                                        onChange={(e) => updateAssignmentInfo('description', e.target.value)}
+                                        className="w-full p-3 border rounded-lg resize-both hover:border-blue-400 transition-all duration-200 pr-12"
+                                        rows="3"
+                                        placeholder="Detailed description of assignment requirements and expectations..."
+                                        title="Type here for quick editing, or click the expand button for rich text editor"
+                                        style={{ minHeight: '80px', maxHeight: '200px', resize: 'both' }}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            openInlineEditor(
+                                                rubricData.assignmentInfo.description,
+                                                'Assignment Description',
+                                                (newContent) => updateAssignmentInfo('description', newContent),
+                                                null,
+                                                null,
+                                                'assignment'
+                                            );
+                                        }}
+                                        className="absolute top-2 right-2 z-10 opacity-70 hover:opacity-100 transition-opacity bg-blue-500 text-white rounded p-1 hover:bg-blue-600 cursor-pointer"
+                                        title="Open inline rich text editor"
+                                    >
+                                        <Maximize2 size={14} />
+                                    </button>
+                                </div>
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Passing Threshold (%)</label>
@@ -678,6 +1162,100 @@ const RubricCreator = () => {
                                 />
                             </div>
                         </div>
+
+                        {/* FIXED: Inline Rich Text Editor for Assignment */}
+                        {inlineEditor.show && inlineEditor.type === 'assignment' && (
+                            <div className="mt-6 border-2 border-blue-300 rounded-lg bg-white shadow-lg">
+                                {/* Editor Header */}
+                                <div className="flex justify-between items-center p-4 border-b bg-gradient-to-r from-blue-50 to-indigo-50">
+                                    <h4 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                                        <Maximize2 size={20} className="text-blue-600" />
+                                        Rich Text Editor: {inlineEditor.field}
+                                    </h4>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => closeInlineEditor(true)}
+                                            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded flex items-center gap-2 transition-colors"
+                                        >
+                                            <Save size={16} />
+                                            Save & Close
+                                        </button>
+                                        <button
+                                            onClick={() => closeInlineEditor(false)}
+                                            className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded flex items-center gap-2 transition-colors"
+                                        >
+                                            <X size={16} />
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <RichTextToolbar />
+
+                                {/* FIXED: Editor Content */}
+                                <div className="p-4">
+                                    <style>{`
+                                        .rich-text-editor h1 { font-size: 1.5em; font-weight: bold; margin: 0.5em 0; }
+                                        .rich-text-editor h2 { font-size: 1.3em; font-weight: bold; margin: 0.4em 0; }
+                                        .rich-text-editor h3 { font-size: 1.1em; font-weight: bold; margin: 0.3em 0; }
+                                        .rich-text-editor p { margin: 0.5em 0; }
+                                        .rich-text-editor ul, .rich-text-editor ol { margin: 0.5em 0; padding-left: 1.5em; }
+                                        .rich-text-editor li { margin: 0.2em 0; }
+                                        .rich-text-editor blockquote { 
+                                            margin: 0.5em 0; 
+                                            padding: 0.5em 1em; 
+                                            border-left: 4px solid #e5e7eb; 
+                                            background: #f9fafb; 
+                                            font-style: italic; 
+                                        }
+                                        .rich-text-editor pre { 
+                                            background: #f3f4f6; 
+                                            padding: 0.5em; 
+                                            border-radius: 4px; 
+                                            font-family: monospace; 
+                                            font-size: 0.9em; 
+                                            white-space: pre-wrap; 
+                                        }
+                                        .rich-text-editor a { color: #3b82f6; text-decoration: underline; }
+                                        .rich-text-editor hr { margin: 1em 0; border: none; border-top: 1px solid #d1d5db; }
+                                        .rich-text-editor br { line-height: 1.8; }
+                                    `}</style>
+                                    <div
+                                        ref={editorRef}
+                                        contentEditable={true}
+                                        onInput={handleRichTextChange}
+                                        onKeyDown={handleKeyDown}
+                                        className="w-full p-4 border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rich-text-editor"
+                                        style={{
+                                            minHeight: '200px',
+                                            backgroundColor: '#fff',
+                                            fontSize: '14px',
+                                            lineHeight: '1.8',
+                                            fontFamily: 'inherit',
+                                            whiteSpace: 'pre-wrap',
+                                            wordBreak: 'break-word'
+                                        }}
+                                        suppressContentEditableWarning={true}
+                                    />
+                                </div>
+
+                                {/* Footer */}
+                                <div className="p-4 border-t bg-gradient-to-r from-gray-50 to-blue-50 rounded-b-lg">
+                                    <div className="flex justify-between items-center">
+                                        <div className="flex items-center gap-4 text-sm text-gray-600">
+                                            <span className="flex items-center gap-2">
+                                                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                                                Rich Text Editor Active
+                                            </span>
+                                            <span>Use toolbar for advanced formatting</span>
+                                        </div>
+                                        <div className="text-xs text-gray-500">
+                                            <strong>Shortcuts:</strong> Ctrl+B (Bold), Ctrl+I (Italic), Ctrl+U (Underline), Enter (New Line), Tab (Indent)
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* Point System Selection */}
@@ -727,6 +1305,14 @@ const RubricCreator = () => {
                                     {reversedOrder ? 'High→Low' : 'Low→High'}
                                 </button>
                                 <button
+                                    onClick={resetTextareaSizes}
+                                    className="bg-gray-600 hover:bg-gray-700 px-3 py-2 rounded flex items-center gap-1 text-sm"
+                                    title="Reset all textarea sizes to original dimensions"
+                                >
+                                    <Minimize2 size={14} />
+                                    Reset Sizes
+                                </button>
+                                <button
                                     onClick={addCriterion}
                                     className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded flex items-center gap-2"
                                 >
@@ -767,106 +1353,234 @@ const RubricCreator = () => {
                                 </thead>
                                 <tbody>
                                     {rubricData.criteria.map((criterion, index) => (
-                                        <tr key={criterion.id}>
-                                            {/* Criterion Column */}
-                                            <td className="border p-3 bg-gray-50">
-                                                <div className="space-y-2">
-                                                    <input
-                                                        type="text"
-                                                        value={criterion.name}
-                                                        onChange={(e) => updateCriterion(criterion.id, 'name', e.target.value)}
-                                                        className="w-full p-2 border rounded text-sm font-medium"
-                                                        placeholder={`Criterion ${index + 1} name`}
-                                                    />
-                                                    <textarea
-                                                        value={criterion.description}
-                                                        onChange={(e) => updateCriterion(criterion.id, 'description', e.target.value)}
-                                                        onContextMenu={(e) => {
-                                                            e.preventDefault();
-                                                            openModalEdit(
-                                                                criterion.description,
-                                                                'Criterion Description',
-                                                                (newContent) => updateCriterion(criterion.id, 'description', newContent)
-                                                            );
-                                                        }}
-                                                        className="w-full p-2 border rounded text-xs resize-both"
-                                                        rows="2"
-                                                        placeholder="Brief description of what this criterion measures"
-                                                        title="Right-click for full-page editor"
-                                                        style={{ minHeight: '48px', maxHeight: '200px', resize: 'both' }}
-                                                    />
-                                                    <div className="flex gap-2">
-                                                        <div className="flex-1">
-                                                            <label className="text-xs text-gray-600">Max Points</label>
-                                                            <input
-                                                                type="number"
-                                                                value={criterion.maxPoints}
-                                                                onChange={(e) => updateCriterion(criterion.id, 'maxPoints', parseInt(e.target.value) || 0)}
-                                                                className="w-full p-1 border rounded text-sm"
-                                                                min="0"
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </td>
-
-                                            {/* Level Columns */}
-                                            {getDisplayLevels().map((level) => (
-                                                <td key={level.level} className="border p-3 align-top">
+                                        <React.Fragment key={criterion.id}>
+                                            <tr>
+                                                {/* Criterion Column */}
+                                                <td className="border p-3 bg-gray-50">
                                                     <div className="space-y-2">
-                                                        <div className="text-center">
-                                                            <div
-                                                                className="font-bold text-sm px-2 py-1 rounded"
-                                                                style={{
-                                                                    color: level.color,
-                                                                    backgroundColor: level.color + '20'
+                                                        <input
+                                                            type="text"
+                                                            value={criterion.name}
+                                                            onChange={(e) => updateCriterion(criterion.id, 'name', e.target.value)}
+                                                            className="w-full p-2 border rounded text-sm font-medium"
+                                                            placeholder={`Criterion ${index + 1} name`}
+                                                        />
+                                                        <div className="relative">
+                                                            <textarea
+                                                                value={criterion.description}
+                                                                onChange={(e) => updateCriterion(criterion.id, 'description', e.target.value)}
+                                                                className="w-full p-2 border rounded text-xs resize-both hover:border-blue-400 transition-all duration-200 pr-8"
+                                                                rows="2"
+                                                                placeholder="Brief description of what this criterion measures"
+                                                                title="Type here for quick editing, or click the expand button for rich text editor"
+                                                                style={{ minHeight: '48px', maxHeight: '200px', resize: 'both' }}
+                                                            />
+                                                            <button
+                                                                type="button"
+                                                                onClick={(e) => {
+                                                                    e.preventDefault();
+                                                                    e.stopPropagation();
+                                                                    openInlineEditor(
+                                                                        criterion.description,
+                                                                        `Criterion Description - ${criterion.name || 'Criterion'}`,
+                                                                        (newContent) => updateCriterion(criterion.id, 'description', newContent),
+                                                                        criterion.id,
+                                                                        null,
+                                                                        'criterion'
+                                                                    );
                                                                 }}
+                                                                className="absolute top-1 right-1 z-10 opacity-70 hover:opacity-100 transition-opacity bg-blue-500 text-white rounded p-1 hover:bg-blue-600 cursor-pointer"
+                                                                title="Open inline rich text editor"
                                                             >
-                                                                {calculatePointRange(criterion, level.level)} pts
+                                                                <Maximize2 size={12} />
+                                                            </button>
+                                                        </div>
+                                                        <div className="flex gap-2">
+                                                            <div className="flex-1">
+                                                                <label className="text-xs text-gray-600">Max Points</label>
+                                                                <input
+                                                                    type="number"
+                                                                    value={criterion.maxPoints}
+                                                                    onChange={(e) => updateCriterion(criterion.id, 'maxPoints', parseInt(e.target.value) || 0)}
+                                                                    className="w-full p-1 border rounded text-sm"
+                                                                    min="0"
+                                                                />
                                                             </div>
                                                         </div>
-                                                        <textarea
-                                                            value={criterion.levels[level.level]?.description || ''}
-                                                            onChange={(e) => updateCriterionLevel(criterion.id, level.level, 'description', e.target.value)}
-                                                            onContextMenu={(e) => {
-                                                                e.preventDefault();
-                                                                openModalEdit(
-                                                                    criterion.levels[level.level]?.description || '',
-                                                                    `${level.name} Description - ${criterion.name || 'Criterion'}`,
-                                                                    (newContent) => updateCriterionLevel(criterion.id, level.level, 'description', newContent)
-                                                                );
-                                                            }}
-                                                            className="w-full p-2 border rounded text-xs resize-both"
-                                                            rows="4"
-                                                            placeholder={`Describe ${level.name.toLowerCase()} performance...`}
-                                                            title="Right-click for full-page editor"
-                                                            style={{ minHeight: '80px', maxHeight: '300px', resize: 'both' }}
-                                                        />
-                                                        {pointingSystem === 'custom' && (
-                                                            <input
-                                                                type="text"
-                                                                value={criterion.levels[level.level]?.pointRange || ''}
-                                                                onChange={(e) => updateCriterionLevel(criterion.id, level.level, 'pointRange', e.target.value)}
-                                                                className="w-full p-1 border rounded text-xs text-center"
-                                                                placeholder="e.g., 18-20"
-                                                            />
-                                                        )}
                                                     </div>
                                                 </td>
-                                            ))}
 
-                                            {/* Actions Column */}
-                                            <td className="border p-3 text-center">
-                                                <button
-                                                    onClick={() => removeCriterion(criterion.id)}
-                                                    className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50"
-                                                    disabled={rubricData.criteria.length === 1}
-                                                    title={rubricData.criteria.length === 1 ? "Cannot remove the last criterion" : "Remove this criterion"}
-                                                >
-                                                    <X size={16} />
-                                                </button>
-                                            </td>
-                                        </tr>
+                                                {/* Level Columns */}
+                                                {getDisplayLevels().map((level) => (
+                                                    <td key={level.level} className="border p-3 align-top">
+                                                        <div className="space-y-2">
+                                                            <div className="text-center">
+                                                                <div
+                                                                    className="font-bold text-sm px-2 py-1 rounded"
+                                                                    style={{
+                                                                        color: level.color,
+                                                                        backgroundColor: level.color + '20'
+                                                                    }}
+                                                                >
+                                                                    {calculatePointRange(criterion, level.level)} pts
+                                                                </div>
+                                                            </div>
+                                                            <div className="relative">
+                                                                <textarea
+                                                                    value={criterion.levels[level.level]?.description || ''}
+                                                                    onChange={(e) => updateCriterionLevel(criterion.id, level.level, 'description', e.target.value)}
+                                                                    className="w-full p-2 border rounded text-xs resize-both hover:border-blue-400 transition-all duration-200 pr-8"
+                                                                    rows="4"
+                                                                    placeholder={`Describe ${level.name.toLowerCase()} performance...`}
+                                                                    title="Type here for quick editing, or click the expand button for rich text editor"
+                                                                    style={{ minHeight: '80px', maxHeight: '300px', resize: 'both' }}
+                                                                />
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={(e) => {
+                                                                        e.preventDefault();
+                                                                        e.stopPropagation();
+                                                                        openInlineEditor(
+                                                                            criterion.levels[level.level]?.description || '',
+                                                                            `${level.name} Level - ${criterion.name || 'Criterion'}`,
+                                                                            (newContent) => updateCriterionLevel(criterion.id, level.level, 'description', newContent),
+                                                                            criterion.id,
+                                                                            level.level,
+                                                                            'level'
+                                                                        );
+                                                                    }}
+                                                                    className="absolute top-1 right-1 z-10 opacity-70 hover:opacity-100 transition-opacity bg-blue-500 text-white rounded p-1 hover:bg-blue-600 cursor-pointer"
+                                                                    title="Open inline rich text editor"
+                                                                >
+                                                                    <Maximize2 size={12} />
+                                                                </button>
+                                                            </div>
+                                                            {pointingSystem === 'custom' && (
+                                                                <input
+                                                                    type="text"
+                                                                    value={criterion.levels[level.level]?.pointRange || ''}
+                                                                    onChange={(e) => updateCriterionLevel(criterion.id, level.level, 'pointRange', e.target.value)}
+                                                                    className="w-full p-1 border rounded text-xs text-center"
+                                                                    placeholder="e.g., 18-20"
+                                                                />
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                ))}
+
+                                                {/* Actions Column */}
+                                                <td className="border p-3 text-center">
+                                                    <button
+                                                        onClick={() => removeCriterion(criterion.id)}
+                                                        className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50"
+                                                        disabled={rubricData.criteria.length === 1}
+                                                        title={rubricData.criteria.length === 1 ? "Cannot remove the last criterion" : "Remove this criterion"}
+                                                    >
+                                                        <X size={16} />
+                                                    </button>
+                                                </td>
+                                            </tr>
+
+                                            {/* FIXED: Inline Rich Text Editor for Criterion or Level */}
+                                            {inlineEditor.show &&
+                                                inlineEditor.criterionId === criterion.id &&
+                                                (inlineEditor.type === 'criterion' || inlineEditor.type === 'level') && (
+                                                    <tr>
+                                                        <td colSpan={getDisplayLevels().length + 2} className="border-0 p-0">
+                                                            <div className="border-2 border-blue-300 rounded-lg bg-white shadow-lg m-2">
+                                                                {/* Editor Header */}
+                                                                <div className="flex justify-between items-center p-4 border-b bg-gradient-to-r from-blue-50 to-indigo-50">
+                                                                    <h4 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                                                                        <Maximize2 size={20} className="text-blue-600" />
+                                                                        Rich Text Editor: {inlineEditor.field}
+                                                                    </h4>
+                                                                    <div className="flex gap-2">
+                                                                        <button
+                                                                            onClick={() => closeInlineEditor(true)}
+                                                                            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded flex items-center gap-2 transition-colors"
+                                                                        >
+                                                                            <Save size={16} />
+                                                                            Save & Close
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => closeInlineEditor(false)}
+                                                                            className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded flex items-center gap-2 transition-colors"
+                                                                        >
+                                                                            <X size={16} />
+                                                                            Cancel
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+
+                                                                <RichTextToolbar />
+
+                                                                {/* FIXED: Editor Content */}
+                                                                <div className="p-4">
+                                                                    <style>{`
+                                                                    .rich-text-editor h1 { font-size: 1.5em; font-weight: bold; margin: 0.5em 0; }
+                                                                    .rich-text-editor h2 { font-size: 1.3em; font-weight: bold; margin: 0.4em 0; }
+                                                                    .rich-text-editor h3 { font-size: 1.1em; font-weight: bold; margin: 0.3em 0; }
+                                                                    .rich-text-editor p { margin: 0.5em 0; }
+                                                                    .rich-text-editor ul, .rich-text-editor ol { margin: 0.5em 0; padding-left: 1.5em; }
+                                                                    .rich-text-editor li { margin: 0.2em 0; }
+                                                                    .rich-text-editor blockquote { 
+                                                                        margin: 0.5em 0; 
+                                                                        padding: 0.5em 1em; 
+                                                                        border-left: 4px solid #e5e7eb; 
+                                                                        background: #f9fafb; 
+                                                                        font-style: italic; 
+                                                                    }
+                                                                    .rich-text-editor pre { 
+                                                                        background: #f3f4f6; 
+                                                                        padding: 0.5em; 
+                                                                        border-radius: 4px; 
+                                                                        font-family: monospace; 
+                                                                        font-size: 0.9em; 
+                                                                        white-space: pre-wrap; 
+                                                                    }
+                                                                    .rich-text-editor a { color: #3b82f6; text-decoration: underline; }
+                                                                    .rich-text-editor hr { margin: 1em 0; border: none; border-top: 1px solid #d1d5db; }
+                                                                    .rich-text-editor br { line-height: 1.8; }
+                                                                `}</style>
+                                                                    <div
+                                                                        ref={editorRef}
+                                                                        contentEditable={true}
+                                                                        onInput={handleRichTextChange}
+                                                                        onKeyDown={handleKeyDown}
+                                                                        className="w-full p-4 border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rich-text-editor"
+                                                                        style={{
+                                                                            minHeight: '150px',
+                                                                            backgroundColor: '#fff',
+                                                                            fontSize: '14px',
+                                                                            lineHeight: '1.8',
+                                                                            fontFamily: 'inherit',
+                                                                            whiteSpace: 'pre-wrap',
+                                                                            wordBreak: 'break-word'
+                                                                        }}
+                                                                        suppressContentEditableWarning={true}
+                                                                    />
+                                                                </div>
+
+                                                                {/* Footer */}
+                                                                <div className="p-4 border-t bg-gradient-to-r from-gray-50 to-blue-50 rounded-b-lg">
+                                                                    <div className="flex justify-between items-center">
+                                                                        <div className="flex items-center gap-4 text-sm text-gray-600">
+                                                                            <span className="flex items-center gap-2">
+                                                                                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                                                                                Rich Text Editor Active
+                                                                            </span>
+                                                                            <span>Use toolbar for formatting</span>
+                                                                        </div>
+                                                                        <div className="text-xs text-gray-500">
+                                                                            <strong>Shortcuts:</strong> Ctrl+B (Bold), Ctrl+I (Italic), Ctrl+U (Underline), Enter (New Line), Tab (Indent)
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                        </React.Fragment>
                                     ))}
                                 </tbody>
                             </table>
@@ -931,7 +1645,7 @@ const RubricCreator = () => {
                                                                     <span
                                                                         className="flex-1 p-2 bg-gray-50 rounded border cursor-pointer hover:bg-gray-100 transition-colors"
                                                                         onClick={() => {
-                                                                            openModalEdit(
+                                                                            openInlineEditor(
                                                                                 item,
                                                                                 `${category} Comment`,
                                                                                 (newContent) => {
@@ -951,7 +1665,10 @@ const RubricCreator = () => {
                                                                                                 : c
                                                                                         )
                                                                                     }));
-                                                                                }
+                                                                                },
+                                                                                criterion.id,
+                                                                                null,
+                                                                                'feedback'
                                                                             );
                                                                         }}
                                                                         title="Click to edit"
@@ -1026,51 +1743,6 @@ const RubricCreator = () => {
                         )}
                     </div>
                 </div>
-
-                {/* Full-Page Text Editor Modal */}
-                {modalEdit.show && (
-                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                        <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl h-full max-h-[90vh] flex flex-col">
-                            <div className="flex justify-between items-center p-4 border-b bg-gray-50">
-                                <h3 className="text-lg font-semibold text-gray-800">
-                                    <Maximize2 size={20} className="inline mr-2" />
-                                    Edit: {modalEdit.field}
-                                </h3>
-                                <div className="flex gap-2">
-                                    <button
-                                        onClick={() => closeModalEdit(true)}
-                                        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded flex items-center gap-2"
-                                    >
-                                        <Save size={16} />
-                                        Save & Close
-                                    </button>
-                                    <button
-                                        onClick={() => closeModalEdit(false)}
-                                        className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded flex items-center gap-2"
-                                    >
-                                        <X size={16} />
-                                        Cancel
-                                    </button>
-                                </div>
-                            </div>
-                            <div className="flex-1 p-4">
-                                <textarea
-                                    value={modalEdit.content}
-                                    onChange={(e) => setModalEdit(prev => ({ ...prev, content: e.target.value }))}
-                                    className="w-full h-full p-4 border rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                    placeholder="Enter your detailed text here..."
-                                    style={{ minHeight: '400px' }}
-                                />
-                            </div>
-                            <div className="p-4 border-t bg-gray-50 rounded-b-lg">
-                                <p className="text-sm text-gray-600">
-                                    <strong>💡 Full-Page Editor:</strong> Use this space for detailed descriptions and comprehensive feedback comments.
-                                    Your changes are automatically saved when you click "Save & Close".
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                )}
 
                 {/* Hidden file inputs */}
                 <input
