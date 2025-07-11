@@ -34,7 +34,8 @@ const ToolbarButton = ({ icon: Icon, onClick, title }) => (
 );
 
 const MarkupEditor = React.forwardRef(({ initialHTML, onChange }, ref) => {
-  const editorRef = ref || useRef(null);
+  const localRef = useRef(null);
+  const editorRef = ref || localRef;
 
   useEffect(() => {
     if (editorRef.current) {
