@@ -1759,3 +1759,25 @@ button.p-3.rounded-lg.border-2 {
     background: white !important;
   }
 }
+/* ─── RICH-TEXT EDITOR LIST TWEAKS ─────────────────────────────── */
+.rich-text-editor li {
+  margin: 0.2em 0;
+}
+
+/* normal line height */
+.rich-text-editor li p {
+  margin: 0;
+}
+
+/* remove extra gap */
+.rich-text-editor p {
+  margin: 0.25em 0;
+}
+
+/* gentle spacing, not huge gaps */
+.rich-text-editor p,
+.rich-text-editor li {
+  margin-top: 0;
+  margin-bottom: 0.5em;
+  /* Adjust this value as needed for desired spacing */
+}

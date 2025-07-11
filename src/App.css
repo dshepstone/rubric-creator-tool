@@ -36,3 +36,15 @@
     transform: rotate(360deg);
   }
 }
+#editor {
+  border: 1px solid #ccc;
+  padding: 1rem;
+  min-height: 200px;
+  line-height: 1.5;
+  border-radius: 4px;
+}
+
+#editor ul,
+#editor ol {
+  margin-left: 1.5rem;
+}

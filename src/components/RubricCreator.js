@@ -1,6 +1,63 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Plus, X, Upload, Download, Save, FileText, RotateCcw, ChevronDown, ChevronUp, Maximize2, ArrowRight, Minimize2 } from 'lucide-react';
+import { Plus, X, Upload, Download, Save, FileText, RotateCcw, ChevronDown, ChevronUp, Maximize2, ArrowRight, Minimize2, Edit3 } from 'lucide-react';
 import { useAssessment } from './SharedContext';
+
+/**
+ * ===================================================================================
+ * MARKDOWN PASTE UTILITY
+ * ===================================================================================
+ * This function converts plain text (with markdown-like lists) into clean HTML.
+ * It's designed to be robust and handle various list formats reliably.
+ *
+ * @param {string} text - The plain text from the clipboard.
+ * @returns {string} - A clean HTML string.
+ */
+const pasteAsMarkdown = (text) => {
+    if (!text) return '';
+
+    const lines = text.split('\n');
+    let html = '';
+    let inList = false;
+    let listType = null; // 'ol' or 'ul'
+
+    const closeList = () => {
+        if (inList) {
+            html += `</${listType}>`;
+            inList = false;
+            listType = null;
+        }
+    };
+
+    lines.forEach(line => {
+        const trimmedLine = line.trim();
+        const isNumberedList = /^\d+\.\s/.test(trimmedLine);
+        const isBulletedList = /^(\*|-)\s/.test(trimmedLine);
+
+        if (isNumberedList || isBulletedList) {
+            const currentListType = isNumberedList ? 'ol' : 'ul';
+            if (!inList || currentListType !== listType) {
+                closeList();
+                html += `<${currentListType}>`;
+                inList = true;
+                listType = currentListType;
+            }
+            // Remove the markdown prefix (e.g., "1. " or "* ")
+            html += `<li>${trimmedLine.replace(/^(\d+\.|\*|-)\s/, '')}</li>`;
+        } else {
+            closeList();
+            if (trimmedLine) {
+                html += `<p>${trimmedLine}</p>`;
+            } else {
+                // If the line is empty, it acts as a paragraph break.
+                // We don't add anything here, letting the paragraph tags handle spacing.
+            }
+        }
+    });
+
+    closeList(); // Ensure any open list is closed at the end.
+    return html;
+};
+
 
 const RubricCreator = () => {
     // Get shared context functions and state
@@ -69,14 +126,32 @@ const RubricCreator = () => {
     });
     const [autoSaveTimeout, setAutoSaveTimeout] = useState(null);
 
-    // FIXED: Use refs instead of state for rich text content to prevent cursor jumping
+    // Use refs instead of state for rich text content to prevent cursor jumping
     const richTextContentRef = useRef('');
     const editorRef = useRef(null);
 
     // Refs for file inputs
     const importInputRef = useRef(null);
 
-    // FIXED: Cursor position management functions
+    // Helper functions for HTML content handling
+    const containsHtml = (content) => {
+        return content && /<[^>]*>/.test(content);
+    };
+
+    const stripHtml = (html) => {
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = html;
+        return tempDiv.textContent || tempDiv.innerText || '';
+    };
+
+    const sanitizeHtml = (html) => {
+        // Create a temporary div to clean and validate HTML
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = html;
+        return tempDiv.innerHTML;
+    };
+
+    // Cursor position management functions
     const saveCursorPosition = () => {
         const editor = editorRef.current;
         if (!editor) return null;
@@ -152,9 +227,9 @@ const RubricCreator = () => {
         }));
     };
 
-    // FIXED: Open inline editor for text editing
+    // Open inline editor for text editing - FIXED to preserve HTML
     const openInlineEditor = (content, field, onSave, criterionId = null, level = null, type = 'assignment') => {
-        // Initialize the ref with current content
+        // Initialize the ref with current content (preserve HTML)
         richTextContentRef.current = content || '';
 
         setInlineEditor({
@@ -171,6 +246,7 @@ const RubricCreator = () => {
         setTimeout(() => {
             const editor = editorRef.current;
             if (editor) {
+                // FIXED: Preserve HTML formatting when opening editor
                 editor.innerHTML = content || '';
                 editor.focus();
                 // Place cursor at end
@@ -184,7 +260,7 @@ const RubricCreator = () => {
         }, 100);
     };
 
-    // FIXED: Enhanced rich text editor functions
+    // Enhanced rich text editor functions
     const handleRichTextCommand = (command, value = null) => {
         const editor = editorRef.current;
         if (editor) {
@@ -195,7 +271,17 @@ const RubricCreator = () => {
 
             document.execCommand(command, false, value);
 
-            // Update our ref content
+            // Update our ref content with light cleaning to maintain consistency
+            const currentContent = editor.innerHTML;
+            // Only apply light cleaning for commands, not the heavy paste cleaning
+            const lightCleaned = currentContent
+                .replace(/(<br\s*\/?>\s*){4,}/gi, '<br><br><br>') // Limit consecutive line breaks
+                .replace(/&nbsp;{3,}/gi, '&nbsp;&nbsp;'); // Limit consecutive spaces
+
+            if (lightCleaned !== currentContent) {
+                editor.innerHTML = lightCleaned;
+            }
+
             richTextContentRef.current = editor.innerHTML;
 
             // Restore cursor position if needed
@@ -207,14 +293,36 @@ const RubricCreator = () => {
         }
     };
 
-    // FIXED: Handle rich text changes without state updates
+    // Handle rich text changes without state updates
     const handleRichTextChange = (e) => {
         const editor = editorRef.current;
         if (editor) {
-            // Simply update our ref, don't trigger state update
+            // Update our ref with current content
             richTextContentRef.current = editor.innerHTML;
         }
     };
+
+    // Corrected Code
+    const handlePaste = (e) => {
+        e.preventDefault();
+        const clipboardData = e.clipboardData || window.clipboardData;
+        let pasteData = '';
+
+        // Prioritize HTML content if available
+        if (clipboardData.types.includes('text/html')) {
+            const dirtyHtml = clipboardData.getData('text/html');
+            // Use the existing sanitize function to clean the HTML
+            pasteData = sanitizeHtml(dirtyHtml);
+        } else {
+            // Fallback to the plain text markdown converter
+            const plainText = clipboardData.getData('text/plain');
+            pasteData = pasteAsMarkdown(plainText);
+        }
+
+        // Insert the cleaned HTML into the editor
+        document.execCommand('insertHTML', false, pasteData);
+    };
+
 
     // FIXED: Handle key events properly
     const handleKeyDown = (e) => {
@@ -222,10 +330,17 @@ const RubricCreator = () => {
         if (!editor) return;
 
         if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            // Insert proper line break
-            document.execCommand('insertHTML', false, '<br><br>');
-            richTextContentRef.current = editor.innerHTML;
+            // Let the browser handle normal paragraph creation by default
+            // Only clean afterwards if needed
+            setTimeout(() => {
+                const currentContent = editor.innerHTML;
+                // Only clean if there are excessive breaks
+                const cleaned = currentContent.replace(/(<br\s*\/?>\s*){4,}/gi, '<br><br><br>');
+                if (cleaned !== currentContent) {
+                    editor.innerHTML = cleaned;
+                }
+                richTextContentRef.current = editor.innerHTML;
+            }, 0);
         } else if (e.key === 'Tab') {
             e.preventDefault();
             document.execCommand('insertHTML', false, '&nbsp;&nbsp;&nbsp;&nbsp;');
@@ -251,22 +366,11 @@ const RubricCreator = () => {
         }
     };
 
-    const convertHtmlToPlainText = (html) => {
-        // Create a temporary div to parse HTML
-        const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = html;
-        return tempDiv.textContent || tempDiv.innerText || '';
-    };
-
-    // FIXED: Close inline editor and save if needed
+    // FIXED: Close inline editor and save HTML content instead of plain text
     const closeInlineEditor = (save = false) => {
         if (save && inlineEditor.onSave) {
-            // Get the current content from ref (most up-to-date)
-            const finalContent = richTextContentRef.current;
-            const plainText = convertHtmlToPlainText(finalContent);
-            inlineEditor.onSave(plainText);
+            inlineEditor.onSave(richTextContentRef.current);
         }
-
         setInlineEditor({
             show: false,
             content: '',
@@ -593,7 +697,7 @@ const RubricCreator = () => {
 <body>
     <div class="header">
         <h1>${rubricData.assignmentInfo.title || 'Assessment Rubric'}</h1>
-        <p style="color: #64748b; font-size: 1.1em;">${rubricData.assignmentInfo.description || 'No description provided'}</p>
+        <p style="color: #64748b; font-size: 1.1em;">${stripHtml(rubricData.assignmentInfo.description) || 'No description provided'}</p>
     </div>
     
     <div class="assignment-info">
@@ -618,7 +722,7 @@ const RubricCreator = () => {
                     <td class="criterion-name">
                         <strong style="color: #1e40af; font-size: 1.1em;">${criterion.name || 'Unnamed Criterion'}</strong>
                         <div style="font-weight: normal; color: #475569; margin-top: 8px; font-style: italic;">
-                            ${criterion.description || 'No description provided'}
+                            ${stripHtml(criterion.description) || 'No description provided'}
                         </div>
                         <div style="background: #1e40af; color: white; padding: 5px 10px; border-radius: 4px; margin-top: 10px; text-align: center; font-weight: bold;">
                             ${criterion.maxPoints} points
@@ -630,7 +734,7 @@ const RubricCreator = () => {
                                 ${calculatePointRange(criterion, level.level)} pts
                             </div>
                             <div class="level-description">
-                                ${criterion.levels[level.level]?.description || '<em>Not defined</em>'}
+                                ${stripHtml(criterion.levels[level.level]?.description) || '<em>Not defined</em>'}
                             </div>
                         </td>
                     `).join('')}
@@ -676,6 +780,94 @@ const RubricCreator = () => {
         link.download = `rubric_${rubricData.assignmentInfo.title.replace(/\s+/g, '_') || 'display'}_${new Date().toISOString().split('T')[0]}.html`;
         link.click();
         URL.revokeObjectURL(url);
+    };
+
+    // FIXED: Content display component that handles both HTML and plain text
+    const ContentDisplay = ({ content, onEdit, placeholder, isTextarea = false, className = "" }) => {
+        const hasHtml = containsHtml(content);
+
+        if (hasHtml && !isTextarea) {
+            return (
+                <div className={`relative group ${className}`}>
+                    <div
+                        className="p-2 border rounded text-xs bg-white min-h-[80px] max-h-[300px] overflow-y-auto"
+                        style={{
+                            wordWrap: 'break-word',
+                            overflowWrap: 'break-word',
+                            whiteSpace: 'pre-wrap',
+                            maxWidth: '100%'
+                        }}
+                        dangerouslySetInnerHTML={{ __html: content }}
+                    />
+                    <button
+                        type="button"
+                        onClick={onEdit}
+                        className="absolute top-1 right-1 opacity-70 group-hover:opacity-100 transition-opacity bg-blue-500 text-white rounded p-1 hover:bg-blue-600 cursor-pointer"
+                        title="Open rich text editor"
+                    >
+                        <Edit3 size={12} />
+                    </button>
+                </div>
+            );
+        }
+
+        if (isTextarea) {
+            return (
+                <div className="relative">
+                    <textarea
+                        value={content}
+                        onChange={(e) => onEdit(e.target.value)}
+                        className={`w-full p-3 border rounded-lg resize-both hover:border-blue-400 transition-all duration-200 pr-12 ${className}`}
+                        rows="3"
+                        placeholder={placeholder}
+                        title="Type here for quick editing, or click the expand button for rich text editor"
+                        style={{
+                            minHeight: '80px',
+                            maxHeight: '200px',
+                            resize: 'both',
+                            wordWrap: 'break-word',
+                            overflowWrap: 'break-word'
+                        }}
+                    />
+                    <button
+                        type="button"
+                        onClick={() => onEdit(null, true)} // Signal to open rich editor
+                        className="absolute top-2 right-2 z-10 opacity-70 hover:opacity-100 transition-opacity bg-blue-500 text-white rounded p-1 hover:bg-blue-600 cursor-pointer"
+                        title="Open rich text editor"
+                    >
+                        <Maximize2 size={14} />
+                    </button>
+                </div>
+            );
+        }
+
+        return (
+            <div className="relative">
+                <textarea
+                    value={content}
+                    onChange={(e) => onEdit(e.target.value)}
+                    className={`w-full p-2 border rounded text-xs resize-both hover:border-blue-400 transition-all duration-200 pr-8 ${className}`}
+                    rows="2"
+                    placeholder={placeholder}
+                    title="Type here for quick editing, or click the expand button for rich text editor"
+                    style={{
+                        minHeight: '48px',
+                        maxHeight: '200px',
+                        resize: 'both',
+                        wordWrap: 'break-word',
+                        overflowWrap: 'break-word'
+                    }}
+                />
+                <button
+                    type="button"
+                    onClick={() => onEdit(null, true)} // Signal to open rich editor
+                    className="absolute top-1 right-1 z-10 opacity-70 hover:opacity-100 transition-opacity bg-blue-500 text-white rounded p-1 hover:bg-blue-600 cursor-pointer"
+                    title="Open rich text editor"
+                >
+                    <Maximize2 size={12} />
+                </button>
+            </div>
+        );
     };
 
     // Enhanced Rich Text Toolbar Component
@@ -938,10 +1130,17 @@ const RubricCreator = () => {
                     </button>
                     <button
                         type="button"
-                        onClick={() => handleRichTextCommand('insertHTML', '<strong>Requirements:</strong><br>• <br>• <br>• ')}
+                        onClick={() => handleRichTextCommand('insertHTML', '<strong>Requirements:</strong><ul><li></li><li></li><li></li></ul>')}
                         className="px-2 py-1 bg-purple-100 hover:bg-purple-200 rounded transition-colors"
                     >
                         Add Requirements List
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => handleRichTextCommand('insertHTML', '<ol><li><strong>First step</strong> - <em>description</em></li><li><strong>Second step</strong> - <em>description</em></li><li><strong>Third step</strong> - <em>description</em></li></ol>')}
+                        className="px-2 py-1 bg-indigo-100 hover:bg-indigo-200 rounded transition-colors"
+                    >
+                        Add Formatted Steps
                     </button>
                     <button
                         type="button"
@@ -963,6 +1162,48 @@ const RubricCreator = () => {
 
     return (
         <div className="min-h-screen bg-gray-50 p-6">
+            {/* FIXED: Added CSS for improved list rendering and table width constraints */}
+            <style>{`
+                .rubric-table-container table {
+                    table-layout: fixed;
+                    width: 100%;
+                }
+                .rubric-table-container td {
+                    max-width: 0;
+                    word-wrap: break-word;
+                    overflow-wrap: break-word;
+                    white-space: pre-wrap;
+                    vertical-align: top;
+                }
+                .rubric-table-container .criterion-column {
+                    width: 200px;
+                }
+                .rubric-table-container .level-column {
+                    width: calc((100% - 200px - 80px) / 7);
+                }
+                .rubric-table-container .actions-column {
+                    width: 80px;
+                }
+                
+                /* FIXED: Enhanced list styling for better paste rendering */
+                .rich-text-editor li {
+                    margin: 0.2em 0;
+                    line-height: 1.4;
+                }
+                
+                /* Kill stray <p> margin that might slip through */
+                .rich-text-editor li p {
+                    margin: 0;
+                }
+                
+                /* Better spacing for lists overall */
+                .rich-text-editor ul, .rich-text-editor ol {
+                    margin: 0.5em 0;
+                    padding-left: 1.5em;
+                    line-height: 1.5;
+                }
+            `}</style>
+
             <div className="max-w-7xl mx-auto bg-white rounded-lg shadow-lg">
                 {/* Header */}
                 <div className="bg-blue-900 text-white p-6 rounded-t-lg">
@@ -1078,6 +1319,9 @@ const RubricCreator = () => {
                                     <p className="text-blue-800 text-sm mt-2">
                                         <strong>📝 Rich Text Editing:</strong> Type directly in any description box for quick editing, OR click the blue expand button (⤢) for powerful inline rich text editor with full formatting toolbar including headings, colors, links, lists, and more!
                                     </p>
+                                    <p className="text-blue-800 text-sm mt-2">
+                                        <strong>🎯 FIXED:</strong> Copy/paste from Word and Google Docs now preserves lists, formatting, and proper spacing with NO vertical gaps!
+                                    </p>
                                 </div>
                             </div>
                         )}
@@ -1110,21 +1354,10 @@ const RubricCreator = () => {
                             </div>
                             <div className="md:col-span-2">
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                                <div className="relative">
-                                    <textarea
-                                        value={rubricData.assignmentInfo.description}
-                                        onChange={(e) => updateAssignmentInfo('description', e.target.value)}
-                                        className="w-full p-3 border rounded-lg resize-both hover:border-blue-400 transition-all duration-200 pr-12"
-                                        rows="3"
-                                        placeholder="Detailed description of assignment requirements and expectations..."
-                                        title="Type here for quick editing, or click the expand button for rich text editor"
-                                        style={{ minHeight: '80px', maxHeight: '200px', resize: 'both' }}
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={(e) => {
-                                            e.preventDefault();
-                                            e.stopPropagation();
+                                <ContentDisplay
+                                    content={rubricData.assignmentInfo.description}
+                                    onEdit={(value, openRichEditor) => {
+                                        if (openRichEditor) {
                                             openInlineEditor(
                                                 rubricData.assignmentInfo.description,
                                                 'Assignment Description',
@@ -1133,13 +1366,13 @@ const RubricCreator = () => {
                                                 null,
                                                 'assignment'
                                             );
-                                        }}
-                                        className="absolute top-2 right-2 z-10 opacity-70 hover:opacity-100 transition-opacity bg-blue-500 text-white rounded p-1 hover:bg-blue-600 cursor-pointer"
-                                        title="Open inline rich text editor"
-                                    >
-                                        <Maximize2 size={14} />
-                                    </button>
-                                </div>
+                                        } else {
+                                            updateAssignmentInfo('description', value);
+                                        }
+                                    }}
+                                    placeholder="Detailed description of assignment requirements and expectations..."
+                                    isTextarea={true}
+                                />
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Passing Threshold (%)</label>
@@ -1163,7 +1396,7 @@ const RubricCreator = () => {
                             </div>
                         </div>
 
-                        {/* FIXED: Inline Rich Text Editor for Assignment */}
+                        {/* Inline Rich Text Editor for Assignment */}
                         {inlineEditor.show && inlineEditor.type === 'assignment' && (
                             <div className="mt-6 border-2 border-blue-300 rounded-lg bg-white shadow-lg">
                                 {/* Editor Header */}
@@ -1182,7 +1415,7 @@ const RubricCreator = () => {
                                         </button>
                                         <button
                                             onClick={() => closeInlineEditor(false)}
-                                            className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded flex items-center gap-2 transition-colors"
+                                            className="bg-gray-800 hover:bg-gray-900 text-white px-4 py-2 rounded flex items-center gap-2 transition-colors"
                                         >
                                             <X size={16} />
                                             Cancel
@@ -1192,21 +1425,23 @@ const RubricCreator = () => {
 
                                 <RichTextToolbar />
 
-                                {/* FIXED: Editor Content */}
+                                {/* Editor Content */}
                                 <div className="p-4">
                                     <style>{`
-                                        .rich-text-editor h1 { font-size: 1.5em; font-weight: bold; margin: 0.5em 0; }
-                                        .rich-text-editor h2 { font-size: 1.3em; font-weight: bold; margin: 0.4em 0; }
-                                        .rich-text-editor h3 { font-size: 1.1em; font-weight: bold; margin: 0.3em 0; }
-                                        .rich-text-editor p { margin: 0.5em 0; }
-                                        .rich-text-editor ul, .rich-text-editor ol { margin: 0.5em 0; padding-left: 1.5em; }
-                                        .rich-text-editor li { margin: 0.2em 0; }
+                                        .rich-text-editor { line-height: 1.5; }
+                                        .rich-text-editor h1 { font-size: 1.5em; font-weight: bold; margin: 0.5em 0; line-height: 1.2; }
+                                        .rich-text-editor h2 { font-size: 1.3em; font-weight: bold; margin: 0.4em 0; line-height: 1.2; }
+                                        .rich-text-editor h3 { font-size: 1.1em; font-weight: bold; margin: 0.3em 0; line-height: 1.2; }
+                                        .rich-text-editor p { margin: 0.5em 0; line-height: 1.5; }
+                                        .rich-text-editor ul, .rich-text-editor ol { margin: 0.5em 0; padding-left: 1.5em; line-height: 1.5; }
+                                        .rich-text-editor li { margin: 0.2em 0; line-height: 1.4; }
                                         .rich-text-editor blockquote { 
                                             margin: 0.5em 0; 
                                             padding: 0.5em 1em; 
                                             border-left: 4px solid #e5e7eb; 
                                             background: #f9fafb; 
-                                            font-style: italic; 
+                                            font-style: italic;
+                                            line-height: 1.5;
                                         }
                                         .rich-text-editor pre { 
                                             background: #f3f4f6; 
@@ -1214,23 +1449,35 @@ const RubricCreator = () => {
                                             border-radius: 4px; 
                                             font-family: monospace; 
                                             font-size: 0.9em; 
-                                            white-space: pre-wrap; 
+                                            white-space: pre-wrap;
+                                            line-height: 1.3;
+                                            margin: 0.5em 0;
                                         }
                                         .rich-text-editor a { color: #3b82f6; text-decoration: underline; }
                                         .rich-text-editor hr { margin: 1em 0; border: none; border-top: 1px solid #d1d5db; }
-                                        .rich-text-editor br { line-height: 1.8; }
+                                        .rich-text-editor div { margin: 0; }
+                                        .rich-text-editor * { max-width: 100%; word-wrap: break-word; }
+                                        
+                                        /* Enhanced formatting support */
+                                        .rich-text-editor strong, .rich-text-editor b { font-weight: bold; }
+                                        .rich-text-editor em, .rich-text-editor i { font-style: italic; }
+                                        .rich-text-editor u { text-decoration: underline; }
+                                        .rich-text-editor strike, .rich-text-editor s { text-decoration: line-through; }
+                                        .rich-text-editor sub { vertical-align: sub; font-size: smaller; }
+                                        .rich-text-editor sup { vertical-align: super; font-size: smaller; }
                                     `}</style>
                                     <div
                                         ref={editorRef}
                                         contentEditable={true}
                                         onInput={handleRichTextChange}
-                                        onKeyDown={handleKeyDown}
+
+
                                         className="w-full p-4 border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rich-text-editor"
                                         style={{
                                             minHeight: '200px',
                                             backgroundColor: '#fff',
                                             fontSize: '14px',
-                                            lineHeight: '1.8',
+                                            lineHeight: '1.5',
                                             fontFamily: 'inherit',
                                             whiteSpace: 'pre-wrap',
                                             wordBreak: 'break-word'
@@ -1250,7 +1497,8 @@ const RubricCreator = () => {
                                             <span>Use toolbar for advanced formatting</span>
                                         </div>
                                         <div className="text-xs text-gray-500">
-                                            <strong>Shortcuts:</strong> Ctrl+B (Bold), Ctrl+I (Italic), Ctrl+U (Underline), Enter (New Line), Tab (Indent)
+                                            <strong>Shortcuts:</strong> Ctrl+B (Bold), Ctrl+I (Italic), Ctrl+U (Underline), Enter (New Paragraph), Tab (Indent)<br />
+                                            <strong>FIXED Paste:</strong> Copy formatted text from Word/Google Docs - lists and formatting preserved with NO vertical gaps!
                                         </div>
                                     </div>
                                 </div>
@@ -1291,8 +1539,8 @@ const RubricCreator = () => {
                         </div>
                     </div>
 
-                    {/* Rubric Table */}
-                    <div className="bg-white border rounded-lg overflow-hidden mb-6">
+                    {/* FIXED: Rubric Table with width constraints */}
+                    <div className="bg-white border rounded-lg overflow-hidden mb-6 rubric-table-container">
                         <div className="bg-gray-50 p-4 border-b flex justify-between items-center">
                             <h3 className="text-lg font-semibold text-gray-800">Assessment Criteria Matrix</h3>
                             <div className="flex gap-2">
@@ -1326,17 +1574,16 @@ const RubricCreator = () => {
                             <table className="w-full border-collapse">
                                 <thead>
                                     <tr className="bg-gray-100">
-                                        <th className="border p-3 text-left font-semibold" style={{ width: '200px' }}>
+                                        <th className="border p-3 text-left font-semibold criterion-column">
                                             Criterion ({rubricData.criteria.length})
                                         </th>
                                         {getDisplayLevels().map((level) => (
                                             <th
                                                 key={level.level}
-                                                className="border p-3 text-center font-semibold"
+                                                className="border p-3 text-center font-semibold level-column"
                                                 style={{
                                                     backgroundColor: level.color + '20',
                                                     color: level.color,
-                                                    minWidth: '150px',
                                                     border: `2px solid ${level.color}`
                                                 }}
                                             >
@@ -1346,7 +1593,7 @@ const RubricCreator = () => {
                                                 </div>
                                             </th>
                                         ))}
-                                        <th className="border p-3 text-center font-semibold" style={{ width: '80px' }}>
+                                        <th className="border p-3 text-center font-semibold actions-column">
                                             Actions
                                         </th>
                                     </tr>
@@ -1356,7 +1603,7 @@ const RubricCreator = () => {
                                         <React.Fragment key={criterion.id}>
                                             <tr>
                                                 {/* Criterion Column */}
-                                                <td className="border p-3 bg-gray-50">
+                                                <td className="border p-3 bg-gray-50 criterion-column">
                                                     <div className="space-y-2">
                                                         <input
                                                             type="text"
@@ -1364,22 +1611,12 @@ const RubricCreator = () => {
                                                             onChange={(e) => updateCriterion(criterion.id, 'name', e.target.value)}
                                                             className="w-full p-2 border rounded text-sm font-medium"
                                                             placeholder={`Criterion ${index + 1} name`}
+                                                            style={{ wordWrap: 'break-word', overflowWrap: 'break-word' }}
                                                         />
-                                                        <div className="relative">
-                                                            <textarea
-                                                                value={criterion.description}
-                                                                onChange={(e) => updateCriterion(criterion.id, 'description', e.target.value)}
-                                                                className="w-full p-2 border rounded text-xs resize-both hover:border-blue-400 transition-all duration-200 pr-8"
-                                                                rows="2"
-                                                                placeholder="Brief description of what this criterion measures"
-                                                                title="Type here for quick editing, or click the expand button for rich text editor"
-                                                                style={{ minHeight: '48px', maxHeight: '200px', resize: 'both' }}
-                                                            />
-                                                            <button
-                                                                type="button"
-                                                                onClick={(e) => {
-                                                                    e.preventDefault();
-                                                                    e.stopPropagation();
+                                                        <ContentDisplay
+                                                            content={criterion.description}
+                                                            onEdit={(value, openRichEditor) => {
+                                                                if (openRichEditor) {
                                                                     openInlineEditor(
                                                                         criterion.description,
                                                                         `Criterion Description - ${criterion.name || 'Criterion'}`,
@@ -1388,13 +1625,12 @@ const RubricCreator = () => {
                                                                         null,
                                                                         'criterion'
                                                                     );
-                                                                }}
-                                                                className="absolute top-1 right-1 z-10 opacity-70 hover:opacity-100 transition-opacity bg-blue-500 text-white rounded p-1 hover:bg-blue-600 cursor-pointer"
-                                                                title="Open inline rich text editor"
-                                                            >
-                                                                <Maximize2 size={12} />
-                                                            </button>
-                                                        </div>
+                                                                } else {
+                                                                    updateCriterion(criterion.id, 'description', value);
+                                                                }
+                                                            }}
+                                                            placeholder="Brief description of what this criterion measures"
+                                                        />
                                                         <div className="flex gap-2">
                                                             <div className="flex-1">
                                                                 <label className="text-xs text-gray-600">Max Points</label>
@@ -1412,7 +1648,7 @@ const RubricCreator = () => {
 
                                                 {/* Level Columns */}
                                                 {getDisplayLevels().map((level) => (
-                                                    <td key={level.level} className="border p-3 align-top">
+                                                    <td key={level.level} className="border p-3 align-top level-column">
                                                         <div className="space-y-2">
                                                             <div className="text-center">
                                                                 <div
@@ -1425,21 +1661,10 @@ const RubricCreator = () => {
                                                                     {calculatePointRange(criterion, level.level)} pts
                                                                 </div>
                                                             </div>
-                                                            <div className="relative">
-                                                                <textarea
-                                                                    value={criterion.levels[level.level]?.description || ''}
-                                                                    onChange={(e) => updateCriterionLevel(criterion.id, level.level, 'description', e.target.value)}
-                                                                    className="w-full p-2 border rounded text-xs resize-both hover:border-blue-400 transition-all duration-200 pr-8"
-                                                                    rows="4"
-                                                                    placeholder={`Describe ${level.name.toLowerCase()} performance...`}
-                                                                    title="Type here for quick editing, or click the expand button for rich text editor"
-                                                                    style={{ minHeight: '80px', maxHeight: '300px', resize: 'both' }}
-                                                                />
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={(e) => {
-                                                                        e.preventDefault();
-                                                                        e.stopPropagation();
+                                                            <ContentDisplay
+                                                                content={criterion.levels[level.level]?.description || ''}
+                                                                onEdit={(value, openRichEditor) => {
+                                                                    if (openRichEditor) {
                                                                         openInlineEditor(
                                                                             criterion.levels[level.level]?.description || '',
                                                                             `${level.name} Level - ${criterion.name || 'Criterion'}`,
@@ -1448,13 +1673,12 @@ const RubricCreator = () => {
                                                                             level.level,
                                                                             'level'
                                                                         );
-                                                                    }}
-                                                                    className="absolute top-1 right-1 z-10 opacity-70 hover:opacity-100 transition-opacity bg-blue-500 text-white rounded p-1 hover:bg-blue-600 cursor-pointer"
-                                                                    title="Open inline rich text editor"
-                                                                >
-                                                                    <Maximize2 size={12} />
-                                                                </button>
-                                                            </div>
+                                                                    } else {
+                                                                        updateCriterionLevel(criterion.id, level.level, 'description', value);
+                                                                    }
+                                                                }}
+                                                                placeholder={`Describe ${level.name.toLowerCase()} performance...`}
+                                                            />
                                                             {pointingSystem === 'custom' && (
                                                                 <input
                                                                     type="text"
@@ -1462,6 +1686,7 @@ const RubricCreator = () => {
                                                                     onChange={(e) => updateCriterionLevel(criterion.id, level.level, 'pointRange', e.target.value)}
                                                                     className="w-full p-1 border rounded text-xs text-center"
                                                                     placeholder="e.g., 18-20"
+                                                                    style={{ wordWrap: 'break-word', overflowWrap: 'break-word' }}
                                                                 />
                                                             )}
                                                         </div>
@@ -1469,7 +1694,7 @@ const RubricCreator = () => {
                                                 ))}
 
                                                 {/* Actions Column */}
-                                                <td className="border p-3 text-center">
+                                                <td className="border p-3 text-center actions-column">
                                                     <button
                                                         onClick={() => removeCriterion(criterion.id)}
                                                         className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50"
@@ -1481,7 +1706,7 @@ const RubricCreator = () => {
                                                 </td>
                                             </tr>
 
-                                            {/* FIXED: Inline Rich Text Editor for Criterion or Level */}
+                                            {/* Inline Rich Text Editor for Criterion or Level */}
                                             {inlineEditor.show &&
                                                 inlineEditor.criterionId === criterion.id &&
                                                 (inlineEditor.type === 'criterion' || inlineEditor.type === 'level') && (
@@ -1504,7 +1729,7 @@ const RubricCreator = () => {
                                                                         </button>
                                                                         <button
                                                                             onClick={() => closeInlineEditor(false)}
-                                                                            className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded flex items-center gap-2 transition-colors"
+                                                                            className="bg-gray-800 hover:bg-gray-900 text-white px-4 py-2 rounded flex items-center gap-2 transition-colors"
                                                                         >
                                                                             <X size={16} />
                                                                             Cancel
@@ -1514,21 +1739,23 @@ const RubricCreator = () => {
 
                                                                 <RichTextToolbar />
 
-                                                                {/* FIXED: Editor Content */}
+                                                                {/* Editor Content */}
                                                                 <div className="p-4">
                                                                     <style>{`
-                                                                    .rich-text-editor h1 { font-size: 1.5em; font-weight: bold; margin: 0.5em 0; }
-                                                                    .rich-text-editor h2 { font-size: 1.3em; font-weight: bold; margin: 0.4em 0; }
-                                                                    .rich-text-editor h3 { font-size: 1.1em; font-weight: bold; margin: 0.3em 0; }
-                                                                    .rich-text-editor p { margin: 0.5em 0; }
-                                                                    .rich-text-editor ul, .rich-text-editor ol { margin: 0.5em 0; padding-left: 1.5em; }
-                                                                    .rich-text-editor li { margin: 0.2em 0; }
+                                                                    .rich-text-editor { line-height: 1.5; }
+                                                                    .rich-text-editor h1 { font-size: 1.5em; font-weight: bold; margin: 0.5em 0; line-height: 1.2; }
+                                                                    .rich-text-editor h2 { font-size: 1.3em; font-weight: bold; margin: 0.4em 0; line-height: 1.2; }
+                                                                    .rich-text-editor h3 { font-size: 1.1em; font-weight: bold; margin: 0.3em 0; line-height: 1.2; }
+                                                                    .rich-text-editor p { margin: 0.5em 0; line-height: 1.5; }
+                                                                    .rich-text-editor ul, .rich-text-editor ol { margin: 0.5em 0; padding-left: 1.5em; line-height: 1.5; }
+                                                                    .rich-text-editor li { margin: 0.2em 0; line-height: 1.4; }
                                                                     .rich-text-editor blockquote { 
                                                                         margin: 0.5em 0; 
                                                                         padding: 0.5em 1em; 
                                                                         border-left: 4px solid #e5e7eb; 
                                                                         background: #f9fafb; 
-                                                                        font-style: italic; 
+                                                                        font-style: italic;
+                                                                        line-height: 1.5;
                                                                     }
                                                                     .rich-text-editor pre { 
                                                                         background: #f3f4f6; 
@@ -1536,23 +1763,35 @@ const RubricCreator = () => {
                                                                         border-radius: 4px; 
                                                                         font-family: monospace; 
                                                                         font-size: 0.9em; 
-                                                                        white-space: pre-wrap; 
+                                                                        white-space: pre-wrap;
+                                                                        line-height: 1.3;
+                                                                        margin: 0.5em 0;
                                                                     }
                                                                     .rich-text-editor a { color: #3b82f6; text-decoration: underline; }
                                                                     .rich-text-editor hr { margin: 1em 0; border: none; border-top: 1px solid #d1d5db; }
-                                                                    .rich-text-editor br { line-height: 1.8; }
+                                                                    .rich-text-editor div { margin: 0; }
+                                                                    .rich-text-editor * { max-width: 100%; word-wrap: break-word; }
+                                                                    
+                                                                    /* Enhanced formatting support */
+                                                                    .rich-text-editor strong, .rich-text-editor b { font-weight: bold; }
+                                                                    .rich-text-editor em, .rich-text-editor i { font-style: italic; }
+                                                                    .rich-text-editor u { text-decoration: underline; }
+                                                                    .rich-text-editor strike, .rich-text-editor s { text-decoration: line-through; }
+                                                                    .rich-text-editor sub { vertical-align: sub; font-size: smaller; }
+                                                                    .rich-text-editor sup { vertical-align: super; font-size: smaller; }
                                                                 `}</style>
                                                                     <div
                                                                         ref={editorRef}
                                                                         contentEditable={true}
                                                                         onInput={handleRichTextChange}
-                                                                        onKeyDown={handleKeyDown}
+
+
                                                                         className="w-full p-4 border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rich-text-editor"
                                                                         style={{
                                                                             minHeight: '150px',
                                                                             backgroundColor: '#fff',
                                                                             fontSize: '14px',
-                                                                            lineHeight: '1.8',
+                                                                            lineHeight: '1.5',
                                                                             fontFamily: 'inherit',
                                                                             whiteSpace: 'pre-wrap',
                                                                             wordBreak: 'break-word'
@@ -1572,7 +1811,8 @@ const RubricCreator = () => {
                                                                             <span>Use toolbar for formatting</span>
                                                                         </div>
                                                                         <div className="text-xs text-gray-500">
-                                                                            <strong>Shortcuts:</strong> Ctrl+B (Bold), Ctrl+I (Italic), Ctrl+U (Underline), Enter (New Line), Tab (Indent)
+                                                                            <strong>Shortcuts:</strong> Ctrl+B (Bold), Ctrl+I (Italic), Ctrl+U (Underline), Enter (New Paragraph), Tab (Indent)<br />
+                                                                            <strong>FIXED Paste:</strong> Copy formatted text from Word/Google Docs - lists and formatting preserved with NO vertical gaps!
                                                                         </div>
                                                                     </div>
                                                                 </div>
@@ -1671,9 +1911,14 @@ const RubricCreator = () => {
                                                                                 'feedback'
                                                                             );
                                                                         }}
-                                                                        title="Click to edit"
+                                                                        title="Click to edit with rich text editor"
+                                                                        style={{
+                                                                            wordWrap: 'break-word',
+                                                                            overflowWrap: 'break-word',
+                                                                            whiteSpace: 'pre-wrap'
+                                                                        }}
                                                                     >
-                                                                        {item}
+                                                                        {stripHtml(item)}
                                                                     </span>
                                                                     <button
                                                                         onClick={() => removeFeedbackItem(criterion.id, category, index)}
