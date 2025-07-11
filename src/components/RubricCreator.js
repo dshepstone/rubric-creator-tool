@@ -184,70 +184,11 @@ const RubricCreator = () => {
         }, 100);
     };
 
-    // FIXED: Enhanced rich text editor functions
-    const handleRichTextCommand = (command, value = null) => {
+    // Simple markup editor input handler
+    const handleEditorInput = () => {
         const editor = editorRef.current;
         if (editor) {
-            editor.focus();
-
-            // Save cursor position before command
-            const cursorPos = saveCursorPosition();
-
-            document.execCommand(command, false, value);
-
-            // Update our ref content
             richTextContentRef.current = editor.innerHTML;
-
-            // Restore cursor position if needed
-            setTimeout(() => {
-                if (cursorPos && editor.contains(cursorPos.startContainer)) {
-                    restoreCursorPosition(cursorPos);
-                }
-            }, 0);
-        }
-    };
-
-    // FIXED: Handle rich text changes without state updates
-    const handleRichTextChange = (e) => {
-        const editor = editorRef.current;
-        if (editor) {
-            // Simply update our ref, don't trigger state update
-            richTextContentRef.current = editor.innerHTML;
-        }
-    };
-
-    // FIXED: Handle key events properly
-    const handleKeyDown = (e) => {
-        const editor = editorRef.current;
-        if (!editor) return;
-
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            // Insert proper line break
-            document.execCommand('insertHTML', false, '<br><br>');
-            richTextContentRef.current = editor.innerHTML;
-        } else if (e.key === 'Tab') {
-            e.preventDefault();
-            document.execCommand('insertHTML', false, '&nbsp;&nbsp;&nbsp;&nbsp;');
-            richTextContentRef.current = editor.innerHTML;
-        }
-
-        // Handle common keyboard shortcuts
-        if (e.ctrlKey || e.metaKey) {
-            switch (e.key) {
-                case 'b':
-                    e.preventDefault();
-                    handleRichTextCommand('bold');
-                    break;
-                case 'i':
-                    e.preventDefault();
-                    handleRichTextCommand('italic');
-                    break;
-                case 'u':
-                    e.preventDefault();
-                    handleRichTextCommand('underline');
-                    break;
-            }
         }
     };
 
@@ -258,13 +199,16 @@ const RubricCreator = () => {
         return tempDiv.textContent || tempDiv.innerText || '';
     };
 
-    // FIXED: Close inline editor and save if needed
+    const convertPlainTextToHtml = (text) => {
+        return text.replace(/\n/g, '<br>');
+    };
+
+    // Close inline editor and optionally save
     const closeInlineEditor = (save = false) => {
         if (save && inlineEditor.onSave) {
             // Get the current content from ref (most up-to-date)
             const finalContent = richTextContentRef.current;
-            const plainText = convertHtmlToPlainText(finalContent);
-            inlineEditor.onSave(plainText);
+            inlineEditor.onSave(finalContent);
         }
 
         setInlineEditor({
@@ -678,288 +622,8 @@ const RubricCreator = () => {
         URL.revokeObjectURL(url);
     };
 
-    // Enhanced Rich Text Toolbar Component
-    const RichTextToolbar = () => (
-        <div className="border-b bg-gray-50 p-3">
-            {/* Main Toolbar */}
-            <div className="flex flex-wrap gap-1 mb-2">
-                {/* Headings */}
-                <div className="flex border-r border-gray-300 pr-2 mr-2">
-                    <select
-                        onChange={(e) => {
-                            if (e.target.value) {
-                                handleRichTextCommand('formatBlock', e.target.value);
-                                e.target.value = '';
-                            }
-                        }}
-                        className="p-1 text-xs border rounded"
-                        title="Text Format"
-                    >
-                        <option value="">Format</option>
-                        <option value="h1">Heading 1</option>
-                        <option value="h2">Heading 2</option>
-                        <option value="h3">Heading 3</option>
-                        <option value="p">Paragraph</option>
-                        <option value="blockquote">Quote</option>
-                        <option value="pre">Code Block</option>
-                    </select>
-                </div>
-
-                {/* Font Size */}
-                <div className="flex border-r border-gray-300 pr-2 mr-2">
-                    <select
-                        onChange={(e) => {
-                            if (e.target.value) {
-                                handleRichTextCommand('fontSize', e.target.value);
-                                e.target.value = '';
-                            }
-                        }}
-                        className="p-1 text-xs border rounded"
-                        title="Font Size"
-                    >
-                        <option value="">Size</option>
-                        <option value="1">Small</option>
-                        <option value="3">Normal</option>
-                        <option value="4">Medium</option>
-                        <option value="5">Large</option>
-                        <option value="6">X-Large</option>
-                    </select>
-                </div>
-
-                {/* Text Formatting */}
-                <div className="flex border-r border-gray-300 pr-2 mr-2">
-                    <button
-                        type="button"
-                        onClick={() => handleRichTextCommand('bold')}
-                        className="p-2 hover:bg-gray-200 rounded transition-colors"
-                        title="Bold (Ctrl+B)"
-                    >
-                        <span className="font-bold">B</span>
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => handleRichTextCommand('italic')}
-                        className="p-2 hover:bg-gray-200 rounded transition-colors"
-                        title="Italic (Ctrl+I)"
-                    >
-                        <span className="italic">I</span>
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => handleRichTextCommand('underline')}
-                        className="p-2 hover:bg-gray-200 rounded transition-colors"
-                        title="Underline (Ctrl+U)"
-                    >
-                        <span className="underline">U</span>
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => handleRichTextCommand('strikeThrough')}
-                        className="p-2 hover:bg-gray-200 rounded transition-colors"
-                        title="Strikethrough"
-                    >
-                        <span className="line-through">S</span>
-                    </button>
-                </div>
-
-                {/* Colors */}
-                <div className="flex border-r border-gray-300 pr-2 mr-2">
-                    <input
-                        type="color"
-                        onChange={(e) => handleRichTextCommand('foreColor', e.target.value)}
-                        className="w-8 h-8 border rounded cursor-pointer"
-                        title="Text Color"
-                    />
-                    <input
-                        type="color"
-                        onChange={(e) => handleRichTextCommand('hiliteColor', e.target.value)}
-                        className="w-8 h-8 border rounded cursor-pointer ml-1"
-                        title="Highlight Color"
-                    />
-                </div>
-
-                {/* Lists */}
-                <div className="flex border-r border-gray-300 pr-2 mr-2">
-                    <button
-                        type="button"
-                        onClick={() => handleRichTextCommand('insertUnorderedList')}
-                        className="p-2 hover:bg-gray-200 rounded transition-colors"
-                        title="Bullet List"
-                    >
-                        • List
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => handleRichTextCommand('insertOrderedList')}
-                        className="p-2 hover:bg-gray-200 rounded transition-colors"
-                        title="Numbered List"
-                    >
-                        1. List
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => handleRichTextCommand('outdent')}
-                        className="p-2 hover:bg-gray-200 rounded transition-colors"
-                        title="Decrease Indent"
-                    >
-                        ⇤
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => handleRichTextCommand('indent')}
-                        className="p-2 hover:bg-gray-200 rounded transition-colors"
-                        title="Increase Indent"
-                    >
-                        ⇥
-                    </button>
-                </div>
-
-                {/* Alignment */}
-                <div className="flex border-r border-gray-300 pr-2 mr-2">
-                    <button
-                        type="button"
-                        onClick={() => handleRichTextCommand('justifyLeft')}
-                        className="p-2 hover:bg-gray-200 rounded transition-colors"
-                        title="Align Left"
-                    >
-                        ⫷
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => handleRichTextCommand('justifyCenter')}
-                        className="p-2 hover:bg-gray-200 rounded transition-colors"
-                        title="Align Center"
-                    >
-                        ≡
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => handleRichTextCommand('justifyRight')}
-                        className="p-2 hover:bg-gray-200 rounded transition-colors"
-                        title="Align Right"
-                    >
-                        ⫸
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => handleRichTextCommand('justifyFull')}
-                        className="p-2 hover:bg-gray-200 rounded transition-colors"
-                        title="Justify"
-                    >
-                        ⫼
-                    </button>
-                </div>
-
-                {/* Special */}
-                <div className="flex border-r border-gray-300 pr-2 mr-2">
-                    <button
-                        type="button"
-                        onClick={() => {
-                            const url = prompt('Enter URL:');
-                            if (url) handleRichTextCommand('createLink', url);
-                        }}
-                        className="p-2 hover:bg-gray-200 rounded transition-colors"
-                        title="Insert Link"
-                    >
-                        🔗
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => handleRichTextCommand('insertHorizontalRule')}
-                        className="p-2 hover:bg-gray-200 rounded transition-colors"
-                        title="Insert Line"
-                    >
-                        ─
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => handleRichTextCommand('superscript')}
-                        className="p-2 hover:bg-gray-200 rounded transition-colors"
-                        title="Superscript"
-                    >
-                        x²
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => handleRichTextCommand('subscript')}
-                        className="p-2 hover:bg-gray-200 rounded transition-colors"
-                        title="Subscript"
-                    >
-                        x₂
-                    </button>
-                </div>
-
-                {/* Actions */}
-                <div className="flex">
-                    <button
-                        type="button"
-                        onClick={() => handleRichTextCommand('undo')}
-                        className="p-2 hover:bg-gray-200 rounded transition-colors"
-                        title="Undo"
-                    >
-                        ↶
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => handleRichTextCommand('redo')}
-                        className="p-2 hover:bg-gray-200 rounded transition-colors"
-                        title="Redo"
-                    >
-                        ↷
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => handleRichTextCommand('removeFormat')}
-                        className="p-2 hover:bg-gray-200 rounded transition-colors"
-                        title="Clear Formatting"
-                    >
-                        Clear
-                    </button>
-                </div>
-            </div>
-
-            {/* Quick Actions Row */}
-            <div className="pt-2 border-t border-gray-200">
-                <div className="flex flex-wrap gap-1 text-xs">
-                    <span className="text-gray-600 mr-2">Quick Insert:</span>
-                    <button
-                        type="button"
-                        onClick={() => handleRichTextCommand('insertHTML', '<strong>Example:</strong> ')}
-                        className="px-2 py-1 bg-blue-100 hover:bg-blue-200 rounded transition-colors"
-                    >
-                        Add "Example:"
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => handleRichTextCommand('insertHTML', '<em>Note:</em> ')}
-                        className="px-2 py-1 bg-green-100 hover:bg-green-200 rounded transition-colors"
-                    >
-                        Add "Note:"
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => handleRichTextCommand('insertHTML', '<strong>Requirements:</strong><br>• <br>• <br>• ')}
-                        className="px-2 py-1 bg-purple-100 hover:bg-purple-200 rounded transition-colors"
-                    >
-                        Add Requirements List
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => {
-                            const editor = editorRef.current;
-                            if (editor) {
-                                editor.innerHTML = '';
-                                richTextContentRef.current = '';
-                            }
-                        }}
-                        className="px-2 py-1 bg-red-100 hover:bg-red-200 rounded transition-colors"
-                    >
-                        Clear All
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
+    // Simple markup editor toolbar placeholder (removed rich text actions)
+    const RichTextToolbar = () => null;
 
     return (
         <div className="min-h-screen bg-gray-50 p-6">
@@ -1076,7 +740,7 @@ const RubricCreator = () => {
                                         <strong>💡 Tip:</strong> Work is auto-saved every second. Switch between tabs freely - your progress is preserved.
                                     </p>
                                     <p className="text-blue-800 text-sm mt-2">
-                                        <strong>📝 Rich Text Editing:</strong> Type directly in any description box for quick editing, OR click the blue expand button (⤢) for powerful inline rich text editor with full formatting toolbar including headings, colors, links, lists, and more!
+                                        <strong>📝 Markup Editing:</strong> Type directly in any description box for quick edits, or click the blue expand button (⤢) to open the markup editor. Pasted formatting from Word or the web is preserved.
                                     </p>
                                 </div>
                             </div>
@@ -1112,8 +776,8 @@ const RubricCreator = () => {
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
                                 <div className="relative">
                                     <textarea
-                                        value={rubricData.assignmentInfo.description}
-                                        onChange={(e) => updateAssignmentInfo('description', e.target.value)}
+                                        value={convertHtmlToPlainText(rubricData.assignmentInfo.description)}
+                                        onChange={(e) => updateAssignmentInfo('description', convertPlainTextToHtml(e.target.value))}
                                         className="w-full p-3 border rounded-lg resize-both hover:border-blue-400 transition-all duration-200 pr-12"
                                         rows="3"
                                         placeholder="Detailed description of assignment requirements and expectations..."
@@ -1163,14 +827,14 @@ const RubricCreator = () => {
                             </div>
                         </div>
 
-                        {/* FIXED: Inline Rich Text Editor for Assignment */}
+                        {/* Inline Markup Editor for Assignment */}
                         {inlineEditor.show && inlineEditor.type === 'assignment' && (
                             <div className="mt-6 border-2 border-blue-300 rounded-lg bg-white shadow-lg">
                                 {/* Editor Header */}
                                 <div className="flex justify-between items-center p-4 border-b bg-gradient-to-r from-blue-50 to-indigo-50">
                                     <h4 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
                                         <Maximize2 size={20} className="text-blue-600" />
-                                        Rich Text Editor: {inlineEditor.field}
+                                        Markup Editor: {inlineEditor.field}
                                     </h4>
                                     <div className="flex gap-2">
                                         <button
@@ -1190,9 +854,7 @@ const RubricCreator = () => {
                                     </div>
                                 </div>
 
-                                <RichTextToolbar />
-
-                                {/* FIXED: Editor Content */}
+                                {/* Editor Content */}
                                 <div className="p-4">
                                     <style>{`
                                         .rich-text-editor h1 { font-size: 1.5em; font-weight: bold; margin: 0.5em 0; }
@@ -1223,8 +885,7 @@ const RubricCreator = () => {
                                     <div
                                         ref={editorRef}
                                         contentEditable={true}
-                                        onInput={handleRichTextChange}
-                                        onKeyDown={handleKeyDown}
+                                        onInput={handleEditorInput}
                                         className="w-full p-4 border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rich-text-editor"
                                         style={{
                                             minHeight: '200px',
@@ -1245,9 +906,9 @@ const RubricCreator = () => {
                                         <div className="flex items-center gap-4 text-sm text-gray-600">
                                             <span className="flex items-center gap-2">
                                                 <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                                                Rich Text Editor Active
+                                                Markup Editor Active
                                             </span>
-                                            <span>Use toolbar for advanced formatting</span>
+                                            <span>Paste rich text from other sources</span>
                                         </div>
                                         <div className="text-xs text-gray-500">
                                             <strong>Shortcuts:</strong> Ctrl+B (Bold), Ctrl+I (Italic), Ctrl+U (Underline), Enter (New Line), Tab (Indent)
@@ -1367,8 +1028,8 @@ const RubricCreator = () => {
                                                         />
                                                         <div className="relative">
                                                             <textarea
-                                                                value={criterion.description}
-                                                                onChange={(e) => updateCriterion(criterion.id, 'description', e.target.value)}
+                                                                value={convertHtmlToPlainText(criterion.description)}
+                                                                onChange={(e) => updateCriterion(criterion.id, 'description', convertPlainTextToHtml(e.target.value))}
                                                                 className="w-full p-2 border rounded text-xs resize-both hover:border-blue-400 transition-all duration-200 pr-8"
                                                                 rows="2"
                                                                 placeholder="Brief description of what this criterion measures"
@@ -1427,8 +1088,8 @@ const RubricCreator = () => {
                                                             </div>
                                                             <div className="relative">
                                                                 <textarea
-                                                                    value={criterion.levels[level.level]?.description || ''}
-                                                                    onChange={(e) => updateCriterionLevel(criterion.id, level.level, 'description', e.target.value)}
+                                                                    value={convertHtmlToPlainText(criterion.levels[level.level]?.description || '')}
+                                                                    onChange={(e) => updateCriterionLevel(criterion.id, level.level, 'description', convertPlainTextToHtml(e.target.value))}
                                                                     className="w-full p-2 border rounded text-xs resize-both hover:border-blue-400 transition-all duration-200 pr-8"
                                                                     rows="4"
                                                                     placeholder={`Describe ${level.name.toLowerCase()} performance...`}
@@ -1481,7 +1142,7 @@ const RubricCreator = () => {
                                                 </td>
                                             </tr>
 
-                                            {/* FIXED: Inline Rich Text Editor for Criterion or Level */}
+                                            {/* Inline Markup Editor for Criterion or Level */}
                                             {inlineEditor.show &&
                                                 inlineEditor.criterionId === criterion.id &&
                                                 (inlineEditor.type === 'criterion' || inlineEditor.type === 'level') && (
@@ -1492,7 +1153,7 @@ const RubricCreator = () => {
                                                                 <div className="flex justify-between items-center p-4 border-b bg-gradient-to-r from-blue-50 to-indigo-50">
                                                                     <h4 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
                                                                         <Maximize2 size={20} className="text-blue-600" />
-                                                                        Rich Text Editor: {inlineEditor.field}
+                                                                        Markup Editor: {inlineEditor.field}
                                                                     </h4>
                                                                     <div className="flex gap-2">
                                                                         <button
@@ -1512,9 +1173,7 @@ const RubricCreator = () => {
                                                                     </div>
                                                                 </div>
 
-                                                                <RichTextToolbar />
-
-                                                                {/* FIXED: Editor Content */}
+                                                                {/* Editor Content */}
                                                                 <div className="p-4">
                                                                     <style>{`
                                                                     .rich-text-editor h1 { font-size: 1.5em; font-weight: bold; margin: 0.5em 0; }
@@ -1545,8 +1204,7 @@ const RubricCreator = () => {
                                                                     <div
                                                                         ref={editorRef}
                                                                         contentEditable={true}
-                                                                        onInput={handleRichTextChange}
-                                                                        onKeyDown={handleKeyDown}
+                                                                        onInput={handleEditorInput}
                                                                         className="w-full p-4 border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rich-text-editor"
                                                                         style={{
                                                                             minHeight: '150px',
@@ -1566,10 +1224,10 @@ const RubricCreator = () => {
                                                                     <div className="flex justify-between items-center">
                                                                         <div className="flex items-center gap-4 text-sm text-gray-600">
                                                                             <span className="flex items-center gap-2">
-                                                                                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                                                                                Rich Text Editor Active
-                                                                            </span>
-                                                                            <span>Use toolbar for formatting</span>
+                                                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                                                Markup Editor Active
+                                            </span>
+                                            <span>Paste rich text from other sources</span>
                                                                         </div>
                                                                         <div className="text-xs text-gray-500">
                                                                             <strong>Shortcuts:</strong> Ctrl+B (Bold), Ctrl+I (Italic), Ctrl+U (Underline), Enter (New Line), Tab (Indent)
@@ -1650,7 +1308,7 @@ const RubricCreator = () => {
                                                                                 `${category} Comment`,
                                                                                 (newContent) => {
                                                                                     const updatedFeedback = [...criterion.feedbackLibrary[category]];
-                                                                                    updatedFeedback[index] = newContent;
+                                                                                    updatedFeedback[index] = convertHtmlToPlainText(newContent);
                                                                                     setRubricData(prev => ({
                                                                                         ...prev,
                                                                                         criteria: prev.criteria.map(c =>
