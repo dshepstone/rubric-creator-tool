@@ -86,6 +86,43 @@ const sanitizeHtml = (html) => {
   return wrapper.innerHTML.replace(/(<br\s*\/?>\s*){2,}/gi, '<br>');
 };
 
+// Remove Microsoft Word specific markup and normalize blocks
+const cleanPastedContent = (html) => {
+  if (!html) return '';
+
+  let cleaned = html
+    .replace(/<!--StartFragment-->|<!--EndFragment-->/gi, '')
+    .replace(/<!--[^]*?-->/g, '')
+    .replace(/<(\/)?o:p[^>]*>/gi, '')
+    .replace(/\sclass=("|')?Mso.*?("|')/gi, '')
+    .replace(/\s*mso-[^:]+:[^;"']+;?/gi, '');
+
+  const doc = new DOMParser().parseFromString(cleaned, 'text/html');
+
+  doc.querySelectorAll('[style]').forEach((el) => {
+    const style = el.getAttribute('style')
+      .replace(/mso-[^:]+:[^;]+;?/gi, '')
+      .replace(/margin[^:]*:[^;]+;?/gi, '')
+      .replace(/padding[^:]*:[^;]+;?/gi, '');
+    if (style.trim()) {
+      el.setAttribute('style', style.trim());
+    } else {
+      el.removeAttribute('style');
+    }
+  });
+
+  // Replace <p> with <div> to avoid Word margins
+  doc.querySelectorAll('p').forEach((p) => {
+    const div = doc.createElement('div');
+    div.innerHTML = p.innerHTML;
+    p.replaceWith(div);
+  });
+
+  return sanitizeHtml(doc.body.innerHTML)
+    .replace(/(<div>\s*<br>\s*<\/div>)+/gi, '<br>')
+    .replace(/(<br\s*\/?>\s*){2,}/gi, '<br>');
+};
+
 const ToolbarButton = ({ icon: Icon, onClick, title }) => (
   <button
     type="button"
@@ -124,7 +161,7 @@ const MarkupEditor = React.forwardRef(({ initialHTML, onChange }, ref) => {
 
     let clean;
     if (htmlData) {
-      clean = sanitizeHtml(htmlData);
+      clean = cleanPastedContent(htmlData);
     } else {
       clean = textData
         .replace(/&/g, '&amp;')
@@ -144,7 +181,7 @@ const MarkupEditor = React.forwardRef(({ initialHTML, onChange }, ref) => {
 
   return (
     <div>
-      <div className="flex flex-wrap gap-1 border-b border-gray-200 bg-gray-50 p-2 mb-2">
+      <div className="flex flex-wrap gap-1 border-b border-gray-200 bg-gray-50 p-2 mb-2 overflow-x-auto">
         <ToolbarButton icon={Bold} onClick={() => exec('bold')} title="Bold" />
         <ToolbarButton icon={Italic} onClick={() => exec('italic')} title="Italic" />
         <ToolbarButton icon={Underline} onClick={() => exec('underline')} title="Underline" />
