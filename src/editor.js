@@ -24,6 +24,8 @@ const sanitizeHtml = (html) => {
     'strong',
     'em',
     'p',
+    'div',
+    'span',
     'br',
     'ul',
     'ol',
@@ -53,6 +55,10 @@ const sanitizeHtml = (html) => {
           el.setAttribute('href', node.getAttribute('href'));
           el.setAttribute('target', '_blank');
           el.setAttribute('rel', 'noopener noreferrer');
+        }
+
+        if (node.getAttribute('style')) {
+          el.setAttribute('style', node.getAttribute('style'));
         }
 
         node.childNodes.forEach((child) => {
