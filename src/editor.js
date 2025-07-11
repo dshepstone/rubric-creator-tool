@@ -1,51 +1,89 @@
 import React, { useEffect, useRef } from 'react';
-import { Bold, Italic, Underline, Strikethrough, Heading1, Heading2, Heading3, List, ListOrdered, Link as LinkIcon, Undo2, Redo2, Eraser } from 'lucide-react';
+import {
+  Bold,
+  Italic,
+  Underline,
+  Strikethrough,
+  Heading1,
+  Heading2,
+  Heading3,
+  List,
+  ListOrdered,
+  Link as LinkIcon,
+  Undo2,
+  Redo2,
+  Eraser
+} from 'lucide-react';
 
-// Clean pasted HTML by removing unwanted tags/attributes and normalising breaks
-const cleanPastedContent = (html) => {
-  const allowedTags = [
-    'b', 'strong', 'i', 'em', 'u', 's', 'br', 'p',
-    'ul', 'ol', 'li', 'a', 'h1', 'h2', 'h3', 'code'
+// Sanitize pasted HTML, keeping only allowed tags and flattening everything else
+const sanitizeHtml = (html) => {
+  const ALLOWED_TAGS = [
+    'b',
+    'i',
+    'u',
+    'strong',
+    'em',
+    'p',
+    'br',
+    'ul',
+    'ol',
+    'li',
+    'h1',
+    'h2',
+    'h3',
+    'code',
+    'a'
   ];
-  const doc = new DOMParser().parseFromString(html || '', 'text/html');
-  const root = doc.body || doc.documentElement;
-  if (!root) return html || '';
 
-  const traverse = (node) => {
-    if (node.nodeType === Node.TEXT_NODE) return;
-    [...node.childNodes].forEach(traverse);
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const frag = document.createDocumentFragment();
+
+  const cleanNode = (node) => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      return document.createTextNode(node.textContent);
+    }
 
     if (node.nodeType === Node.ELEMENT_NODE) {
       const tag = node.tagName.toLowerCase();
-      if (!allowedTags.includes(tag)) {
-        const frag = document.createDocumentFragment();
-        while (node.firstChild) frag.appendChild(node.firstChild);
-        node.replaceWith(frag);
-        return;
-      }
 
-      [...node.attributes].forEach((attr) => {
-        if (tag !== 'a' || attr.name.toLowerCase() !== 'href') {
-          node.removeAttribute(attr.name);
+      if (ALLOWED_TAGS.includes(tag)) {
+        const el = document.createElement(tag);
+
+        if (tag === 'a' && node.getAttribute('href')) {
+          el.setAttribute('href', node.getAttribute('href'));
+          el.setAttribute('target', '_blank');
+          el.setAttribute('rel', 'noopener noreferrer');
         }
-      });
 
-      if (tag === 'a' && node.getAttribute('href')) {
-        node.setAttribute('target', '_blank');
-        node.setAttribute('rel', 'noopener noreferrer');
+        node.childNodes.forEach((child) => {
+          const cleaned = cleanNode(child);
+          if (cleaned) el.appendChild(cleaned);
+        });
+
+        return el;
       }
+
+      // Flatten children of disallowed tags
+      const container = document.createDocumentFragment();
+      node.childNodes.forEach((child) => {
+        const cleaned = cleanNode(child);
+        if (cleaned) container.appendChild(cleaned);
+      });
+      return container;
     }
+
+    return null;
   };
 
-  traverse(root);
-
-  root.querySelectorAll('p').forEach((p) => {
-    if (!p.textContent.trim()) p.remove();
+  Array.from(doc.body.childNodes).forEach((n) => {
+    const cleaned = cleanNode(n);
+    if (cleaned) frag.appendChild(cleaned);
   });
 
-  root.innerHTML = root.innerHTML.replace(/(<br\s*\/?>\s*){2,}/gi, '<br>');
+  const wrapper = document.createElement('div');
+  wrapper.appendChild(frag);
 
-  return root.innerHTML.trim();
+  return wrapper.innerHTML.replace(/(<br\s*\/?>\s*){2,}/gi, '<br>');
 };
 
 const ToolbarButton = ({ icon: Icon, onClick, title }) => (
@@ -79,9 +117,23 @@ const MarkupEditor = React.forwardRef(({ initialHTML, onChange }, ref) => {
 
   const handlePaste = (e) => {
     e.preventDefault();
-    const clipboard = e.clipboardData.getData('text/html') || e.clipboardData.getData('text/plain');
-    const cleaned = cleanPastedContent(clipboard);
-    document.execCommand('insertHTML', false, cleaned);
+
+    const clipboard = e.clipboardData || window.clipboardData;
+    const htmlData = clipboard.getData('text/html');
+    const textData = clipboard.getData('text/plain');
+
+    let clean;
+    if (htmlData) {
+      clean = sanitizeHtml(htmlData);
+    } else {
+      clean = textData
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/\r\n|\r|\n/g, '<br>');
+    }
+
+    document.execCommand('insertHTML', false, clean);
     emitChange();
   };
 
