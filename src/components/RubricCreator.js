@@ -1,7 +1,448 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Plus, X, Upload, Download, Save, FileText, RotateCcw, ChevronDown, ChevronUp, Maximize2, ArrowRight, Minimize2 } from 'lucide-react';
-import RichTextEditor from '../RichTextEditor';
 import { useAssessment } from './SharedContext';
+
+// Simple Rich Text Editor Component to replace the problematic ReactQuill
+const SimpleRichTextEditor = React.forwardRef(({ value, onChange, placeholder }, ref) => {
+    const editorRef = useRef(null);
+    const [isEditorReady, setIsEditorReady] = useState(false);
+
+    useEffect(() => {
+        if (editorRef.current) {
+            setIsEditorReady(true);
+            // Set initial content
+            if (value && editorRef.current.innerHTML !== value) {
+                editorRef.current.innerHTML = value || '';
+            }
+        }
+    }, [value]);
+
+    const handlePaste = (e) => {
+        e.preventDefault();
+        const clipboard = e.clipboardData;
+        const htmlData = clipboard.getData('text/html');
+        const textData = clipboard.getData('text/plain');
+
+        let cleanContent;
+        if (htmlData) {
+            // Enhanced HTML sanitization - preserve more formatting including lists
+            cleanContent = sanitizeHtml(htmlData);
+        } else {
+            // Convert plain text to HTML, preserving line breaks
+            cleanContent = textData
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/\r\n|\r|\n/g, '<br>');
+        }
+
+        // Focus the editor first
+        editorRef.current.focus();
+        
+        // Insert the content
+        if (document.queryCommandSupported('insertHTML')) {
+            document.execCommand('insertHTML', false, cleanContent);
+        } else {
+            // Fallback for browsers that don't support insertHTML
+            const selection = window.getSelection();
+            if (selection.rangeCount > 0) {
+                const range = selection.getRangeAt(0);
+                range.deleteContents();
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = cleanContent;
+                const fragment = document.createDocumentFragment();
+                while (tempDiv.firstChild) {
+                    fragment.appendChild(tempDiv.firstChild);
+                }
+                range.insertNode(fragment);
+            }
+        }
+        
+        // Trigger onChange
+        if (onChange) {
+            onChange(editorRef.current.innerHTML);
+        }
+    };
+
+    const sanitizeHtml = (html) => {
+        // First, remove all style blocks, comments, and Microsoft Word specific content
+        let cleanedHtml = html
+            // Remove HTML comments (including the massive style block from Word)
+            .replace(/<!--[\s\S]*?-->/g, '')
+            // Remove style tags and their content
+            .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+            // Remove script tags and their content
+            .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+            // Remove XML declarations and Office-specific tags
+            .replace(/<\?xml[^>]*>/gi, '')
+            .replace(/<\/?o:p[^>]*>/gi, '')
+            .replace(/<\/?v:[^>]*>/gi, '')
+            .replace(/<\/?w:[^>]*>/gi, '')
+            // Remove Microsoft Word conditional comments
+            .replace(/<!--\[if[^>]*>[\s\S]*?<!\[endif\]-->/gi, '');
+
+        // Create a temporary container
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = cleanedHtml;
+        
+        // Remove all style attributes and Microsoft Office attributes
+        const removeAttributes = (element) => {
+            if (element.nodeType === Node.ELEMENT_NODE) {
+                // Get all attributes to remove
+                const attributesToRemove = [];
+                for (let i = 0; i < element.attributes.length; i++) {
+                    const attr = element.attributes[i];
+                    // Remove style attributes, class attributes, and any mso-* attributes
+                    if (attr.name === 'style' || 
+                        attr.name === 'class' || 
+                        attr.name.startsWith('mso-') ||
+                        attr.name.startsWith('data-') ||
+                        attr.name === 'lang' ||
+                        attr.name === 'dir') {
+                        attributesToRemove.push(attr.name);
+                    }
+                }
+                
+                // Remove the attributes
+                attributesToRemove.forEach(attrName => {
+                    element.removeAttribute(attrName);
+                });
+                
+                // Recursively clean child elements
+                Array.from(element.children).forEach(child => {
+                    removeAttributes(child);
+                });
+            }
+        };
+        
+        removeAttributes(tempDiv);
+        
+        // Convert Microsoft Word's complex list structures to simple HTML lists
+        const convertWordLists = (container) => {
+            // Find paragraphs that are actually list items (they contain bullet symbols or are indented)
+            const paragraphs = container.querySelectorAll('p');
+            let currentList = null;
+            let currentListType = null;
+            
+            paragraphs.forEach(p => {
+                const text = p.textContent.trim();
+                const isListItem = text.startsWith('·') || 
+                                 text.startsWith('•') || 
+                                 text.startsWith('-') ||
+                                 text.match(/^\d+\./) ||
+                                 p.style.marginLeft ||
+                                 p.className?.includes('List');
+                
+                if (isListItem) {
+                    // Determine if it's ordered or unordered
+                    const isOrdered = text.match(/^\d+\./);
+                    const listType = isOrdered ? 'ol' : 'ul';
+                    
+                    // Create new list if needed
+                    if (!currentList || currentListType !== listType) {
+                        currentList = document.createElement(listType);
+                        currentListType = listType;
+                        p.parentNode.insertBefore(currentList, p);
+                    }
+                    
+                    // Create list item
+                    const li = document.createElement('li');
+                    
+                    // Clean the text (remove bullet symbols and extra spacing)
+                    let cleanText = text
+                        .replace(/^[·•\-]\s*/, '') // Remove bullet symbols
+                        .replace(/^\d+\.\s*/, '') // Remove number prefix
+                        .trim();
+                    
+                    // Move the paragraph content to the list item
+                    li.innerHTML = cleanText;
+                    currentList.appendChild(li);
+                    
+                    // Remove the original paragraph
+                    p.remove();
+                } else {
+                    // Reset list tracking for non-list content
+                    currentList = null;
+                    currentListType = null;
+                }
+            });
+        };
+        
+        convertWordLists(tempDiv);
+        
+        // Define allowed tags
+        const allowedTags = ['b', 'i', 'u', 'strong', 'em', 'p', 'br', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'];
+        
+        // Function to recursively clean nodes and remove disallowed tags
+        const cleanNode = (node) => {
+            if (node.nodeType === Node.TEXT_NODE) {
+                // Clean up text content - remove extra whitespace
+                const cleanText = node.textContent.replace(/\s+/g, ' ').trim();
+                return cleanText ? document.createTextNode(cleanText) : null;
+            }
+            
+            if (node.nodeType === Node.ELEMENT_NODE) {
+                const tagName = node.tagName.toLowerCase();
+                
+                if (allowedTags.includes(tagName)) {
+                    const newNode = document.createElement(tagName);
+                    
+                    // Recursively clean children
+                    Array.from(node.childNodes).forEach(child => {
+                        const cleanedChild = cleanNode(child);
+                        if (cleanedChild) {
+                            newNode.appendChild(cleanedChild);
+                        }
+                    });
+                    
+                    // Only return the node if it has content
+                    return newNode.textContent.trim() || newNode.children.length > 0 ? newNode : null;
+                } else {
+                    // For disallowed tags (like div, span), extract their children
+                    const fragment = document.createDocumentFragment();
+                    Array.from(node.childNodes).forEach(child => {
+                        const cleanedChild = cleanNode(child);
+                        if (cleanedChild) {
+                            fragment.appendChild(cleanedChild);
+                        }
+                    });
+                    return fragment.childNodes.length > 0 ? fragment : null;
+                }
+            }
+            
+            return null;
+        };
+        
+        const cleanedContainer = document.createElement('div');
+        Array.from(tempDiv.childNodes).forEach(child => {
+            const cleanedChild = cleanNode(child);
+            if (cleanedChild) {
+                cleanedContainer.appendChild(cleanedChild);
+            }
+        });
+        
+        // Final cleanup - remove empty paragraphs and normalize spacing
+        const finalHtml = cleanedContainer.innerHTML
+            .replace(/<p[^>]*>\s*<\/p>/g, '') // Remove empty paragraphs
+            .replace(/\n\s*\n/g, '\n') // Remove multiple line breaks
+            .replace(/(<\/[^>]+>)\s+(<[^>]+>)/g, '$1$2') // Remove spaces between tags
+            .trim();
+        
+        return finalHtml;
+    };
+
+    const handleInput = () => {
+        if (onChange && editorRef.current) {
+            onChange(editorRef.current.innerHTML);
+        }
+    };
+
+    const formatText = (command, value = null) => {
+        // Focus the editor first to ensure commands work
+        if (editorRef.current) {
+            editorRef.current.focus();
+            
+            // Small delay to ensure focus is set
+            setTimeout(() => {
+                try {
+                    const success = document.execCommand(command, false, value);
+                    if (!success) {
+                        console.warn(`Command ${command} not successful`);
+                    }
+                    
+                    // Trigger onChange after formatting
+                    if (onChange && editorRef.current) {
+                        onChange(editorRef.current.innerHTML);
+                    }
+                } catch (error) {
+                    console.error(`Error executing command ${command}:`, error);
+                }
+            }, 10);
+        }
+    };
+
+    const handleKeyDown = (e) => {
+        // Handle some common keyboard shortcuts
+        if (e.ctrlKey || e.metaKey) {
+            switch (e.key) {
+                case 'b':
+                    e.preventDefault();
+                    formatText('bold');
+                    break;
+                case 'i':
+                    e.preventDefault();
+                    formatText('italic');
+                    break;
+                case 'u':
+                    e.preventDefault();
+                    formatText('underline');
+                    break;
+            }
+        }
+    };
+
+    return (
+        <div className="simple-rich-text-editor border border-gray-300 rounded-lg overflow-hidden">
+            {/* Toolbar */}
+            <div className="bg-gray-50 border-b border-gray-300 p-2 flex gap-2 flex-wrap">
+                <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()} // Prevent focus loss
+                    onClick={() => formatText('bold')}
+                    className="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm font-bold transition-colors"
+                    title="Bold (Ctrl+B)"
+                >
+                    B
+                </button>
+                <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => formatText('italic')}
+                    className="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm italic transition-colors"
+                    title="Italic (Ctrl+I)"
+                >
+                    I
+                </button>
+                <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => formatText('underline')}
+                    className="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm underline transition-colors"
+                    title="Underline (Ctrl+U)"
+                >
+                    U
+                </button>
+                <div className="w-px bg-gray-300"></div>
+                <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => formatText('formatBlock', 'h3')}
+                    className="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm font-bold transition-colors"
+                    title="Heading 3"
+                >
+                    H3
+                </button>
+                <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => formatText('formatBlock', 'p')}
+                    className="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm transition-colors"
+                    title="Paragraph"
+                >
+                    P
+                </button>
+                <div className="w-px bg-gray-300"></div>
+                <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => formatText('insertUnorderedList')}
+                    className="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm transition-colors"
+                    title="Bullet List"
+                >
+                    • List
+                </button>
+                <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => formatText('insertOrderedList')}
+                    className="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm transition-colors"
+                    title="Numbered List"
+                >
+                    1. List
+                </button>
+                <div className="w-px bg-gray-300"></div>
+                <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => formatText('outdent')}
+                    className="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm transition-colors"
+                    title="Decrease Indent"
+                >
+                    ←
+                </button>
+                <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => formatText('indent')}
+                    className="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm transition-colors"
+                    title="Increase Indent"
+                >
+                    →
+                </button>
+                <div className="w-px bg-gray-300"></div>
+                <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => formatText('removeFormat')}
+                    className="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm text-red-600 transition-colors"
+                    title="Clear Formatting"
+                >
+                    Clear
+                </button>
+            </div>
+
+            {/* Editor Content */}
+            <div
+                ref={editorRef}
+                contentEditable
+                onInput={handleInput}
+                onPaste={handlePaste}
+                onKeyDown={handleKeyDown}
+                className="p-4 min-h-[200px] max-h-[400px] overflow-y-auto focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-20"
+                style={{ 
+                    lineHeight: '1.5',
+                    wordWrap: 'break-word',
+                    overflowWrap: 'break-word'
+                }}
+                dangerouslySetInnerHTML={{ __html: value || '' }}
+                suppressContentEditableWarning={true}
+                data-placeholder={placeholder}
+            />
+
+            {/* Enhanced styling for lists and editor */}
+            <style jsx>{`
+                [contenteditable]:empty:before {
+                    content: attr(data-placeholder);
+                    color: #9ca3af;
+                    font-style: italic;
+                    pointer-events: none;
+                }
+                [contenteditable]:focus:before {
+                    content: none;
+                }
+                [contenteditable] ul {
+                    list-style-type: disc;
+                    margin-left: 1.5em;
+                    margin-top: 0.5em;
+                    margin-bottom: 0.5em;
+                }
+                [contenteditable] ol {
+                    list-style-type: decimal;
+                    margin-left: 1.5em;
+                    margin-top: 0.5em;
+                    margin-bottom: 0.5em;
+                }
+                [contenteditable] li {
+                    margin-bottom: 0.25em;
+                }
+                [contenteditable] h3 {
+                    font-size: 1.25em;
+                    font-weight: bold;
+                    margin-top: 0.5em;
+                    margin-bottom: 0.5em;
+                }
+                [contenteditable] p {
+                    margin-bottom: 0.5em;
+                }
+                [contenteditable] p:last-child {
+                    margin-bottom: 0;
+                }
+            `}</style>
+        </div>
+    );
+});
+
+SimpleRichTextEditor.displayName = 'SimpleRichTextEditor';
 
 const RubricCreator = () => {
     // Get shared context functions and state
@@ -66,7 +507,7 @@ const RubricCreator = () => {
         onSave: null,
         criterionId: null,
         level: null,
-        type: null // 'assignment', 'criterion', or 'level'
+        type: null // 'assignment', 'criterion', 'level', or 'feedback'
     });
     const [autoSaveTimeout, setAutoSaveTimeout] = useState(null);
 
@@ -76,48 +517,6 @@ const RubricCreator = () => {
 
     // Refs for file inputs
     const importInputRef = useRef(null);
-
-    // Cursor position helpers for the inline editor
-    const saveCursorPosition = () => {
-        const editor = editorRef.current;
-        if (!editor) return null;
-
-        const selection = window.getSelection();
-        if (selection.rangeCount === 0) return null;
-
-        const range = selection.getRangeAt(0);
-        return {
-            startContainer: range.startContainer,
-            startOffset: range.startOffset,
-            endContainer: range.endContainer,
-            endOffset: range.endOffset
-        };
-    };
-
-    const restoreCursorPosition = (savedPosition) => {
-        if (!savedPosition || !editorRef.current) return;
-
-        try {
-            const selection = window.getSelection();
-            const range = document.createRange();
-
-            range.setStart(savedPosition.startContainer, savedPosition.startOffset);
-            range.setEnd(savedPosition.endContainer, savedPosition.endOffset);
-
-            selection.removeAllRanges();
-            selection.addRange(range);
-        } catch (error) {
-            // If cursor restoration fails, place cursor at end
-            const editor = editorRef.current;
-            const range = document.createRange();
-            const selection = window.getSelection();
-
-            range.selectNodeContents(editor);
-            range.collapse(false);
-            selection.removeAllRanges();
-            selection.addRange(range);
-        }
-    };
 
     // Auto-save to shared context whenever rubricData changes
     useEffect(() => {
@@ -170,6 +569,7 @@ const RubricCreator = () => {
     };
 
     const convertHtmlToPlainText = (html) => {
+        if (!html) return '';
         // Create a temporary div to parse HTML
         const tempDiv = document.createElement('div');
         tempDiv.innerHTML = html;
@@ -177,6 +577,7 @@ const RubricCreator = () => {
     };
 
     const convertPlainTextToHtml = (text) => {
+        if (!text) return '';
         return text.replace(/\n/g, '<br>');
     };
 
@@ -516,7 +917,7 @@ const RubricCreator = () => {
 <body>
     <div class="header">
         <h1>${rubricData.assignmentInfo.title || 'Assessment Rubric'}</h1>
-        <p style="color: #64748b; font-size: 1.1em;">${rubricData.assignmentInfo.description || 'No description provided'}</p>
+        <p style="color: #64748b; font-size: 1.1em;">${convertHtmlToPlainText(rubricData.assignmentInfo.description) || 'No description provided'}</p>
     </div>
     
     <div class="assignment-info">
@@ -541,7 +942,7 @@ const RubricCreator = () => {
                     <td class="criterion-name">
                         <strong style="color: #1e40af; font-size: 1.1em;">${criterion.name || 'Unnamed Criterion'}</strong>
                         <div style="font-weight: normal; color: #475569; margin-top: 8px; font-style: italic;">
-                            ${criterion.description || 'No description provided'}
+                            ${convertHtmlToPlainText(criterion.description) || 'No description provided'}
                         </div>
                         <div style="background: #1e40af; color: white; padding: 5px 10px; border-radius: 4px; margin-top: 10px; text-align: center; font-weight: bold;">
                             ${criterion.maxPoints} points
@@ -600,7 +1001,6 @@ const RubricCreator = () => {
         link.click();
         URL.revokeObjectURL(url);
     };
-
 
     return (
         <div className="min-h-screen bg-gray-50 p-6">
@@ -670,7 +1070,7 @@ const RubricCreator = () => {
                     {sharedRubric && (
                         <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-6">
                             <div className="flex items-center gap-2 text-green-800">
-                                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
                                 <span className="text-sm font-medium">Auto-saved - Ready for grading tool</span>
                             </div>
                         </div>
@@ -717,7 +1117,7 @@ const RubricCreator = () => {
                                         <strong>💡 Tip:</strong> Work is auto-saved every second. Switch between tabs freely - your progress is preserved.
                                     </p>
                                     <p className="text-blue-800 text-sm mt-2">
-                                        <strong>📝 Rich Text Editing:</strong> Type directly in any description box for quick edits, or click the blue expand button (⤢) to open the full editor. Pasted formatting from Word or the web is preserved.
+                                        <strong>📝 Rich Text Editing:</strong> Type directly in any description box for quick edits, or click the blue expand button (⤢) to open the full editor. Paste formatting from Word or the web is preserved.
                                     </p>
                                 </div>
                             </div>
@@ -776,7 +1176,7 @@ const RubricCreator = () => {
                                             );
                                         }}
                                         className="absolute top-2 right-2 z-10 opacity-70 hover:opacity-100 transition-opacity bg-blue-500 text-white rounded p-1 hover:bg-blue-600 cursor-pointer"
-                                        title="Open inline rich text editor"
+                                        title="Open rich text editor"
                                     >
                                         <Maximize2 size={14} />
                                     </button>
@@ -833,12 +1233,13 @@ const RubricCreator = () => {
 
                                 {/* Editor Content */}
                                 <div className="p-4">
-                                    <RichTextEditor
+                                    <SimpleRichTextEditor
                                         ref={editorRef}
                                         value={inlineEditor.content}
                                         onChange={(html) => {
                                             richTextContentRef.current = html;
                                         }}
+                                        placeholder="Enter detailed assignment description..."
                                     />
                                 </div>
 
@@ -853,7 +1254,7 @@ const RubricCreator = () => {
                                             <span>Paste rich text from other sources</span>
                                         </div>
                                         <div className="text-xs text-gray-500">
-                                            <strong>Shortcuts:</strong> Ctrl+B (Bold), Ctrl+I (Italic), Ctrl+U (Underline), Enter (New Line), Tab (Indent)
+                                            <strong>Features:</strong> Headers, Bold, Italic, Lists, Links, Colors
                                         </div>
                                     </div>
                                 </div>
@@ -901,7 +1302,7 @@ const RubricCreator = () => {
                             <div className="flex gap-2">
                                 <button
                                     onClick={() => setReversedOrder(!reversedOrder)}
-                                    className="bg-indigo-700 hover:bg-indigo-600 px-3 py-2 rounded flex items-center gap-1 text-sm"
+                                    className="bg-indigo-700 hover:bg-indigo-600 px-3 py-2 rounded flex items-center gap-1 text-sm text-white"
                                     title="Switch between ascending and descending level order"
                                 >
                                     <RotateCcw size={14} />
@@ -909,7 +1310,7 @@ const RubricCreator = () => {
                                 </button>
                                 <button
                                     onClick={resetTextareaSizes}
-                                    className="bg-gray-600 hover:bg-gray-700 px-3 py-2 rounded flex items-center gap-1 text-sm"
+                                    className="bg-gray-600 hover:bg-gray-700 px-3 py-2 rounded flex items-center gap-1 text-sm text-white"
                                     title="Reset all textarea sizes to original dimensions"
                                 >
                                     <Minimize2 size={14} />
@@ -993,7 +1394,7 @@ const RubricCreator = () => {
                                                                     );
                                                                 }}
                                                                 className="absolute top-1 right-1 z-10 opacity-70 hover:opacity-100 transition-opacity bg-blue-500 text-white rounded p-1 hover:bg-blue-600 cursor-pointer"
-                                                                title="Open inline rich text editor"
+                                                                title="Open rich text editor"
                                                             >
                                                                 <Maximize2 size={12} />
                                                             </button>
@@ -1053,7 +1454,7 @@ const RubricCreator = () => {
                                                                         );
                                                                     }}
                                                                     className="absolute top-1 right-1 z-10 opacity-70 hover:opacity-100 transition-opacity bg-blue-500 text-white rounded p-1 hover:bg-blue-600 cursor-pointer"
-                                                                    title="Open inline rich text editor"
+                                                                    title="Open rich text editor"
                                                                 >
                                                                     <Maximize2 size={12} />
                                                                 </button>
@@ -1117,12 +1518,13 @@ const RubricCreator = () => {
 
                                                                 {/* Editor Content */}
                                                                 <div className="p-4">
-                                                                    <RichTextEditor
+                                                                    <SimpleRichTextEditor
                                                                         ref={editorRef}
                                                                         value={inlineEditor.content}
                                                                         onChange={(html) => {
                                                                             richTextContentRef.current = html;
                                                                         }}
+                                                                        placeholder={`Enter ${inlineEditor.type === 'criterion' ? 'criterion description' : 'level description'}...`}
                                                                     />
                                                                 </div>
 
@@ -1131,13 +1533,13 @@ const RubricCreator = () => {
                                                                     <div className="flex justify-between items-center">
                                                                         <div className="flex items-center gap-4 text-sm text-gray-600">
                                                                             <span className="flex items-center gap-2">
-                                                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                                                Rich Text Editor Active
-                                            </span>
-                                            <span>Paste rich text from other sources</span>
+                                                                                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                                                                                Rich Text Editor Active
+                                                                            </span>
+                                                                            <span>Paste rich text from other sources</span>
                                                                         </div>
                                                                         <div className="text-xs text-gray-500">
-                                                                            <strong>Shortcuts:</strong> Ctrl+B (Bold), Ctrl+I (Italic), Ctrl+U (Underline), Enter (New Line), Tab (Indent)
+                                                                            <strong>Features:</strong> Headers, Bold, Italic, Lists, Links, Colors
                                                                         </div>
                                                                     </div>
                                                                 </div>
@@ -1215,8 +1617,8 @@ const RubricCreator = () => {
                                                                                 `${category} Comment`,
                                                                                 (newContent) => {
                                                                                     const updatedFeedback = [...criterion.feedbackLibrary[category]];
-    // Store formatted HTML so formatting persists in exports
-    updatedFeedback[index] = newContent;
+                                                                                    // Store formatted HTML so formatting persists in exports
+                                                                                    updatedFeedback[index] = newContent;
                                                                                     setRubricData(prev => ({
                                                                                         ...prev,
                                                                                         criteria: prev.criteria.map(c =>
@@ -1264,6 +1666,63 @@ const RubricCreator = () => {
                                 </div>
                             ))}
                         </div>
+
+                        {/* Inline Rich Text Editor for Feedback */}
+                        {inlineEditor.show && inlineEditor.type === 'feedback' && (
+                            <div className="mt-6 border-2 border-blue-300 rounded-lg bg-white shadow-lg">
+                                {/* Editor Header */}
+                                <div className="flex justify-between items-center p-4 border-b bg-gradient-to-r from-blue-50 to-indigo-50">
+                                    <h4 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                                        <Maximize2 size={20} className="text-blue-600" />
+                                        Rich Text Editor: {inlineEditor.field}
+                                    </h4>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => closeInlineEditor(true)}
+                                            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded flex items-center gap-2 transition-colors"
+                                        >
+                                            <Save size={16} />
+                                            Save & Close
+                                        </button>
+                                        <button
+                                            onClick={() => closeInlineEditor(false)}
+                                            className="bg-red-700 hover:bg-red-800 text-white px-4 py-2 rounded flex items-center gap-2 transition-colors"
+                                        >
+                                            <X size={16} />
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Editor Content */}
+                                <div className="p-4">
+                                    <SimpleRichTextEditor
+                                        ref={editorRef}
+                                        value={inlineEditor.content}
+                                        onChange={(html) => {
+                                            richTextContentRef.current = html;
+                                        }}
+                                        placeholder="Enter feedback comment..."
+                                    />
+                                </div>
+
+                                {/* Footer */}
+                                <div className="p-4 border-t bg-gradient-to-r from-gray-50 to-blue-50 rounded-b-lg">
+                                    <div className="flex justify-between items-center">
+                                        <div className="flex items-center gap-4 text-sm text-gray-600">
+                                            <span className="flex items-center gap-2">
+                                                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                                                Rich Text Editor Active
+                                            </span>
+                                            <span>Paste rich text from other sources</span>
+                                        </div>
+                                        <div className="text-xs text-gray-500">
+                                            <strong>Features:</strong> Headers, Bold, Italic, Lists, Links, Colors
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* Overall Score Preview */}
