@@ -7,7 +7,9 @@ const cleanPastedContent = (html) => {
     'b', 'strong', 'i', 'em', 'u', 's', 'br', 'p',
     'ul', 'ol', 'li', 'a', 'h1', 'h2', 'h3', 'code'
   ];
-  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const doc = new DOMParser().parseFromString(html || '', 'text/html');
+  const root = doc.body || doc.documentElement;
+  if (!root) return html || '';
 
   const traverse = (node) => {
     if (node.nodeType === Node.TEXT_NODE) return;
@@ -35,15 +37,15 @@ const cleanPastedContent = (html) => {
     }
   };
 
-  traverse(doc.body);
+  traverse(root);
 
-  doc.body.querySelectorAll('p').forEach((p) => {
+  root.querySelectorAll('p').forEach((p) => {
     if (!p.textContent.trim()) p.remove();
   });
 
-  doc.body.innerHTML = doc.body.innerHTML.replace(/(<br\s*\/?>\s*){2,}/gi, '<br>');
+  root.innerHTML = root.innerHTML.replace(/(<br\s*\/?>\s*){2,}/gi, '<br>');
 
-  return doc.body.innerHTML.trim();
+  return root.innerHTML.trim();
 };
 
 const ToolbarButton = ({ icon: Icon, onClick, title }) => (
