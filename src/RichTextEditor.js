@@ -9,6 +9,12 @@ import {
   Heading3,
   List,
   ListOrdered,
+  Indent,
+  Outdent,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  AlignJustify,
   Link as LinkIcon,
   Undo2,
   Redo2,
@@ -118,16 +124,9 @@ const cleanPastedContent = (html) => {
     }
   });
 
-  // Replace <p> with <div> to avoid Word margins
-  body.querySelectorAll('p').forEach((p) => {
-    const div = doc.createElement('div');
-    div.innerHTML = p.innerHTML;
-    p.replaceWith(div);
-  });
-
-  return sanitizeHtml((body.innerHTML || ''))
-    .replace(/(<div>\s*<br>\s*<\/div>)+/gi, '<br>')
-    .replace(/(<br\s*\/?>\s*){2,}/gi, '<br>');
+  return sanitizeHtml(body.innerHTML || '')
+    .replace(/(<br\s*\/?>\s*){2,}/gi, '<br>')
+    .trim();
 };
 
 const ToolbarButton = ({ icon: Icon, onClick, title }) => (
@@ -188,7 +187,7 @@ const RichTextEditor = React.forwardRef(({ initialHTML, onChange }, ref) => {
 
   return (
     <div>
-      <div className="flex flex-wrap gap-1 border-b border-gray-200 bg-gray-50 p-2 mb-2 overflow-x-auto">
+      <div className="flex flex-wrap gap-1 border-b border-gray-200 bg-gray-50 p-2 mb-1 overflow-x-auto">
         <ToolbarButton icon={Bold} onClick={() => exec('bold')} title="Bold" />
         <ToolbarButton icon={Italic} onClick={() => exec('italic')} title="Italic" />
         <ToolbarButton icon={Underline} onClick={() => exec('underline')} title="Underline" />
@@ -198,13 +197,30 @@ const RichTextEditor = React.forwardRef(({ initialHTML, onChange }, ref) => {
         <ToolbarButton icon={Heading2} onClick={() => exec('formatBlock', 'h2')} title="Heading 2" />
         <ToolbarButton icon={Heading3} onClick={() => exec('formatBlock', 'h3')} title="Heading 3" />
         <span className="mx-1 border-l border-gray-300" />
+        <input type="color" onChange={(e) => exec('foreColor', e.target.value)} className="w-8 h-8 border rounded cursor-pointer" title="Text Color" />
+        <input type="color" onChange={(e) => exec('hiliteColor', e.target.value)} className="w-8 h-8 border rounded cursor-pointer ml-1" title="Highlight" />
+        <span className="mx-1 border-l border-gray-300" />
         <ToolbarButton icon={List} onClick={() => exec('insertUnorderedList')} title="Bulleted List" />
         <ToolbarButton icon={ListOrdered} onClick={() => exec('insertOrderedList')} title="Numbered List" />
+        <ToolbarButton icon={Outdent} onClick={() => exec('outdent')} title="Decrease Indent" />
+        <ToolbarButton icon={Indent} onClick={() => exec('indent')} title="Increase Indent" />
+        <span className="mx-1 border-l border-gray-300" />
+        <ToolbarButton icon={AlignLeft} onClick={() => exec('justifyLeft')} title="Align Left" />
+        <ToolbarButton icon={AlignCenter} onClick={() => exec('justifyCenter')} title="Align Center" />
+        <ToolbarButton icon={AlignRight} onClick={() => exec('justifyRight')} title="Align Right" />
+        <ToolbarButton icon={AlignJustify} onClick={() => exec('justifyFull')} title="Justify" />
         <span className="mx-1 border-l border-gray-300" />
         <ToolbarButton icon={LinkIcon} onClick={() => { const url = prompt('Enter URL'); if (url) exec('createLink', url); }} title="Link" />
         <ToolbarButton icon={Undo2} onClick={() => exec('undo')} title="Undo" />
         <ToolbarButton icon={Redo2} onClick={() => exec('redo')} title="Redo" />
         <ToolbarButton icon={Eraser} onClick={() => exec('removeFormat')} title="Clear Formatting" />
+      </div>
+      <div className="flex flex-wrap gap-1 text-xs mb-2 px-2">
+        <span className="text-gray-600 mr-2">Quick Insert:</span>
+        <button type="button" onClick={() => exec('insertHTML', '<strong>Example:</strong> ')} className="px-2 py-1 bg-blue-100 hover:bg-blue-200 rounded">Example</button>
+        <button type="button" onClick={() => exec('insertHTML', '<em>Note:</em> ')} className="px-2 py-1 bg-green-100 hover:bg-green-200 rounded">Note</button>
+        <button type="button" onClick={() => exec('insertHTML', '<strong>Requirements:</strong><br>• <br>• <br>• ')} className="px-2 py-1 bg-purple-100 hover:bg-purple-200 rounded">Requirements</button>
+        <button type="button" onClick={() => { if (editorRef.current) { editorRef.current.innerHTML = ''; emitChange(); } }} className="px-2 py-1 bg-red-100 hover:bg-red-200 rounded">Clear All</button>
       </div>
       <style>{`
         .rich-text-editor h1 { font-size: 1.5em; font-weight: bold; margin: 0.5em 0; }
