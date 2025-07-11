@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Plus, X, Upload, Download, Save, FileText, RotateCcw, ChevronDown, ChevronUp, Maximize2, ArrowRight, Minimize2 } from 'lucide-react';
-import MarkupEditor from '../editor';
+import RichTextEditor from '../RichTextEditor';
 import { useAssessment } from './SharedContext';
 
 const RubricCreator = () => {
@@ -70,14 +70,14 @@ const RubricCreator = () => {
     });
     const [autoSaveTimeout, setAutoSaveTimeout] = useState(null);
 
-    // FIXED: Use refs instead of state for rich text content to prevent cursor jumping
+    // Use refs to store editor content and DOM node
     const richTextContentRef = useRef('');
     const editorRef = useRef(null);
 
     // Refs for file inputs
     const importInputRef = useRef(null);
 
-    // FIXED: Cursor position management functions
+    // Cursor position helpers for the inline editor
     const saveCursorPosition = () => {
         const editor = editorRef.current;
         if (!editor) return null;
@@ -153,7 +153,7 @@ const RubricCreator = () => {
         }));
     };
 
-    // FIXED: Open inline editor for text editing
+    // Launch the inline rich text editor
     const openInlineEditor = (content, field, onSave, criterionId = null, level = null, type = 'assignment') => {
         // Initialize the ref with current content
         richTextContentRef.current = content || '';
@@ -601,8 +601,6 @@ const RubricCreator = () => {
         URL.revokeObjectURL(url);
     };
 
-    // Simple markup editor toolbar placeholder (removed rich text actions)
-    const RichTextToolbar = () => null;
 
     return (
         <div className="min-h-screen bg-gray-50 p-6">
@@ -719,7 +717,7 @@ const RubricCreator = () => {
                                         <strong>💡 Tip:</strong> Work is auto-saved every second. Switch between tabs freely - your progress is preserved.
                                     </p>
                                     <p className="text-blue-800 text-sm mt-2">
-                                        <strong>📝 Markup Editing:</strong> Type directly in any description box for quick edits, or click the blue expand button (⤢) to open the markup editor. Pasted formatting from Word or the web is preserved.
+                                        <strong>📝 Rich Text Editing:</strong> Type directly in any description box for quick edits, or click the blue expand button (⤢) to open the rich text editor. Pasted formatting from Word or the web is preserved.
                                     </p>
                                 </div>
                             </div>
@@ -806,14 +804,14 @@ const RubricCreator = () => {
                             </div>
                         </div>
 
-                        {/* Inline Markup Editor for Assignment */}
+                        {/* Inline Rich Text Editor for Assignment */}
                         {inlineEditor.show && inlineEditor.type === 'assignment' && (
                             <div className="mt-6 border-2 border-blue-300 rounded-lg bg-white shadow-lg">
                                 {/* Editor Header */}
                                 <div className="flex justify-between items-center p-4 border-b bg-gradient-to-r from-blue-50 to-indigo-50">
                                     <h4 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
                                         <Maximize2 size={20} className="text-blue-600" />
-                                        Markup Editor: {inlineEditor.field}
+                                        Rich Text Editor: {inlineEditor.field}
                                     </h4>
                                     <div className="flex gap-2">
                                         <button
@@ -835,7 +833,7 @@ const RubricCreator = () => {
 
                                 {/* Editor Content */}
                                 <div className="p-4">
-                                    <MarkupEditor
+                                    <RichTextEditor
                                         ref={editorRef}
                                         initialHTML={inlineEditor.content}
                                         onChange={(html) => {
@@ -850,7 +848,7 @@ const RubricCreator = () => {
                                         <div className="flex items-center gap-4 text-sm text-gray-600">
                                             <span className="flex items-center gap-2">
                                                 <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                                                Markup Editor Active
+                                                Rich Text Editor Active
                                             </span>
                                             <span>Paste rich text from other sources</span>
                                         </div>
@@ -1086,7 +1084,7 @@ const RubricCreator = () => {
                                                 </td>
                                             </tr>
 
-                                            {/* Inline Markup Editor for Criterion or Level */}
+                                            {/* Inline Rich Text Editor for Criterion or Level */}
                                             {inlineEditor.show &&
                                                 inlineEditor.criterionId === criterion.id &&
                                                 (inlineEditor.type === 'criterion' || inlineEditor.type === 'level') && (
@@ -1097,7 +1095,7 @@ const RubricCreator = () => {
                                                                 <div className="flex justify-between items-center p-4 border-b bg-gradient-to-r from-blue-50 to-indigo-50">
                                                                     <h4 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
                                                                         <Maximize2 size={20} className="text-blue-600" />
-                                                                        Markup Editor: {inlineEditor.field}
+                                                                        Rich Text Editor: {inlineEditor.field}
                                                                     </h4>
                                                                     <div className="flex gap-2">
                                                                         <button
@@ -1119,7 +1117,7 @@ const RubricCreator = () => {
 
                                                                 {/* Editor Content */}
                                                                 <div className="p-4">
-                                                                    <MarkupEditor
+                                                                    <RichTextEditor
                                                                         ref={editorRef}
                                                                         initialHTML={inlineEditor.content}
                                                                         onChange={(html) => {
@@ -1134,7 +1132,7 @@ const RubricCreator = () => {
                                                                         <div className="flex items-center gap-4 text-sm text-gray-600">
                                                                             <span className="flex items-center gap-2">
                                                 <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                                                Markup Editor Active
+                                                Rich Text Editor Active
                                             </span>
                                             <span>Paste rich text from other sources</span>
                                                                         </div>

@@ -141,7 +141,7 @@ const ToolbarButton = ({ icon: Icon, onClick, title }) => (
   </button>
 );
 
-const MarkupEditor = React.forwardRef(({ initialHTML, onChange }, ref) => {
+const RichTextEditor = React.forwardRef(({ initialHTML, onChange }, ref) => {
   const localRef = useRef(null);
   const editorRef = ref || localRef;
 
@@ -253,4 +253,4 @@ const MarkupEditor = React.forwardRef(({ initialHTML, onChange }, ref) => {
   );
 });
 
-export default MarkupEditor;
+export default RichTextEditor;
