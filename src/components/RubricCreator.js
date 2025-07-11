@@ -311,6 +311,8 @@ const RubricCreator = () => {
     const addFeedbackItem = (criterionId, category, item) => {
         if (!item || !item.trim()) return;
 
+        const htmlItem = convertPlainTextToHtml(item.trim());
+
         setRubricData(prev => ({
             ...prev,
             criteria: prev.criteria.map(criterion =>
@@ -319,7 +321,7 @@ const RubricCreator = () => {
                         ...criterion,
                         feedbackLibrary: {
                             ...criterion.feedbackLibrary,
-                            [category]: [...criterion.feedbackLibrary[category], item.trim()]
+                            [category]: [...criterion.feedbackLibrary[category], htmlItem]
                         }
                     }
                     : criterion
@@ -1215,7 +1217,8 @@ const RubricCreator = () => {
                                                                                 `${category} Comment`,
                                                                                 (newContent) => {
                                                                                     const updatedFeedback = [...criterion.feedbackLibrary[category]];
-                                                                                    updatedFeedback[index] = convertHtmlToPlainText(newContent);
+    // Store formatted HTML so formatting persists in exports
+    updatedFeedback[index] = newContent;
                                                                                     setRubricData(prev => ({
                                                                                         ...prev,
                                                                                         criteria: prev.criteria.map(c =>
@@ -1238,7 +1241,7 @@ const RubricCreator = () => {
                                                                         }}
                                                                         title="Click to edit"
                                                                     >
-                                                                        {item}
+                                                                        {convertHtmlToPlainText(item)}
                                                                     </span>
                                                                     <button
                                                                         onClick={() => removeFeedbackItem(criterion.id, category, index)}
