@@ -252,6 +252,33 @@ const GradingTemplate = () => {
     updateAssignmentInfo
   } = useAssessment();
 
+  // Helper function to convert HTML content to readable text format
+  const renderFormattedContent = (htmlContent) => {
+    if (!htmlContent) return '';
+
+    // Convert basic HTML to readable text format
+    let textContent = htmlContent
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/p>/gi, '\n')
+      .replace(/<p[^>]*>/gi, '')
+      .replace(/<strong[^>]*>(.*?)<\/strong>/gi, '**$1**')
+      .replace(/<b[^>]*>(.*?)<\/b>/gi, '**$1**')
+      .replace(/<em[^>]*>(.*?)<\/em>/gi, '*$1*')
+      .replace(/<i[^>]*>(.*?)<\/i>/gi, '*$1*')
+      .replace(/<u[^>]*>(.*?)<\/u>/gi, '_$1_')
+      .replace(/<h3[^>]*>(.*?)<\/h3>/gi, '### $1\n')
+      .replace(/<li[^>]*>(.*?)<\/li>/gi, '• $1\n')
+      .replace(/<\/ul>/gi, '\n')
+      .replace(/<ul[^>]*>/gi, '')
+      .replace(/<\/ol>/gi, '\n')
+      .replace(/<ol[^>]*>/gi, '')
+      .replace(/<[^>]*>/g, '') // Remove any remaining HTML tags
+      .replace(/\n\s*\n/g, '\n') // Remove extra line breaks
+      .trim();
+
+    return textContent;
+  };
+
   // Current active course module
   const [activeModule, setActiveModule] = useState("2d-animation");
   const [customModules, setCustomModules] = useState({});
@@ -591,6 +618,8 @@ const GradingTemplate = () => {
       }
     }).join('');
 
+    
+
     // Build video links HTML
     const videoLinksHTML = gradingData.videoLinks.map(link => `
       <div class="video-link-item" style="background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
@@ -610,7 +639,7 @@ const GradingTemplate = () => {
       <h3>📋 Detailed Rubric Assessment</h3>
       <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
           <strong>Assignment:</strong> ${loadedRubric.assignmentInfo.title}<br>
-          <strong>Description:</strong> ${loadedRubric.assignmentInfo.description}<br>
+          <strong>Description:</strong> ${renderFormattedContent(loadedRubric.assignmentInfo.description)}<br>
           <strong>Weight:</strong> ${loadedRubric.assignmentInfo.weight}% of Final Grade<br>
           <strong>Passing Threshold:</strong> ${loadedRubric.assignmentInfo.passingThreshold}%  
       </div>
@@ -630,14 +659,14 @@ const GradingTemplate = () => {
       const grading = rubricGrading[criterion.id];
       const level = grading?.selectedLevel ? loadedRubric.rubricLevels.find(l => l.level === grading.selectedLevel) : null;
       const points = level ? (criterion.maxPoints * level.multiplier).toFixed(1) : '0';
-      const levelDescription = level && criterion.levels[level.level] ? criterion.levels[level.level].description : '';
+                const levelDescription = level && criterion.levels[level.level] ? renderFormattedContent(criterion.levels[level.level].description) : '';
       const additionalComments = grading?.customComments || '';
 
       return `
                       <tr>
                           <td style="border: 1px solid #ddd; padding: 8px; vertical-align: top;">
                               <strong style="color: #2c3e50;">${criterion.name}</strong><br>
-                              <small style="color: #666; font-style: italic;">${criterion.description}</small>
+                              <small style="color: #666; font-style: italic;">${renderFormattedContent(criterion.description)}</small>
                           </td>
                           <td style="border: 1px solid #ddd; padding: 8px; text-align: center; font-weight: bold;">${criterion.maxPoints}</td>
                           <td style="border: 1px solid #ddd; padding: 8px; text-align: center; ${level ? `background-color: ${level.color}15; color: ${level.color}; font-weight: bold;` : ''}">${level ? level.name : 'Not Assessed'}</td>
@@ -994,7 +1023,7 @@ const GradingTemplate = () => {
                 <div><strong>Passing Threshold:</strong> ${loadedRubric.assignmentInfo.passingThreshold}%</div>
                 <div><strong>Total Points:</strong> ${loadedRubric.assignmentInfo.totalPoints}</div>
             </div>
-            <div class="assignment-description">${loadedRubric.assignmentInfo.description}</div>
+            <div class="assignment-description">${renderFormattedContent(loadedRubric.assignmentInfo.description)}</div>
         </div>
         
         <table class="rubric-table">
@@ -1012,14 +1041,14 @@ const GradingTemplate = () => {
       const grading = rubricGrading[criterion.id];
       const level = grading?.selectedLevel ? loadedRubric.rubricLevels.find(l => l.level === grading.selectedLevel) : null;
       const points = level ? (criterion.maxPoints * level.multiplier).toFixed(1) : '0';
-      const levelDescription = level && criterion.levels[level.level] ? criterion.levels[level.level].description : '';
+                  const levelDescription = level && criterion.levels[level.level] ? renderFormattedContent(criterion.levels[level.level].description) : '';
       const additionalComments = grading?.customComments || '';
 
       return `
                         <tr class="criterion-row">
                             <td class="criterion-cell">
                                 <div class="criterion-name">${criterion.name}</div>
-                                <div class="criterion-desc">${criterion.description}</div>
+                                <div class="criterion-desc">${renderFormattedContent(criterion.description)}</div>
                             </td>
                             <td class="points-cell">${criterion.maxPoints}</td>
                             <td class="level-cell ${level ? 'level-achieved' : ''}" ${level ? `style="background-color: ${level.color}20; color: ${level.color};"` : ''}>
@@ -2048,7 +2077,7 @@ const GradingTemplate = () => {
                       {loadedRubric.assignmentInfo.title}
                     </p>
                     <p style={{ fontSize: '0.875rem', color: '#059669' }}>
-                      {loadedRubric.assignmentInfo.description}
+                      {renderFormattedContent(loadedRubric.assignmentInfo.description)}
                     </p>
                   </div>
                   <div style={{ textAlign: 'right' }}>
@@ -2089,7 +2118,7 @@ const GradingTemplate = () => {
                               </span>
                             </h4>
                             <p style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.25rem' }}>
-                              {criterion.description}
+                              {renderFormattedContent(criterion.description)}
                             </p>
                           </div>
                           <button
@@ -2180,7 +2209,7 @@ const GradingTemplate = () => {
                                     {criterion.levels[level.level]?.pointRange} pts
                                   </div>
                                   <div style={{ fontSize: '0.75rem', color: '#374151' }}>
-                                    {criterion.levels[level.level]?.description}
+                                    {renderFormattedContent(criterion.levels[level.level]?.description)}
                                   </div>
                                 </div>
                               ))}
@@ -2223,7 +2252,7 @@ const GradingTemplate = () => {
                                 >
                                   <option value="">Add {category}...</option>
                                   {comments.map((comment, idx) => (
-                                    <option key={idx} value={comment}>{comment}</option>
+                                    <option key={idx} value={comment}>{renderFormattedContent(comment)}</option>
                                   ))}
                                 </select>
                               ))}
@@ -2261,7 +2290,7 @@ const GradingTemplate = () => {
                               {' '}({criterion.levels[currentGrading.selectedLevel]?.pointRange} pts)
                             </div>
                             <div style={{ fontSize: '0.875rem', color: '#374151', marginTop: '0.25rem' }}>
-                              {criterion.levels[currentGrading.selectedLevel]?.description}
+                              {renderFormattedContent(criterion.levels[currentGrading.selectedLevel]?.description)}
                             </div>
                           </div>
                         )}
