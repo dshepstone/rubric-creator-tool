@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Plus, X, Upload, Download, Save, FileText, RotateCcw, ChevronDown, ChevronUp, Maximize2, ArrowRight, Minimize2 } from 'lucide-react';
+import MarkupEditor from '../editor';
 import { useAssessment } from './SharedContext';
 
 const RubricCreator = () => {
@@ -166,30 +167,6 @@ const RubricCreator = () => {
             level,
             type
         });
-
-        // Focus the editor after it's rendered
-        setTimeout(() => {
-            const editor = editorRef.current;
-            if (editor) {
-                editor.innerHTML = content || '';
-                editor.focus();
-                // Place cursor at end
-                const range = document.createRange();
-                const selection = window.getSelection();
-                range.selectNodeContents(editor);
-                range.collapse(false);
-                selection.removeAllRanges();
-                selection.addRange(range);
-            }
-        }, 100);
-    };
-
-    // Simple markup editor input handler
-    const handleEditorInput = () => {
-        const editor = editorRef.current;
-        if (editor) {
-            richTextContentRef.current = editor.innerHTML;
-        }
     };
 
     const convertHtmlToPlainText = (html) => {
@@ -856,47 +833,12 @@ const RubricCreator = () => {
 
                                 {/* Editor Content */}
                                 <div className="p-4">
-                                    <style>{`
-                                        .rich-text-editor h1 { font-size: 1.5em; font-weight: bold; margin: 0.5em 0; }
-                                        .rich-text-editor h2 { font-size: 1.3em; font-weight: bold; margin: 0.4em 0; }
-                                        .rich-text-editor h3 { font-size: 1.1em; font-weight: bold; margin: 0.3em 0; }
-                                        .rich-text-editor p { margin: 0.5em 0; }
-                                        .rich-text-editor ul, .rich-text-editor ol { margin: 0.5em 0; padding-left: 1.5em; }
-                                        .rich-text-editor li { margin: 0.2em 0; }
-                                        .rich-text-editor blockquote { 
-                                            margin: 0.5em 0; 
-                                            padding: 0.5em 1em; 
-                                            border-left: 4px solid #e5e7eb; 
-                                            background: #f9fafb; 
-                                            font-style: italic; 
-                                        }
-                                        .rich-text-editor pre { 
-                                            background: #f3f4f6; 
-                                            padding: 0.5em; 
-                                            border-radius: 4px; 
-                                            font-family: monospace; 
-                                            font-size: 0.9em; 
-                                            white-space: pre-wrap; 
-                                        }
-                                        .rich-text-editor a { color: #3b82f6; text-decoration: underline; }
-                                        .rich-text-editor hr { margin: 1em 0; border: none; border-top: 1px solid #d1d5db; }
-                                        .rich-text-editor br { line-height: 1.8; }
-                                    `}</style>
-                                    <div
+                                    <MarkupEditor
                                         ref={editorRef}
-                                        contentEditable={true}
-                                        onInput={handleEditorInput}
-                                        className="w-full p-4 border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rich-text-editor"
-                                        style={{
-                                            minHeight: '200px',
-                                            backgroundColor: '#fff',
-                                            fontSize: '14px',
-                                            lineHeight: '1.8',
-                                            fontFamily: 'inherit',
-                                            whiteSpace: 'pre-wrap',
-                                            wordBreak: 'break-word'
+                                        initialHTML={inlineEditor.content}
+                                        onChange={(html) => {
+                                            richTextContentRef.current = html;
                                         }}
-                                        suppressContentEditableWarning={true}
                                     />
                                 </div>
 
@@ -1175,47 +1117,12 @@ const RubricCreator = () => {
 
                                                                 {/* Editor Content */}
                                                                 <div className="p-4">
-                                                                    <style>{`
-                                                                    .rich-text-editor h1 { font-size: 1.5em; font-weight: bold; margin: 0.5em 0; }
-                                                                    .rich-text-editor h2 { font-size: 1.3em; font-weight: bold; margin: 0.4em 0; }
-                                                                    .rich-text-editor h3 { font-size: 1.1em; font-weight: bold; margin: 0.3em 0; }
-                                                                    .rich-text-editor p { margin: 0.5em 0; }
-                                                                    .rich-text-editor ul, .rich-text-editor ol { margin: 0.5em 0; padding-left: 1.5em; }
-                                                                    .rich-text-editor li { margin: 0.2em 0; }
-                                                                    .rich-text-editor blockquote { 
-                                                                        margin: 0.5em 0; 
-                                                                        padding: 0.5em 1em; 
-                                                                        border-left: 4px solid #e5e7eb; 
-                                                                        background: #f9fafb; 
-                                                                        font-style: italic; 
-                                                                    }
-                                                                    .rich-text-editor pre { 
-                                                                        background: #f3f4f6; 
-                                                                        padding: 0.5em; 
-                                                                        border-radius: 4px; 
-                                                                        font-family: monospace; 
-                                                                        font-size: 0.9em; 
-                                                                        white-space: pre-wrap; 
-                                                                    }
-                                                                    .rich-text-editor a { color: #3b82f6; text-decoration: underline; }
-                                                                    .rich-text-editor hr { margin: 1em 0; border: none; border-top: 1px solid #d1d5db; }
-                                                                    .rich-text-editor br { line-height: 1.8; }
-                                                                `}</style>
-                                                                    <div
+                                                                    <MarkupEditor
                                                                         ref={editorRef}
-                                                                        contentEditable={true}
-                                                                        onInput={handleEditorInput}
-                                                                        className="w-full p-4 border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rich-text-editor"
-                                                                        style={{
-                                                                            minHeight: '150px',
-                                                                            backgroundColor: '#fff',
-                                                                            fontSize: '14px',
-                                                                            lineHeight: '1.8',
-                                                                            fontFamily: 'inherit',
-                                                                            whiteSpace: 'pre-wrap',
-                                                                            wordBreak: 'break-word'
+                                                                        initialHTML={inlineEditor.content}
+                                                                        onChange={(html) => {
+                                                                            richTextContentRef.current = html;
                                                                         }}
-                                                                        suppressContentEditableWarning={true}
                                                                     />
                                                                 </div>
 
