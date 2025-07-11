@@ -42,7 +42,8 @@ const cleanPastedContent = (html) => {
 };
 
 const RichTextEditor = React.forwardRef(({ value, onChange }, ref) => {
-  const quillRef = ref || useRef(null);
+  const internalRef = useRef(null);
+  const quillRef = ref || internalRef;
 
   useEffect(() => {
     const quill = quillRef.current ? quillRef.current.getEditor() : null;
