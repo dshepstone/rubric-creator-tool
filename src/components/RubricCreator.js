@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Plus, X, Upload, Download, Save, FileText, RotateCcw, ChevronDown, ChevronUp, Maximize2, ArrowRight, Minimize2 } from 'lucide-react';
-import MarkupEditor from '../MarkupEditor';
+import RichTextEditor from '../RichTextEditor';
 import { useAssessment } from './SharedContext';
 
 const RubricCreator = () => {
@@ -833,9 +833,9 @@ const RubricCreator = () => {
 
                                 {/* Editor Content */}
                                 <div className="p-4">
-                                    <MarkupEditor
+                                    <RichTextEditor
                                         ref={editorRef}
-                                        initialHTML={inlineEditor.content}
+                                        value={inlineEditor.content}
                                         onChange={(html) => {
                                             richTextContentRef.current = html;
                                         }}
@@ -1117,9 +1117,9 @@ const RubricCreator = () => {
 
                                                                 {/* Editor Content */}
                                                                 <div className="p-4">
-                                                                    <MarkupEditor
+                                                                    <RichTextEditor
                                                                         ref={editorRef}
-                                                                        initialHTML={inlineEditor.content}
+                                                                        value={inlineEditor.content}
                                                                         onChange={(html) => {
                                                                             richTextContentRef.current = html;
                                                                         }}
