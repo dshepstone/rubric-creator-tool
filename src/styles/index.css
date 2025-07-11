@@ -612,3 +612,28 @@ th {
         display: none !important;
     }
 }
+.bg-red-600 {
+    background: linear-gradient(135deg, var(--danger-red) 0%, var(--red-700) 100%);
+    color: white;
+}
+
+.hover\:bg-red-700:hover {
+    background: linear-gradient(135deg, var(--red-700) 0%, var(--danger-red) 100%);
+    color: white;
+}
+/* your “missing” red-600 */
+.bg-red-600 {
+    background: linear-gradient(135deg, var(--danger-red) 0%, var(--red-700) 100%);
+    color: white;
+}
+
+/* your “missing” hover:bg-red-700 */
+.hover\:bg-red-700:hover {
+    background: linear-gradient(135deg, var(--red-700) 0%, var(--danger-red) 100%);
+    color: white;
+}
+/* keep Cancel red even when disabled */
+.bg-red-600:disabled {
+    background: linear-gradient(135deg, var(--danger-red) 0%, var(--red-700) 100%);
+    color: white;
+}

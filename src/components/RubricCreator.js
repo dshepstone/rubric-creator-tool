@@ -568,17 +568,49 @@ const RubricCreator = () => {
         });
     };
 
-    const convertHtmlToPlainText = (html) => {
-        if (!html) return '';
-        // Create a temporary div to parse HTML
+    // Helper function to safely render HTML content in textareas
+    const renderFormattedContent = (htmlContent) => {
+        if (!htmlContent) return '';
+        
+        // Create a temporary div to extract text while preserving some formatting
         const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = html;
-        return tempDiv.textContent || tempDiv.innerText || '';
+        tempDiv.innerHTML = htmlContent;
+        
+        // Convert basic HTML to readable text format
+        let textContent = htmlContent
+            .replace(/<br\s*\/?>/gi, '\n')
+            .replace(/<\/p>/gi, '\n')
+            .replace(/<p[^>]*>/gi, '')
+            .replace(/<strong[^>]*>(.*?)<\/strong>/gi, '**$1**')
+            .replace(/<b[^>]*>(.*?)<\/b>/gi, '**$1**')
+            .replace(/<em[^>]*>(.*?)<\/em>/gi, '*$1*')
+            .replace(/<i[^>]*>(.*?)<\/i>/gi, '*$1*')
+            .replace(/<u[^>]*>(.*?)<\/u>/gi, '_$1_')
+            .replace(/<h3[^>]*>(.*?)<\/h3>/gi, '### $1\n')
+            .replace(/<li[^>]*>(.*?)<\/li>/gi, '• $1\n')
+            .replace(/<\/ul>/gi, '\n')
+            .replace(/<ul[^>]*>/gi, '')
+            .replace(/<\/ol>/gi, '\n')
+            .replace(/<ol[^>]*>/gi, '')
+            .replace(/<[^>]*>/g, '') // Remove any remaining HTML tags
+            .replace(/\n\s*\n/g, '\n') // Remove extra line breaks
+            .trim();
+            
+        return textContent;
     };
 
-    const convertPlainTextToHtml = (text) => {
+    // Helper function to convert formatted text back to HTML
+    const convertFormattedTextToHtml = (text) => {
         if (!text) return '';
-        return text.replace(/\n/g, '<br>');
+        
+        return text
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*(.*?)\*/g, '<em>$1</em>')
+            .replace(/_(.*?)_/g, '<u>$1</u>')
+            .replace(/### (.*?)\n/g, '<h3>$1</h3>')
+            .replace(/• (.*?)\n/g, '<li>$1</li>')
+            .replace(/\n/g, '<br>')
+            .replace(/(<li>.*<\/li>)/g, '<ul>$1</ul>');
     };
 
     // Close inline editor and optionally save
@@ -712,7 +744,7 @@ const RubricCreator = () => {
     const addFeedbackItem = (criterionId, category, item) => {
         if (!item || !item.trim()) return;
 
-        const htmlItem = convertPlainTextToHtml(item.trim());
+        const htmlItem = convertFormattedTextToHtml(item.trim());
 
         setRubricData(prev => ({
             ...prev,
@@ -917,7 +949,7 @@ const RubricCreator = () => {
 <body>
     <div class="header">
         <h1>${rubricData.assignmentInfo.title || 'Assessment Rubric'}</h1>
-        <p style="color: #64748b; font-size: 1.1em;">${convertHtmlToPlainText(rubricData.assignmentInfo.description) || 'No description provided'}</p>
+        <p style="color: #64748b; font-size: 1.1em;">${renderFormattedContent(rubricData.assignmentInfo.description) || 'No description provided'}</p>
     </div>
     
     <div class="assignment-info">
@@ -942,7 +974,7 @@ const RubricCreator = () => {
                     <td class="criterion-name">
                         <strong style="color: #1e40af; font-size: 1.1em;">${criterion.name || 'Unnamed Criterion'}</strong>
                         <div style="font-weight: normal; color: #475569; margin-top: 8px; font-style: italic;">
-                            ${convertHtmlToPlainText(criterion.description) || 'No description provided'}
+                            ${renderFormattedContent(criterion.description) || 'No description provided'}
                         </div>
                         <div style="background: #1e40af; color: white; padding: 5px 10px; border-radius: 4px; margin-top: 10px; text-align: center; font-weight: bold;">
                             ${criterion.maxPoints} points
@@ -1153,9 +1185,9 @@ const RubricCreator = () => {
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
                                 <div className="relative">
                                     <textarea
-                                        value={convertHtmlToPlainText(rubricData.assignmentInfo.description)}
-                                        onChange={(e) => updateAssignmentInfo('description', convertPlainTextToHtml(e.target.value))}
-                                        className="w-full p-3 border rounded-lg resize-both hover:border-blue-400 transition-all duration-200 pr-12"
+                                        value={renderFormattedContent(rubricData.assignmentInfo.description)}
+                                        onChange={(e) => updateAssignmentInfo('description', convertFormattedTextToHtml(e.target.value))}
+                                        className="w-full p-3 border rounded-lg resize-y hover:border-blue-400 transition-all duration-200 pr-12"
                                         rows="3"
                                         placeholder="Detailed description of assignment requirements and expectations..."
                                         title="Type here for quick editing, or click the expand button for rich text editor"
@@ -1223,7 +1255,7 @@ const RubricCreator = () => {
                                         </button>
                                         <button
                                             onClick={() => closeInlineEditor(false)}
-                                            className="bg-red-700 hover:bg-red-800 text-white px-4 py-2 rounded flex items-center gap-2 transition-colors"
+                                            className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded flex items-center gap-2 transition-colors"
                                         >
                                             <X size={16} />
                                             Cancel
@@ -1371,9 +1403,9 @@ const RubricCreator = () => {
                                                         />
                                                         <div className="relative">
                                                             <textarea
-                                                                value={convertHtmlToPlainText(criterion.description)}
-                                                                onChange={(e) => updateCriterion(criterion.id, 'description', convertPlainTextToHtml(e.target.value))}
-                                                                className="w-full p-2 border rounded text-xs resize-both hover:border-blue-400 transition-all duration-200 pr-8"
+                                                                value={renderFormattedContent(criterion.description)}
+                                                                onChange={(e) => updateCriterion(criterion.id, 'description', convertFormattedTextToHtml(e.target.value))}
+                                                                className="w-full p-2 border rounded text-xs resize-y hover:border-blue-400 transition-all duration-200 pr-8"
                                                                 rows="2"
                                                                 placeholder="Brief description of what this criterion measures"
                                                                 title="Type here for quick editing, or click the expand button for rich text editor"
@@ -1431,9 +1463,9 @@ const RubricCreator = () => {
                                                             </div>
                                                             <div className="relative">
                                                                 <textarea
-                                                                    value={convertHtmlToPlainText(criterion.levels[level.level]?.description || '')}
-                                                                    onChange={(e) => updateCriterionLevel(criterion.id, level.level, 'description', convertPlainTextToHtml(e.target.value))}
-                                                                    className="w-full p-2 border rounded text-xs resize-both hover:border-blue-400 transition-all duration-200 pr-8"
+                                                                    value={renderFormattedContent(criterion.levels[level.level]?.description || '')}
+                                                                    onChange={(e) => updateCriterionLevel(criterion.id, level.level, 'description', convertFormattedTextToHtml(e.target.value))}
+                                                                    className="w-full p-2 border rounded text-xs resize-y hover:border-blue-400 transition-all duration-200 pr-8"
                                                                     rows="4"
                                                                     placeholder={`Describe ${level.name.toLowerCase()} performance...`}
                                                                     title="Type here for quick editing, or click the expand button for rich text editor"
@@ -1508,7 +1540,7 @@ const RubricCreator = () => {
                                                                         </button>
                                                                         <button
                                                                             onClick={() => closeInlineEditor(false)}
-                                                                            className="bg-red-700 hover:bg-red-800 text-white px-4 py-2 rounded flex items-center gap-2 transition-colors"
+                                                                        className="bg-red-700 hover:bg-red-600 text-white px-4 py-2 rounded flex items-center gap-2 transition-colors"
                                                                         >
                                                                             <X size={16} />
                                                                             Cancel
@@ -1640,8 +1672,9 @@ const RubricCreator = () => {
                                                                             );
                                                                         }}
                                                                         title="Click to edit"
+                                                                        style={{ resize: 'both', minHeight: '40px' }}
                                                                     >
-                                                                        {convertHtmlToPlainText(item)}
+                                                                        {renderFormattedContent(item)}
                                                                     </span>
                                                                     <button
                                                                         onClick={() => removeFeedbackItem(criterion.id, category, index)}
@@ -1686,7 +1719,7 @@ const RubricCreator = () => {
                                         </button>
                                         <button
                                             onClick={() => closeInlineEditor(false)}
-                                            className="bg-red-700 hover:bg-red-800 text-white px-4 py-2 rounded flex items-center gap-2 transition-colors"
+                                            className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded flex items-center gap-2 transition-colors"
                                         >
                                             <X size={16} />
                                             Cancel
