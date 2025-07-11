@@ -104,8 +104,9 @@ const cleanPastedContent = (html) => {
     .replace(/\s*mso-[^:]+:[^;"']+;?/gi, '');
 
   const doc = new DOMParser().parseFromString(cleaned, 'text/html');
+  const body = doc.body || doc;
 
-  doc.querySelectorAll('[style]').forEach((el) => {
+  body.querySelectorAll('[style]').forEach((el) => {
     const style = el.getAttribute('style')
       .replace(/mso-[^:]+:[^;]+;?/gi, '')
       .replace(/margin[^:]*:[^;]+;?/gi, '')
@@ -118,13 +119,13 @@ const cleanPastedContent = (html) => {
   });
 
   // Replace <p> with <div> to avoid Word margins
-  doc.querySelectorAll('p').forEach((p) => {
+  body.querySelectorAll('p').forEach((p) => {
     const div = doc.createElement('div');
     div.innerHTML = p.innerHTML;
     p.replaceWith(div);
   });
 
-  return sanitizeHtml(doc.body.innerHTML)
+  return sanitizeHtml((body.innerHTML || ''))
     .replace(/(<div>\s*<br>\s*<\/div>)+/gi, '<br>')
     .replace(/(<br\s*\/?>\s*){2,}/gi, '<br>');
 };
