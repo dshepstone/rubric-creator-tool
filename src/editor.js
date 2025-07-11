@@ -1,25 +1,49 @@
 import React, { useEffect, useRef } from 'react';
 import { Bold, Italic, Underline, Strikethrough, Heading1, Heading2, Heading3, List, ListOrdered, Link as LinkIcon, Undo2, Redo2, Eraser } from 'lucide-react';
 
-// Clean pasted HTML by removing empty nodes and collapsing excessive breaks
+// Clean pasted HTML by removing unwanted tags/attributes and normalising breaks
 const cleanPastedContent = (html) => {
+  const allowedTags = [
+    'b', 'strong', 'i', 'em', 'u', 's', 'br', 'p',
+    'ul', 'ol', 'li', 'a', 'h1', 'h2', 'h3', 'code'
+  ];
   const doc = new DOMParser().parseFromString(html, 'text/html');
 
-  // remove style/class/id attributes
-  doc.body.querySelectorAll('*').forEach((el) => {
-    el.removeAttribute('style');
-    el.removeAttribute('class');
-    el.removeAttribute('id');
-  });
+  const traverse = (node) => {
+    if (node.nodeType === Node.TEXT_NODE) return;
+    [...node.childNodes].forEach(traverse);
 
-  // remove empty paragraphs
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      const tag = node.tagName.toLowerCase();
+      if (!allowedTags.includes(tag)) {
+        const frag = document.createDocumentFragment();
+        while (node.firstChild) frag.appendChild(node.firstChild);
+        node.replaceWith(frag);
+        return;
+      }
+
+      [...node.attributes].forEach((attr) => {
+        if (tag !== 'a' || attr.name.toLowerCase() !== 'href') {
+          node.removeAttribute(attr.name);
+        }
+      });
+
+      if (tag === 'a' && node.getAttribute('href')) {
+        node.setAttribute('target', '_blank');
+        node.setAttribute('rel', 'noopener noreferrer');
+      }
+    }
+  };
+
+  traverse(doc.body);
+
   doc.body.querySelectorAll('p').forEach((p) => {
     if (!p.textContent.trim()) p.remove();
   });
 
-  // collapse multiple <br>
   doc.body.innerHTML = doc.body.innerHTML.replace(/(<br\s*\/?>\s*){2,}/gi, '<br>');
-  return doc.body.innerHTML;
+
+  return doc.body.innerHTML.trim();
 };
 
 const ToolbarButton = ({ icon: Icon, onClick, title }) => (
