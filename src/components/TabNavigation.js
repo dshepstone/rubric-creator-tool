@@ -1,9 +1,19 @@
 import React from 'react';
 import { useAssessment } from './SharedContext';
-import { FileText, GraduationCap, ArrowRight, Database } from 'lucide-react';
+import {
+    FileText, GraduationCap, Users, ArrowRight, Database,
+    PlayCircle, Clock, CheckCircle, AlertTriangle
+} from 'lucide-react';
 
 const TabNavigation = () => {
-    const { activeTab, setActiveTab, sharedRubric, persistentFormData } = useAssessment();
+    const {
+        activeTab,
+        setActiveTab,
+        sharedRubric,
+        persistentFormData,
+        classList,
+        gradingSession
+    } = useAssessment();
 
     const tabs = [
         {
@@ -11,6 +21,12 @@ const TabNavigation = () => {
             name: 'Rubric Creator',
             icon: FileText,
             description: 'Create and edit assessment rubrics'
+        },
+        {
+            id: 'class-manager',
+            name: 'Class Manager',
+            icon: Users,
+            description: 'Import and manage class lists'
         },
         {
             id: 'grading-tool',
@@ -29,6 +45,21 @@ const TabNavigation = () => {
         persistentFormData.attachments?.length > 0 ||
         persistentFormData.videoLinks?.length > 0
     );
+    const hasClassListData = classList && classList.students?.length > 0;
+    const hasActiveSession = gradingSession?.active;
+
+    // Calculate grading progress
+    const getGradingProgress = () => {
+        if (!classList || !classList.gradingProgress) return { completed: 0, total: 0, percentage: 0 };
+
+        const completed = classList.gradingProgress.filter(p => p.status === 'completed').length;
+        const total = classList.students.length;
+        const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+        return { completed, total, percentage };
+    };
+
+    const progress = getGradingProgress();
 
     return (
         <div className="border-b border-gray-200 bg-white shadow-sm">
@@ -55,23 +86,58 @@ const TabNavigation = () => {
 
                                 {/* Status Indicators */}
                                 <div className="flex flex-col gap-1 ml-2">
-                                    {tab.id === 'grading-tool' && hasRubricData && (
-                                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                            <Database size={10} className="mr-1" />
-                                            Rubric Ready
-                                        </span>
-                                    )}
-                                    {tab.id === 'grading-tool' && hasFormData && (
-                                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                            <FileText size={10} className="mr-1" />
-                                            Data Saved
-                                        </span>
-                                    )}
+                                    {/* Rubric Creator Indicators */}
                                     {tab.id === 'rubric-creator' && hasRubricData && (
                                         <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
                                             <FileText size={10} className="mr-1" />
-                                            In Progress
+                                            Active Rubric
                                         </span>
+                                    )}
+
+                                    {/* Class Manager Indicators */}
+                                    {tab.id === 'class-manager' && hasClassListData && (
+                                        <div className="flex flex-col gap-1">
+                                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                                                <Users size={10} className="mr-1" />
+                                                {classList.students.length} Students
+                                            </span>
+                                            {progress.total > 0 && (
+                                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                                    <CheckCircle size={10} className="mr-1" />
+                                                    {progress.percentage}% Graded
+                                                </span>
+                                            )}
+                                            {hasActiveSession && (
+                                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                                                    <PlayCircle size={10} className="mr-1" />
+                                                    Active Session
+                                                </span>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* Grading Tool Indicators */}
+                                    {tab.id === 'grading-tool' && (
+                                        <div className="flex flex-col gap-1">
+                                            {hasRubricData && (
+                                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                                    <Database size={10} className="mr-1" />
+                                                    Rubric Ready
+                                                </span>
+                                            )}
+                                            {hasFormData && (
+                                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                                    <FileText size={10} className="mr-1" />
+                                                    Data Saved
+                                                </span>
+                                            )}
+                                            {hasActiveSession && gradingSession.currentStudent && (
+                                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                                    <Clock size={10} className="mr-1" />
+                                                    {gradingSession.currentStudent.name}
+                                                </span>
+                                            )}
+                                        </div>
                                     )}
                                 </div>
                             </button>
@@ -79,23 +145,39 @@ const TabNavigation = () => {
                     })}
                 </nav>
 
-                {/* Quick Actions Bar */}
+                {/* Enhanced Quick Actions Bar */}
                 <div className="px-6 py-3 bg-gradient-to-r from-gray-50 to-blue-50 border-t border-gray-200">
                     <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4 text-sm">
+                        <div className="flex items-center gap-6 text-sm">
+                            {/* Active Rubric Status */}
                             {hasRubricData && (
                                 <div className="flex items-center gap-2 text-gray-600">
                                     <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
                                     <span>Active Rubric: <strong className="text-gray-800">{sharedRubric.assignmentInfo.title}</strong></span>
                                 </div>
                             )}
-                            {hasFormData && !hasRubricData && (
+
+                            {/* Class List Status */}
+                            {hasClassListData && (
                                 <div className="flex items-center gap-2 text-gray-600">
-                                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-                                    <span>Form data preserved across tabs</span>
+                                    <div className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse"></div>
+                                    <span>Class: <strong className="text-gray-800">{classList.students.length} students</strong></span>
+                                    {progress.total > 0 && (
+                                        <span className="text-gray-500">({progress.completed}/{progress.total} graded)</span>
+                                    )}
                                 </div>
                             )}
-                            {!hasRubricData && !hasFormData && (
+
+                            {/* Session Status */}
+                            {hasActiveSession && (
+                                <div className="flex items-center gap-2 text-orange-600">
+                                    <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div>
+                                    <span>Session Active: <strong>{gradingSession.currentStudent?.name || 'Unknown'}</strong></span>
+                                </div>
+                            )}
+
+                            {/* Default Status */}
+                            {!hasRubricData && !hasClassListData && !hasFormData && (
                                 <div className="flex items-center gap-2 text-gray-500">
                                     <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
                                     <span>No active session data</span>
@@ -103,26 +185,87 @@ const TabNavigation = () => {
                             )}
                         </div>
 
-                        {/* Quick Transfer Button */}
-                        {activeTab === 'rubric-creator' && hasRubricData && (
-                            <button
-                                onClick={() => setActiveTab('grading-tool')}
-                                className="flex items-center gap-2 text-blue-700 hover:text-blue-800 text-sm font-medium bg-white px-3 py-1.5 rounded-lg border border-blue-200 hover:border-blue-300 transition-all duration-200 shadow-sm hover:shadow"
-                            >
-                                <ArrowRight size={14} />
-                                Switch to Grading
-                            </button>
-                        )}
+                        {/* Quick Action Buttons */}
+                        <div className="flex items-center gap-3">
+                            {/* Workflow indicators and quick actions */}
+                            {!hasRubricData && activeTab !== 'rubric-creator' && (
+                                <div className="flex items-center gap-2 text-yellow-700 bg-yellow-50 px-3 py-1.5 rounded-lg border border-yellow-200">
+                                    <AlertTriangle size={14} />
+                                    <span className="text-sm">Create rubric first</span>
+                                </div>
+                            )}
 
-                        {activeTab === 'grading-tool' && hasRubricData && (
-                            <button
-                                onClick={() => setActiveTab('rubric-creator')}
-                                className="flex items-center gap-2 text-purple-700 hover:text-purple-800 text-sm font-medium bg-white px-3 py-1.5 rounded-lg border border-purple-200 hover:border-purple-300 transition-all duration-200 shadow-sm hover:shadow"
-                            >
-                                <FileText size={14} />
-                                Edit Rubric
-                            </button>
-                        )}
+                            {hasRubricData && !hasClassListData && activeTab !== 'class-manager' && (
+                                <button
+                                    onClick={() => setActiveTab('class-manager')}
+                                    className="flex items-center gap-2 text-indigo-700 hover:text-indigo-800 text-sm font-medium bg-white px-3 py-1.5 rounded-lg border border-indigo-200 hover:border-indigo-300 transition-all duration-200 shadow-sm hover:shadow"
+                                >
+                                    <Users size={14} />
+                                    Import Class List
+                                </button>
+                            )}
+
+                            {hasRubricData && hasClassListData && !hasActiveSession && activeTab !== 'class-manager' && (
+                                <button
+                                    onClick={() => setActiveTab('class-manager')}
+                                    className="flex items-center gap-2 text-green-700 hover:text-green-800 text-sm font-medium bg-white px-3 py-1.5 rounded-lg border border-green-200 hover:border-green-300 transition-all duration-200 shadow-sm hover:shadow"
+                                >
+                                    <PlayCircle size={14} />
+                                    Start Batch Grading
+                                </button>
+                            )}
+
+                            {/* Tab-specific quick transfer buttons */}
+                            {activeTab === 'rubric-creator' && hasRubricData && hasClassListData && (
+                                <button
+                                    onClick={() => setActiveTab('class-manager')}
+                                    className="flex items-center gap-2 text-blue-700 hover:text-blue-800 text-sm font-medium bg-white px-3 py-1.5 rounded-lg border border-blue-200 hover:border-blue-300 transition-all duration-200 shadow-sm hover:shadow"
+                                >
+                                    <ArrowRight size={14} />
+                                    Start Grading
+                                </button>
+                            )}
+
+                            {activeTab === 'rubric-creator' && hasRubricData && !hasClassListData && (
+                                <button
+                                    onClick={() => setActiveTab('class-manager')}
+                                    className="flex items-center gap-2 text-indigo-700 hover:text-indigo-800 text-sm font-medium bg-white px-3 py-1.5 rounded-lg border border-indigo-200 hover:border-indigo-300 transition-all duration-200 shadow-sm hover:shadow"
+                                >
+                                    <Users size={14} />
+                                    Import Class
+                                </button>
+                            )}
+
+                            {activeTab === 'class-manager' && hasRubricData && hasClassListData && (
+                                <button
+                                    onClick={() => setActiveTab('grading-tool')}
+                                    className="flex items-center gap-2 text-green-700 hover:text-green-800 text-sm font-medium bg-white px-3 py-1.5 rounded-lg border border-green-200 hover:border-green-300 transition-all duration-200 shadow-sm hover:shadow"
+                                >
+                                    <GraduationCap size={14} />
+                                    Go to Grading
+                                </button>
+                            )}
+
+                            {activeTab === 'grading-tool' && hasRubricData && (
+                                <button
+                                    onClick={() => setActiveTab('rubric-creator')}
+                                    className="flex items-center gap-2 text-purple-700 hover:text-purple-800 text-sm font-medium bg-white px-3 py-1.5 rounded-lg border border-purple-200 hover:border-purple-300 transition-all duration-200 shadow-sm hover:shadow"
+                                >
+                                    <FileText size={14} />
+                                    Edit Rubric
+                                </button>
+                            )}
+
+                            {activeTab === 'grading-tool' && hasClassListData && (
+                                <button
+                                    onClick={() => setActiveTab('class-manager')}
+                                    className="flex items-center gap-2 text-indigo-700 hover:text-indigo-800 text-sm font-medium bg-white px-3 py-1.5 rounded-lg border border-indigo-200 hover:border-indigo-300 transition-all duration-200 shadow-sm hover:shadow"
+                                >
+                                    <Users size={14} />
+                                    Manage Class
+                                </button>
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>
