@@ -214,12 +214,19 @@ const GradingTemplate = () => {
     updateStudentInfo,
     updateCourseInfo,
     updateAssignmentInfo,
+    clearGradingFormData,
     classList,
+    setClassList,
+    setCurrentStudent,
     gradingSession,
-    updateGradingSession,
+    setGradingSession,
     nextStudentInSession,
-    jumpToStudent,
-    setActiveTab
+    previousStudentInSession,   // ← ADD THIS LINE
+    updateGradingSession,
+    setActiveTab,
+    currentStudent,
+    saveDraft,
+    loadDraft
   } = useAssessment();
 
   // Helper function to convert HTML content to readable text format
@@ -251,18 +258,22 @@ const GradingTemplate = () => {
 
   // State for all grading data - initialize from shared context or defaults
   const [localGradingData, setLocalGradingData] = useState(() => {
-    if (sharedGradingData) {
-      return sharedGradingData;
+    // 1) Try loading a saved draft first
+    if (currentStudent?.id) {
+      const draft = loadDraft(currentStudent.id);
+      if (draft) {
+        return draft;
+      }
     }
+    // 2) If rubric was just transferred, use that
+    if (sharedGradingData) {
+      return { ...sharedGradingData, student: currentStudent || sharedGradingData.student };
+    }
+    // 3) Otherwise, start fresh for this student
     return {
-      student: { name: '', id: '', email: '' },
-      course: { code: '', name: '', instructor: '', term: '' },
-      assignment: {
-        name: '',
-        dueDate: '',
-        maxPoints: 100
-      },
-      rubric: [],
+      student: currentStudent || { name: '', id: '', email: '' },
+      course: sharedCourseDetails?.course || { code: '', name: '', instructor: '', term: '' },
+      assignment: sharedCourseDetails?.assignment || { name: '', dueDate: '', maxPoints: 100 },
       feedback: { general: '', strengths: '', improvements: '' },
       attachments: [],
       videoLinks: [],
@@ -272,7 +283,8 @@ const GradingTemplate = () => {
         gradedDate: '',
         aiAssisted: false,
         rubricIntegrated: false
-      }
+      },
+      rubricGrading: {}
     };
   });
 
@@ -378,6 +390,17 @@ const GradingTemplate = () => {
       }));
     }
   }, [loadedRubric]);
+
+  // in GradingTemplate.js, below your other useEffects
+  useEffect(() => {
+    if (currentStudent) {
+      setLocalGradingData(prev => ({
+        ...prev,
+        student: currentStudent
+      }));
+    }
+  }, [currentStudent]);
+
 
   // Calculate total score with late policy applied
   const calculateTotalScore = () => {
@@ -524,26 +547,80 @@ const GradingTemplate = () => {
   };
 
   // Student Navigation Functions
+  // Student Navigation Functions
+  // Student Navigation Functions
   const handleNextStudent = () => {
+    // Auto-save current student's work before moving
+    if (currentStudent?.id) {
+      saveDraft(currentStudent.id, localGradingData);
+    }
+
     const success = nextStudentInSession();
     if (!success) {
-      // End of session, show completion message
       alert('Grading session completed! All students have been graded.');
       setActiveTab('class-manager');
+    } else {
+      // Reset only the grading-specific data, let useEffect handle student info
+      setLocalGradingData(prev => ({
+        ...prev,
+        feedback: { general: '', strengths: '', improvements: '' },
+        attachments: [],
+        videoLinks: [],
+        latePolicy: { level: 'none', penaltyApplied: false }
+      }));
+
+      // Reset rubric grading state
+      if (loadedRubric) {
+        const initialGrading = {};
+        loadedRubric.criteria.forEach(criterion => {
+          initialGrading[criterion.id] = {
+            criterionId: criterion.id,
+            selectedLevel: null,
+            customComments: ''
+          };
+        });
+        setRubricGrading(initialGrading);
+      }
     }
   };
 
   const handlePreviousStudent = () => {
-    if (!gradingSession.active || gradingSession.currentStudentIndex <= 0) return;
+    // Auto-save current student's work before moving
+    if (currentStudent?.id) {
+      saveDraft(currentStudent.id, localGradingData);
+    }
 
-    const prevIndex = gradingSession.currentStudentIndex - 1;
-    jumpToStudent(prevIndex);
-    updateGradingSession({ currentStudentIndex: prevIndex });
+    const success = previousStudentInSession();
+    if (!success) {
+      console.log('Already at first student or no active session');
+    } else {
+      // Reset only the grading-specific data, let useEffect handle student info
+      setLocalGradingData(prev => ({
+        ...prev,
+        feedback: { general: '', strengths: '', improvements: '' },
+        attachments: [],
+        videoLinks: [],
+        latePolicy: { level: 'none', penaltyApplied: false }
+      }));
+
+      // Reset rubric grading state
+      if (loadedRubric) {
+        const initialGrading = {};
+        loadedRubric.criteria.forEach(criterion => {
+          initialGrading[criterion.id] = {
+            criterionId: criterion.id,
+            selectedLevel: null,
+            customComments: ''
+          };
+        });
+        setRubricGrading(initialGrading);
+      }
+    }
   };
 
   // Get current student info for navigation display
   const getCurrentStudentInfo = () => {
-    if (!classList || !gradingSession.active || !gradingSession.currentStudent) {
+    if (!classList || !gradingSession?.active || !gradingSession.currentStudent) {
       return null;
     }
 
@@ -1926,7 +2003,7 @@ const GradingTemplate = () => {
                 <input
                   type="text"
                   placeholder="Student Name"
-                  value={gradingData.student.name}
+                  value={currentStudent?.name || gradingData.student.name}
                   onChange={(e) => {
                     const newValue = e.target.value;
                     setGradingData(prevData => ({
@@ -2234,6 +2311,80 @@ const GradingTemplate = () => {
               </div>
             </div>
 
+            {/* Save Draft Section */}
+            {currentStudentInfo && (
+              <div style={{
+                background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+                border: '1px solid #f59e0b',
+                borderRadius: '0.75rem',
+                padding: '1.5rem',
+                marginBottom: '2rem',
+                textAlign: 'center'
+              }}>
+                <h3 style={{ fontSize: '1.125rem', fontWeight: '600', color: '#92400e', marginBottom: '0.75rem' }}>
+                  💾 Save Your Progress
+                </h3>
+                <p style={{ color: '#a16207', marginBottom: '1.5rem', fontSize: '0.875rem' }}>
+                  Save your current grading progress as a draft. You can return to complete it later.
+                </p>
+                <button
+                  onClick={() => {
+                    if (currentStudent?.id) {
+                      saveDraft(currentStudent.id, localGradingData);
+                      // Show success feedback
+                      const button = document.activeElement;
+                      const originalText = button.innerHTML;
+                      const originalBg = button.style.background;
+                      button.innerHTML = '<span style="display: flex; align-items: center; gap: 0.5rem;"><svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>Draft Saved!</span>';
+                      button.style.background = 'linear-gradient(135deg, #059669 0%, #047857 100%)';
+                      setTimeout(() => {
+                        button.innerHTML = originalText;
+                        button.style.background = originalBg;
+                      }, 2000);
+                    }
+                  }}
+                  disabled={!currentStudent?.id}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.75rem',
+                    background: currentStudent?.id ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' : '#9ca3af',
+                    color: 'white',
+                    padding: '1rem 2rem',
+                    borderRadius: '0.75rem',
+                    border: 'none',
+                    cursor: currentStudent?.id ? 'pointer' : 'not-allowed',
+                    fontSize: '1rem',
+                    fontWeight: '600',
+                    boxShadow: currentStudent?.id ? '0 4px 12px rgba(245, 158, 11, 0.4)' : 'none',
+                    transform: 'translateY(0)',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onMouseOver={(e) => {
+                    if (currentStudent?.id) {
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                      e.currentTarget.style.boxShadow = '0 8px 20px rgba(245, 158, 11, 0.5)';
+                    }
+                  }}
+                  onMouseOut={(e) => {
+                    if (currentStudent?.id) {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(245, 158, 11, 0.4)';
+                    }
+                  }}
+                  title={currentStudent?.id ? 'Save current grading progress' : 'No student selected to save'}
+                >
+                  <Save size={20} />
+                  Save Draft
+                </button>
+                {!currentStudent?.id && (
+                  <p style={{ marginTop: '0.75rem', fontSize: '0.75rem', color: '#6b7280' }}>
+                    Select a student from the Class Manager to enable draft saving
+                  </p>
+                )}
+              </div>
+            )}
+
             {/* Complete and Grade Next Button for Active Sessions */}
             {currentStudentInfo && (
               <div style={{
@@ -2269,12 +2420,12 @@ const GradingTemplate = () => {
                     transition: 'all 0.2s ease'
                   }}
                   onMouseOver={(e) => {
-                    e.target.style.transform = 'translateY(-2px)';
-                    e.target.style.boxShadow = '0 8px 20px rgba(16, 185, 129, 0.5)';
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.boxShadow = '0 8px 20px rgba(16, 185, 129, 0.5)';
                   }}
                   onMouseOut={(e) => {
-                    e.target.style.transform = 'translateY(0)';
-                    e.target.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.4)';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.4)';
                   }}
                 >
                   {currentStudentInfo.isLast ? (
