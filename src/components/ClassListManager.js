@@ -9,27 +9,28 @@ import {
 } from 'lucide-react';
 
 const ClassListManager = () => {
+    // Pull classList, currentStudent & helpers from context
     const {
         activeTab,
         setActiveTab,
         sharedRubric,
         gradingData,
+        setGradingData,
         updateStudentInfo,
         updateCourseInfo,
         updateAssignmentInfo,
-        clearGradingFormData
+        clearGradingFormData,
+        classList,
+        setClassList,
+        setCurrentStudent,
+        gradingSession,
+        setGradingSession,
+        initializeGradingSession,
+        hasDraft,
+        loadDraft
     } = useAssessment();
 
-    // Class list management state
-    const [classList, setClassList] = useState(null);
     const [currentStudentIndex, setCurrentStudentIndex] = useState(0);
-    const [gradingSession, setGradingSession] = useState({
-        active: false,
-        startTime: null,
-        gradedStudents: [],
-        totalStudents: 0,
-        currentStudent: null
-    });
     const [batchOperations, setBatchOperations] = useState({
         selectedStudents: [],
         exportQueue: [],
@@ -39,7 +40,6 @@ const ClassListManager = () => {
     const [importResult, setImportResult] = useState(null);
 
     const fileInputRef = useRef(null);
-
     // Handle Excel file import
     const handleExcelImport = async (file) => {
         if (!file) return;
@@ -94,18 +94,12 @@ const ClassListManager = () => {
     // Start batch grading session
     const startGradingSession = () => {
         if (!classList || !classList.students.length) return;
-
-        const session = {
-            active: true,
-            startTime: new Date().toISOString(),
-            gradedStudents: [],
-            totalStudents: classList.students.length,
-            currentStudent: classList.students[0]
-        };
-
-        setGradingSession(session);
-        setCurrentStudentIndex(0);
-        loadStudentForGrading(classList.students[0]);
+        // Use the new initialization function
+        const success = initializeGradingSession(classList);
+        if (success) {
+            // Switch to grading tool
+            setActiveTab('grading-tool');
+        }
     };
 
     // Load student information into grading form
@@ -480,8 +474,8 @@ const ClassListManager = () => {
                                         <tbody className="bg-white divide-y divide-gray-200">
                                             {classList.students.map((student, index) => {
                                                 const progress = classList.gradingProgress[index];
-                                                const isCurrentStudent = gradingSession.active && index === currentStudentIndex;
-
+                                                const isCurrentStudent = gradingSession.active && index === gradingSession.currentStudentIndex;
+                                                const studentHasDraft = hasDraft(student.id);
                                                 return (
                                                     <tr
                                                         key={student.id}
@@ -501,6 +495,11 @@ const ClassListManager = () => {
                                                                     <>
                                                                         <Clock size={16} className="text-yellow-500" />
                                                                         <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full">In Progress</span>
+                                                                    </>
+                                                                ) : studentHasDraft ? (
+                                                                    <>
+                                                                        <FileText size={16} className="text-blue-500" />
+                                                                        <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">Draft Saved</span>
                                                                     </>
                                                                 ) : (
                                                                     <>
@@ -527,10 +526,23 @@ const ClassListManager = () => {
                                                         </td>
                                                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                                             <button
-                                                                onClick={() => jumpToStudent(index)}
-                                                                className="text-indigo-600 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 px-3 py-1 rounded transition-colors"
+                                                                onClick={() => {
+                                                                    setCurrentStudent(student);
+                                                                    // Load draft if it exists, otherwise start fresh
+                                                                    if (studentHasDraft) {
+                                                                        const draft = loadDraft(student.id);
+                                                                        if (draft) {
+                                                                            setGradingData(draft);
+                                                                        }
+                                                                    }
+                                                                    setActiveTab('grading-tool');
+                                                                }}
+                                                                className={`px-3 py-1 rounded transition-colors text-sm font-medium ${studentHasDraft
+                                                                        ? 'text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200'
+                                                                        : 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200'
+                                                                    }`}
                                                             >
-                                                                Grade
+                                                                {studentHasDraft ? 'Continue Draft' : 'Grade'}
                                                             </button>
                                                         </td>
                                                     </tr>
