@@ -1171,24 +1171,35 @@ const RubricCreator = () => {
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Weight (% of Final Grade)</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Weight (% of Final Grade)
+                                </label>
                                 <input
                                     type="number"
                                     value={rubricData.assignmentInfo.weight}
-                                    onChange={(e) => updateAssignmentInfo('weight', parseInt(e.target.value) || 0)}
+                                    onChange={(e) =>
+                                        updateAssignmentInfo('weight', parseInt(e.target.value, 10) || 0)
+                                    }
                                     className="w-full p-3 border rounded-lg"
-                                    min="0"
-                                    max="100"
+                                    min={0}
+                                    max={100}
                                 />
                             </div>
                             <div className="md:col-span-2">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Description
+                                </label>
                                 <div className="relative">
                                     <textarea
                                         value={renderFormattedContent(rubricData.assignmentInfo.description)}
-                                        onChange={(e) => updateAssignmentInfo('description', convertFormattedTextToHtml(e.target.value))}
+                                        onChange={(e) =>
+                                            updateAssignmentInfo(
+                                                'description',
+                                                convertFormattedTextToHtml(e.target.value)
+                                            )
+                                        }
                                         className="w-full p-3 border rounded-lg resize-y hover:border-blue-400 transition-all duration-200 pr-12"
-                                        rows="3"
+                                        rows={3}
                                         placeholder="Detailed description of assignment requirements and expectations..."
                                         title="Type here for quick editing, or click the expand button for rich text editor"
                                         style={{ minHeight: '80px', maxHeight: '200px', resize: 'both' }}
@@ -1207,7 +1218,8 @@ const RubricCreator = () => {
                                                 'assignment'
                                             );
                                         }}
-                                        className="absolute top-2 right-2 z-10 opacity-70 hover:opacity-100 transition-opacity bg-blue-500 text-white rounded p-1 hover:bg-blue-600 cursor-pointer"
+                                        style={{ color: 'black' }}
+                                        className="absolute top-1 right-1 z-10 bg-blue-500 rounded p-1 hover:bg-blue-600 hover:text-white cursor-pointer opacity-70 hover:opacity-100 transition-opacity"
                                         title="Open rich text editor"
                                     >
                                         <Maximize2 size={14} />
@@ -1215,18 +1227,24 @@ const RubricCreator = () => {
                                 </div>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Passing Threshold (%)</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Passing Threshold (%)
+                                </label>
                                 <input
                                     type="number"
                                     value={rubricData.assignmentInfo.passingThreshold}
-                                    onChange={(e) => updateAssignmentInfo('passingThreshold', parseInt(e.target.value) || 0)}
+                                    onChange={(e) =>
+                                        updateAssignmentInfo('passingThreshold', parseInt(e.target.value, 10) || 0)
+                                    }
                                     className="w-full p-3 border rounded-lg"
-                                    min="0"
-                                    max="100"
+                                    min={0}
+                                    max={100}
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Total Points (Auto-calculated)</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Total Points (Auto-calculated)
+                                </label>
                                 <input
                                     type="number"
                                     value={calculateTotalPoints()}
@@ -1235,6 +1253,8 @@ const RubricCreator = () => {
                                 />
                             </div>
                         </div>
+
+
 
                         {/* Inline Rich Text Editor for Assignment */}
                         {inlineEditor.show && inlineEditor.type === 'assignment' && (

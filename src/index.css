@@ -102,8 +102,17 @@ body {
   background-color: white;
 }
 
+/* override the default gray-100 “New Import” style, give it dark text */
 .bg-gray-100 {
-  background-color: var(--gray-100);
+  background: var(--gray-100);
+  color: var(--gray-800);
+}
+
+/* ensure the disabled state still has dark text */
+.bg-gray-100:disabled {
+  color: var(--gray-800);
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .bg-green-100 {
@@ -358,6 +367,10 @@ body {
 /* TEXT COLORS */
 .text-white {
   color: white;
+}
+
+.text-black {
+  color: black !important;
 }
 
 .text-gray-800 {
@@ -989,6 +1002,7 @@ button:disabled {
   background: linear-gradient(135deg, var(--gray-400) 0%, var(--gray-500) 100%);
 }
 
+/* keep the hover exactly where it is */
 .hover\:bg-gray-100:hover {
   background-color: var(--gray-100);
 }
@@ -1758,4 +1772,22 @@ button.p-3.rounded-lg.border-2 {
     border: 1px solid #000;
     background: white !important;
   }
+}
+/* hover state for green-700 */
+.hover\:bg-green-700:hover {
+  background: linear-gradient(135deg, var(--green-700) 0%, var(--green-800) 100%);
+}
+
+/* hover-text-white */
+.hover\:text-white:hover {
+  color: white;
+}
+
+/* disabled:text-gray-800 */
+.disabled\:text-gray-800:disabled {
+  color: var(--gray-800);
+}
+/* make “disabled:text-gray-800” do what it says */
+.disabled\:text-gray-800:disabled {
+  color: var(--gray-800) !important;
 }

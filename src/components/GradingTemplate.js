@@ -221,8 +221,9 @@ const GradingTemplate = () => {
     gradingSession,
     setGradingSession,
     nextStudentInSession,
-    previousStudentInSession,   // ← ADD THIS LINE
+    previousStudentInSession,
     updateGradingSession,
+    initializeGradingSession, // <-- Add this
     setActiveTab,
     currentStudent,
     saveDraft,
@@ -1883,7 +1884,10 @@ const GradingTemplate = () => {
                     </p>
                   </div>
                   <button
-                    onClick={() => setActiveTab('class-manager')}
+                    onClick={() => {
+                      initializeGradingSession(classList);
+                      setActiveTab('grading-tool');
+                    }}
                     style={{
                       display: 'flex',
                       alignItems: 'center',
