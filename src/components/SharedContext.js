@@ -489,8 +489,33 @@ export const AssessmentProvider = ({ children }) => {
             }
         }));
 
+        // Auto-populate course from Excel import
+        if (classListData.courseMetadata) {
+            updateCourseInfo({
+                code: classListData.courseMetadata.courseCode || '',
+                name: classListData.courseMetadata.courseName || '',
+                instructor: classListData.courseMetadata.professors || '',
+                term: classListData.courseMetadata.term || ''
+            });
+        }
+
+        // Auto-populate assignment from loaded rubric
+        if (sharedRubric?.assignmentInfo) {
+            updateAssignmentInfo({
+                name: sharedRubric.assignmentInfo.title || '',
+                maxPoints: sharedRubric.assignmentInfo.totalPoints || 100
+            });
+        }
+
         return true;
-    }, [setGradingSession, setCurrentStudent, setGradingFormData]);
+    }, [
+        setGradingSession,
+        setCurrentStudent,
+        setGradingFormData,
+        updateCourseInfo,
+        updateAssignmentInfo,
+        sharedRubric
+    ]);
 
     // Legacy compatibility - map persistent form data
     const persistentFormData = gradingFormData;

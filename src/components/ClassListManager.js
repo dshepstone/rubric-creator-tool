@@ -377,45 +377,72 @@ const ClassListManager = () => {
                                     <button
                                         onClick={startGradingSession}
                                         disabled={!sharedRubric}
-                                        className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg flex items-center gap-2 font-medium shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="bg-green-600 hover:bg-green-700 text-black disabled:text-gray-800 px-6 py-3 rounded-lg flex items-center gap-2 font-medium shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         <PlayCircle size={20} />
                                         Start Batch Grading
                                     </button>
                                 ) : (
                                     <div className="flex gap-4">
-                                        <button
-                                            onClick={() => setGradingSession(prev => ({ ...prev, active: false }))}
-                                            className="bg-orange-600 hover:bg-orange-700 text-white px-6 py-3 rounded-lg flex items-center gap-2 font-medium shadow-md transition-all"
-                                        >
-                                            <Pause size={20} />
-                                            Pause Session
-                                        </button>
-                                        <button
-                                            onClick={previousStudent}
-                                            disabled={currentStudentIndex === 0}
-                                            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-lg flex items-center gap-2 font-medium shadow-md transition-all disabled:opacity-50"
-                                        >
-                                            ← Previous
-                                        </button>
-                                        <button
-                                            onClick={nextStudent}
-                                            disabled={currentStudentIndex >= classList.students.length - 1}
-                                            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-lg flex items-center gap-2 font-medium shadow-md transition-all disabled:opacity-50"
-                                        >
-                                            Next →
-                                        </button>
+                                            <button
+                                                onClick={() => setGradingSession(prev => ({ ...prev, active: false }))}
+                                                className="
+                                                        bg-orange-600 hover:bg-orange-700
+                                                        text-white
+                                                        px-6 py-3 rounded-lg flex items-center gap-2 font-medium shadow-md
+                                                        transition-all
+                                                    "
+                                            >
+                                                <Pause size={20} />
+                                                Pause Session
+                                            </button>
+
+                                            <button
+                                                onClick={previousStudent}
+                                                disabled={currentStudentIndex === 0}
+                                                className="
+                                                        bg-blue-600 hover:bg-blue-700
+                                                        text-white disabled:text-gray-800
+                                                        px-4 py-3 rounded-lg flex items-center gap-2 font-medium
+                                                        shadow-md transition-all
+                                                        disabled:opacity-50 disabled:cursor-not-allowed
+                                                    "
+                                            >
+                                                ← Previous
+                                            </button>
+                                            <button
+                                                onClick={nextStudent}
+                                                disabled={currentStudentIndex >= classList.students.length - 1}
+                                                className="
+                                                        bg-blue-600 hover:bg-blue-700
+                                                        text-white
+                                                        disabled:text-gray-800 
+                                                        px-4 py-3 rounded-lg flex items-center gap-2 font-medium shadow-md
+                                                        transition-all disabled:opacity-50 disabled:cursor-not-allowed
+                                                    "
+                                            >
+                                                Next →
+                                            </button>
+
                                     </div>
                                 )}
 
+                                {/* Export Grades */}
                                 <button
                                     onClick={exportClassGrades}
-                                    className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-lg flex items-center gap-2 font-medium shadow-md transition-all"
+                                    disabled={!classList}
+                                    className="
+                                                bg-gray-100 hover:bg-gray-100
+                                                text-gray-800
+                                                px-6 py-3 rounded-lg flex items-center gap-2 font-medium shadow-md
+                                                transition-all disabled:opacity-100 disabled:cursor-not-allowed
+                                            "
                                 >
                                     <Download size={20} />
                                     Export Grades
                                 </button>
 
+                                {/* New Import */}
                                 <button
                                     onClick={() => {
                                         setClassList(null);
@@ -423,7 +450,14 @@ const ClassListManager = () => {
                                         setGradingSession({ active: false, startTime: null, gradedStudents: [], totalStudents: 0, currentStudent: null });
                                         setCurrentStudentIndex(0);
                                     }}
-                                    className="bg-gray-600 hover:bg-gray-700 text-white px-6 py-3 rounded-lg flex items-center gap-2 font-medium shadow-md transition-all"
+                                    disabled={!classList}
+                                    className="
+                                        bg-gray-100 hover:bg-gray-100
+                                        text-gray-800 px-6 py-3 rounded-lg
+                                        flex items-center gap-2 font-medium shadow-md
+                                        transition-all
+                                        disabled:opacity-100 disabled:cursor-not-allowed
+                                    "
                                 >
                                     <RefreshCw size={20} />
                                     New Import
@@ -538,8 +572,8 @@ const ClassListManager = () => {
                                                                     setActiveTab('grading-tool');
                                                                 }}
                                                                 className={`px-3 py-1 rounded transition-colors text-sm font-medium ${studentHasDraft
-                                                                        ? 'text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200'
-                                                                        : 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200'
+                                                                    ? 'text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200'
+                                                                    : 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200'
                                                                     }`}
                                                             >
                                                                 {studentHasDraft ? 'Continue Draft' : 'Grade'}

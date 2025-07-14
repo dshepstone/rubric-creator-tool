@@ -12,7 +12,8 @@ const TabNavigation = () => {
         sharedRubric,
         persistentFormData,
         classList,
-        gradingSession
+        gradingSession,
+        initializeGradingSession
     } = useAssessment();
 
     const tabs = [
@@ -207,7 +208,10 @@ const TabNavigation = () => {
 
                             {hasRubricData && hasClassListData && !hasActiveSession && activeTab !== 'class-manager' && (
                                 <button
-                                    onClick={() => setActiveTab('class-manager')}
+                                    onClick={() => {
+                                        initializeGradingSession(classList);
+                                        setActiveTab('grading-tool');
+                                    }}
                                     className="flex items-center gap-2 text-green-700 hover:text-green-800 text-sm font-medium bg-white px-3 py-1.5 rounded-lg border border-green-200 hover:border-green-300 transition-all duration-200 shadow-sm hover:shadow"
                                 >
                                     <PlayCircle size={14} />
@@ -218,7 +222,10 @@ const TabNavigation = () => {
                             {/* Tab-specific quick transfer buttons */}
                             {activeTab === 'rubric-creator' && hasRubricData && hasClassListData && (
                                 <button
-                                    onClick={() => setActiveTab('class-manager')}
+                                    onClick={() => {
+                                        initializeGradingSession(classList);
+                                        setActiveTab('grading-tool');
+                                    }}
                                     className="flex items-center gap-2 text-blue-700 hover:text-blue-800 text-sm font-medium bg-white px-3 py-1.5 rounded-lg border border-blue-200 hover:border-blue-300 transition-all duration-200 shadow-sm hover:shadow"
                                 >
                                     <ArrowRight size={14} />
