@@ -647,7 +647,8 @@ const GradingTemplate = () => {
       setActiveTab('class-manager');
     } else {
       resetGradingForm();
-      console.log('✅ Draft saved, moved to next student');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      console.log('✅ Draft saved, moved to next student (and scrolled to top)');
     }
   };
 
@@ -663,7 +664,8 @@ const GradingTemplate = () => {
       setActiveTab('class-manager');
     } else {
       resetGradingForm();
-      console.log('✅ Final grade saved, moved to next student');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      console.log('✅ Final grade saved, moved to next student (and scrolled to top)');
     }
   };
 
