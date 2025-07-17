@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Plus, X, Upload, Download, Save, FileText, RotateCcw, ChevronDown, ChevronUp, Maximize2, ArrowRight, Minimize2 } from 'lucide-react';
+import { Plus, X, Upload, Download, Save, FileText, RotateCcw, ChevronDown, ChevronUp, Maximize2, ArrowRight, Minimize2, Eraser, Trash2 } from 'lucide-react';
 import { useAssessment } from './SharedContext';
 
 // Simple Rich Text Editor Component to replace the problematic ReactQuill
@@ -38,7 +38,7 @@ const SimpleRichTextEditor = React.forwardRef(({ value, onChange, placeholder },
 
         // Focus the editor first
         editorRef.current.focus();
-        
+
         // Insert the content
         if (document.queryCommandSupported('insertHTML')) {
             document.execCommand('insertHTML', false, cleanContent);
@@ -57,7 +57,7 @@ const SimpleRichTextEditor = React.forwardRef(({ value, onChange, placeholder },
                 range.insertNode(fragment);
             }
         }
-        
+
         // Trigger onChange
         if (onChange) {
             onChange(editorRef.current.innerHTML);
@@ -84,7 +84,7 @@ const SimpleRichTextEditor = React.forwardRef(({ value, onChange, placeholder },
         // Create a temporary container
         const tempDiv = document.createElement('div');
         tempDiv.innerHTML = cleanedHtml;
-        
+
         // Remove all style attributes and Microsoft Office attributes
         const removeAttributes = (element) => {
             if (element.nodeType === Node.ELEMENT_NODE) {
@@ -93,8 +93,8 @@ const SimpleRichTextEditor = React.forwardRef(({ value, onChange, placeholder },
                 for (let i = 0; i < element.attributes.length; i++) {
                     const attr = element.attributes[i];
                     // Remove style attributes, class attributes, and any mso-* attributes
-                    if (attr.name === 'style' || 
-                        attr.name === 'class' || 
+                    if (attr.name === 'style' ||
+                        attr.name === 'class' ||
                         attr.name.startsWith('mso-') ||
                         attr.name.startsWith('data-') ||
                         attr.name === 'lang' ||
@@ -102,62 +102,62 @@ const SimpleRichTextEditor = React.forwardRef(({ value, onChange, placeholder },
                         attributesToRemove.push(attr.name);
                     }
                 }
-                
+
                 // Remove the attributes
                 attributesToRemove.forEach(attrName => {
                     element.removeAttribute(attrName);
                 });
-                
+
                 // Recursively clean child elements
                 Array.from(element.children).forEach(child => {
                     removeAttributes(child);
                 });
             }
         };
-        
+
         removeAttributes(tempDiv);
-        
+
         // Convert Microsoft Word's complex list structures to simple HTML lists
         const convertWordLists = (container) => {
             // Find paragraphs that are actually list items (they contain bullet symbols or are indented)
             const paragraphs = container.querySelectorAll('p');
             let currentList = null;
             let currentListType = null;
-            
+
             paragraphs.forEach(p => {
                 const text = p.textContent.trim();
-                const isListItem = text.startsWith('·') || 
-                                 text.startsWith('•') || 
-                                 text.startsWith('-') ||
-                                 text.match(/^\d+\./) ||
-                                 p.style.marginLeft ||
-                                 p.className?.includes('List');
-                
+                const isListItem = text.startsWith('·') ||
+                    text.startsWith('•') ||
+                    text.startsWith('-') ||
+                    text.match(/^\d+\./) ||
+                    p.style.marginLeft ||
+                    p.className?.includes('List');
+
                 if (isListItem) {
                     // Determine if it's ordered or unordered
                     const isOrdered = text.match(/^\d+\./);
                     const listType = isOrdered ? 'ol' : 'ul';
-                    
+
                     // Create new list if needed
                     if (!currentList || currentListType !== listType) {
                         currentList = document.createElement(listType);
                         currentListType = listType;
                         p.parentNode.insertBefore(currentList, p);
                     }
-                    
+
                     // Create list item
                     const li = document.createElement('li');
-                    
+
                     // Clean the text (remove bullet symbols and extra spacing)
                     let cleanText = text
                         .replace(/^[·•\-]\s*/, '') // Remove bullet symbols
                         .replace(/^\d+\.\s*/, '') // Remove number prefix
                         .trim();
-                    
+
                     // Move the paragraph content to the list item
                     li.innerHTML = cleanText;
                     currentList.appendChild(li);
-                    
+
                     // Remove the original paragraph
                     p.remove();
                 } else {
@@ -167,12 +167,12 @@ const SimpleRichTextEditor = React.forwardRef(({ value, onChange, placeholder },
                 }
             });
         };
-        
+
         convertWordLists(tempDiv);
-        
+
         // Define allowed tags
         const allowedTags = ['b', 'i', 'u', 'strong', 'em', 'p', 'br', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'];
-        
+
         // Function to recursively clean nodes and remove disallowed tags
         const cleanNode = (node) => {
             if (node.nodeType === Node.TEXT_NODE) {
@@ -180,13 +180,13 @@ const SimpleRichTextEditor = React.forwardRef(({ value, onChange, placeholder },
                 const cleanText = node.textContent.replace(/\s+/g, ' ').trim();
                 return cleanText ? document.createTextNode(cleanText) : null;
             }
-            
+
             if (node.nodeType === Node.ELEMENT_NODE) {
                 const tagName = node.tagName.toLowerCase();
-                
+
                 if (allowedTags.includes(tagName)) {
                     const newNode = document.createElement(tagName);
-                    
+
                     // Recursively clean children
                     Array.from(node.childNodes).forEach(child => {
                         const cleanedChild = cleanNode(child);
@@ -194,7 +194,7 @@ const SimpleRichTextEditor = React.forwardRef(({ value, onChange, placeholder },
                             newNode.appendChild(cleanedChild);
                         }
                     });
-                    
+
                     // Only return the node if it has content
                     return newNode.textContent.trim() || newNode.children.length > 0 ? newNode : null;
                 } else {
@@ -209,10 +209,10 @@ const SimpleRichTextEditor = React.forwardRef(({ value, onChange, placeholder },
                     return fragment.childNodes.length > 0 ? fragment : null;
                 }
             }
-            
+
             return null;
         };
-        
+
         const cleanedContainer = document.createElement('div');
         Array.from(tempDiv.childNodes).forEach(child => {
             const cleanedChild = cleanNode(child);
@@ -220,14 +220,14 @@ const SimpleRichTextEditor = React.forwardRef(({ value, onChange, placeholder },
                 cleanedContainer.appendChild(cleanedChild);
             }
         });
-        
+
         // Final cleanup - remove empty paragraphs and normalize spacing
         const finalHtml = cleanedContainer.innerHTML
             .replace(/<p[^>]*>\s*<\/p>/g, '') // Remove empty paragraphs
             .replace(/\n\s*\n/g, '\n') // Remove multiple line breaks
             .replace(/(<\/[^>]+>)\s+(<[^>]+>)/g, '$1$2') // Remove spaces between tags
             .trim();
-        
+
         return finalHtml;
     };
 
@@ -241,7 +241,7 @@ const SimpleRichTextEditor = React.forwardRef(({ value, onChange, placeholder },
         // Focus the editor first to ensure commands work
         if (editorRef.current) {
             editorRef.current.focus();
-            
+
             // Small delay to ensure focus is set
             setTimeout(() => {
                 try {
@@ -249,7 +249,7 @@ const SimpleRichTextEditor = React.forwardRef(({ value, onChange, placeholder },
                     if (!success) {
                         console.warn(`Command ${command} not successful`);
                     }
-                    
+
                     // Trigger onChange after formatting
                     if (onChange && editorRef.current) {
                         onChange(editorRef.current.innerHTML);
@@ -289,7 +289,7 @@ const SimpleRichTextEditor = React.forwardRef(({ value, onChange, placeholder },
                     type="button"
                     onMouseDown={(e) => e.preventDefault()} // Prevent focus loss
                     onClick={() => formatText('bold')}
-                    className="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm font-bold transition-colors"
+                    className="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm font-bold transition-colors text-gray-800"
                     title="Bold (Ctrl+B)"
                 >
                     B
@@ -298,7 +298,7 @@ const SimpleRichTextEditor = React.forwardRef(({ value, onChange, placeholder },
                     type="button"
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => formatText('italic')}
-                    className="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm italic transition-colors"
+                    className="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm italic transition-colors text-gray-800"
                     title="Italic (Ctrl+I)"
                 >
                     I
@@ -307,7 +307,7 @@ const SimpleRichTextEditor = React.forwardRef(({ value, onChange, placeholder },
                     type="button"
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => formatText('underline')}
-                    className="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm underline transition-colors"
+                    className="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm underline transition-colors text-gray-800"
                     title="Underline (Ctrl+U)"
                 >
                     U
@@ -317,7 +317,7 @@ const SimpleRichTextEditor = React.forwardRef(({ value, onChange, placeholder },
                     type="button"
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => formatText('formatBlock', 'h3')}
-                    className="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm font-bold transition-colors"
+                    className="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm font-bold transition-colors text-gray-800"
                     title="Heading 3"
                 >
                     H3
@@ -326,7 +326,7 @@ const SimpleRichTextEditor = React.forwardRef(({ value, onChange, placeholder },
                     type="button"
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => formatText('formatBlock', 'p')}
-                    className="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm transition-colors"
+                    className="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm transition-colors text-gray-800"
                     title="Paragraph"
                 >
                     P
@@ -336,7 +336,7 @@ const SimpleRichTextEditor = React.forwardRef(({ value, onChange, placeholder },
                     type="button"
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => formatText('insertUnorderedList')}
-                    className="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm transition-colors"
+                    className="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm transition-colors text-gray-800"
                     title="Bullet List"
                 >
                     • List
@@ -345,7 +345,7 @@ const SimpleRichTextEditor = React.forwardRef(({ value, onChange, placeholder },
                     type="button"
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => formatText('insertOrderedList')}
-                    className="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm transition-colors"
+                    className="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm transition-colors text-gray-800"
                     title="Numbered List"
                 >
                     1. List
@@ -355,7 +355,7 @@ const SimpleRichTextEditor = React.forwardRef(({ value, onChange, placeholder },
                     type="button"
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => formatText('outdent')}
-                    className="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm transition-colors"
+                    className="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm transition-colors text-gray-800"
                     title="Decrease Indent"
                 >
                     ←
@@ -364,21 +364,70 @@ const SimpleRichTextEditor = React.forwardRef(({ value, onChange, placeholder },
                     type="button"
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => formatText('indent')}
-                    className="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm transition-colors"
+                    className="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm transition-colors text-gray-800"
                     title="Increase Indent"
                 >
                     →
                 </button>
                 <div className="w-px bg-gray-300"></div>
+                
+                {/* ─── Remove formatting (Tx / Eraser) ───────────────────────────── */}
                 <button
                     type="button"
                     onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => formatText('removeFormat')}
-                    className="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm text-red-600 transition-colors"
-                    title="Clear Formatting"
+                    onClick={() => {
+                        if (!editorRef.current) return;
+
+                        const sel = window.getSelection();
+
+                        /* If no text is selected, select the whole editor first */
+                        if (sel && sel.isCollapsed) {
+                            const range = document.createRange();
+                            range.selectNodeContents(editorRef.current);
+                            sel.removeAllRanges();
+                            sel.addRange(range);
+                        }
+
+                        /* Strip bold/italic/underline/lists/etc. from the selection */
+                        document.execCommand('removeFormat');
+
+                        /* Sync React state so Save → inlineEditor.content stays correct */
+                        onChange?.(editorRef.current.innerHTML);
+                    }}
+                    className="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100
+             text-sm transition-colors flex items-center gap-1"
+                    title="Remove formatting"
                 >
+                    <Eraser size={14} />
+                </button>
+
+                {/* ─── Clear all content (Trash) ─────────────────────────────────── */}
+                <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                        if (!editorRef.current) return;
+
+                        editorRef.current.innerHTML = '';
+                        onChange?.('');
+
+                        /* Put caret at start so the user can type immediately */
+                        const sel = window.getSelection();
+                        sel.removeAllRanges();
+                        const range = document.createRange();
+                        range.selectNodeContents(editorRef.current);
+                        range.collapse(true);
+                        sel.addRange(range);
+                    }}
+                    className="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100
+             text-sm text-red-600 transition-colors flex items-center gap-1"
+                    title="Clear all text"
+                >
+                    <Trash2 size={14} />
                     Clear
                 </button>
+
+
             </div>
 
             {/* Editor Content */}
@@ -389,7 +438,7 @@ const SimpleRichTextEditor = React.forwardRef(({ value, onChange, placeholder },
                 onPaste={handlePaste}
                 onKeyDown={handleKeyDown}
                 className="p-4 min-h-[200px] max-h-[400px] overflow-y-auto focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-20"
-                style={{ 
+                style={{
                     lineHeight: '1.5',
                     wordWrap: 'break-word',
                     overflowWrap: 'break-word'
@@ -571,11 +620,11 @@ const RubricCreator = () => {
     // Helper function to safely render HTML content in textareas
     const renderFormattedContent = (htmlContent) => {
         if (!htmlContent) return '';
-        
+
         // Create a temporary div to extract text while preserving some formatting
         const tempDiv = document.createElement('div');
         tempDiv.innerHTML = htmlContent;
-        
+
         // Convert basic HTML to readable text format
         let textContent = htmlContent
             .replace(/<br\s*\/?>/gi, '\n')
@@ -595,14 +644,14 @@ const RubricCreator = () => {
             .replace(/<[^>]*>/g, '') // Remove any remaining HTML tags
             .replace(/\n\s*\n/g, '\n') // Remove extra line breaks
             .trim();
-            
+
         return textContent;
     };
 
     // Helper function to convert formatted text back to HTML
     const convertFormattedTextToHtml = (text) => {
         if (!text) return '';
-        
+
         return text
             .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
             .replace(/\*(.*?)\*/g, '<em>$1</em>')
@@ -1047,7 +1096,7 @@ const RubricCreator = () => {
                         <div className="flex gap-2 flex-wrap">
                             <button
                                 onClick={resetRubric}
-                                className="bg-gray-700 hover:bg-gray-600 px-3 py-2 rounded flex items-center gap-1 text-sm"
+                                className="bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded flex items-center gap-1 text-sm"
                                 title="Reset to blank rubric"
                             >
                                 <RotateCcw size={14} />
@@ -1055,7 +1104,7 @@ const RubricCreator = () => {
                             </button>
                             <button
                                 onClick={() => importInputRef.current?.click()}
-                                className="bg-purple-700 hover:bg-purple-600 px-3 py-2 rounded flex items-center gap-1 text-sm"
+                                className="bg-purple-700 hover:bg-purple-600 text-white px-3 py-2 rounded flex items-center gap-1 text-sm"
                                 title="Import existing rubric JSON file"
                             >
                                 <Upload size={14} />
@@ -1063,7 +1112,7 @@ const RubricCreator = () => {
                             </button>
                             <button
                                 onClick={transferToGrading}
-                                className="bg-blue-700 hover:bg-blue-600 px-3 py-2 rounded flex items-center gap-1 text-sm"
+                                className="bg-blue-700 hover:bg-blue-700 text-white px-3 py-2 rounded flex items-center gap-1 text-sm"
                                 title="Transfer rubric directly to grading tool"
                             >
                                 <ArrowRight size={14} />
@@ -1071,7 +1120,7 @@ const RubricCreator = () => {
                             </button>
                             <button
                                 onClick={saveRubric}
-                                className="bg-teal-700 hover:bg-teal-600 px-3 py-2 rounded flex items-center gap-1 text-sm"
+                                className="bg-teal-700 hover:bg-teal-600 text-white px-3 py-2 rounded flex items-center gap-1 text-sm"
                                 title="Save work in progress as JSON file"
                             >
                                 <Save size={14} />
@@ -1079,7 +1128,7 @@ const RubricCreator = () => {
                             </button>
                             <button
                                 onClick={exportForGrading}
-                                className="bg-green-700 hover:bg-green-600 px-3 py-2 rounded flex items-center gap-1 text-sm"
+                                className="bg-green-700 hover:bg-green-600 text-white px-3 py-2 rounded flex items-center gap-1 text-sm"
                                 title="Export final rubric for grading template"
                             >
                                 <Download size={14} />
@@ -1087,7 +1136,7 @@ const RubricCreator = () => {
                             </button>
                             <button
                                 onClick={exportToHTML}
-                                className="bg-orange-700 hover:bg-orange-600 px-3 py-2 rounded flex items-center gap-1 text-sm"
+                                className="bg-orange-700 hover:bg-orange-600 text-white px-3 py-2 rounded flex items-center gap-1 text-sm"
                                 title="Export HTML version for distribution"
                             >
                                 <FileText size={14} />
@@ -1218,8 +1267,7 @@ const RubricCreator = () => {
                                                 'assignment'
                                             );
                                         }}
-                                        style={{ color: 'black' }}
-                                        className="absolute top-1 right-1 z-10 bg-blue-500 rounded p-1 hover:bg-blue-600 hover:text-white cursor-pointer opacity-70 hover:opacity-100 transition-opacity"
+                                        className="absolute top-1 right-1 z-10 bg-blue-500 text-white rounded p-1 hover:bg-blue-700 cursor-pointer opacity-70 hover:opacity-100 transition-opacity"
                                         title="Open rich text editor"
                                     >
                                         <Maximize2 size={14} />
@@ -1354,7 +1402,7 @@ const RubricCreator = () => {
                             <div className="flex gap-2">
                                 <button
                                     onClick={() => setReversedOrder(!reversedOrder)}
-                                    className="bg-indigo-700 hover:bg-indigo-600 px-3 py-2 rounded flex items-center gap-1 text-sm text-white"
+                                    className="bg-indigo-700 hover:bg-indigo-600 text-white px-3 py-2 rounded flex items-center gap-1 text-sm"
                                     title="Switch between ascending and descending level order"
                                 >
                                     <RotateCcw size={14} />
@@ -1362,7 +1410,7 @@ const RubricCreator = () => {
                                 </button>
                                 <button
                                     onClick={resetTextareaSizes}
-                                    className="bg-gray-600 hover:bg-gray-700 px-3 py-2 rounded flex items-center gap-1 text-sm text-white"
+                                    className="bg-gray-600 hover:bg-gray-700 text-white px-3 py-2 rounded flex items-center gap-1 text-sm"
                                     title="Reset all textarea sizes to original dimensions"
                                 >
                                     <Minimize2 size={14} />
@@ -1445,7 +1493,7 @@ const RubricCreator = () => {
                                                                         'criterion'
                                                                     );
                                                                 }}
-                                                                className="absolute top-1 right-1 z-10 opacity-70 hover:opacity-100 transition-opacity bg-blue-500 text-white rounded p-1 hover:bg-blue-600 cursor-pointer"
+                                                                className="absolute top-1 right-1 z-10 opacity-70 hover:opacity-100 transition-opacity bg-blue-500 text-white rounded p-1 hover:bg-blue-700 cursor-pointer"
                                                                 title="Open rich text editor"
                                                             >
                                                                 <Maximize2 size={12} />
@@ -1505,7 +1553,7 @@ const RubricCreator = () => {
                                                                             'level'
                                                                         );
                                                                     }}
-                                                                    className="absolute top-1 right-1 z-10 opacity-70 hover:opacity-100 transition-opacity bg-blue-500 text-white rounded p-1 hover:bg-blue-600 cursor-pointer"
+                                                                    className="absolute top-1 right-1 z-10 opacity-70 hover:opacity-100 transition-opacity bg-blue-500 text-white rounded p-1 hover:bg-blue-700 cursor-pointer"
                                                                     title="Open rich text editor"
                                                                 >
                                                                     <Maximize2 size={12} />
@@ -1560,7 +1608,7 @@ const RubricCreator = () => {
                                                                         </button>
                                                                         <button
                                                                             onClick={() => closeInlineEditor(false)}
-                                                                        className="bg-red-700 hover:bg-red-600 text-white px-4 py-2 rounded flex items-center gap-2 transition-colors"
+                                                                            className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded flex items-center gap-2 transition-colors"
                                                                         >
                                                                             <X size={16} />
                                                                             Cancel

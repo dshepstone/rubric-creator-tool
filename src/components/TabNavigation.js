@@ -36,6 +36,11 @@ const TabNavigation = () => {
             description: 'Grade assignments using rubrics'
         }
     ];
+    const activeStyles = {
+        'rubric-creator': 'active-rubric border-purple-500 text-purple-700',
+        'class-manager': 'active-class  border-indigo-500 text-indigo-700',
+        'grading-tool': 'active-grading border-green-500  text-green-700',
+    };
 
     // Check if there's data that indicates active work
     const hasRubricData = sharedRubric && sharedRubric.assignmentInfo?.title;
@@ -63,7 +68,7 @@ const TabNavigation = () => {
     const progress = getGradingProgress();
 
     return (
-        <div className="border-b border-gray-200 bg-white shadow-sm">
+        <div className="tab-navigation border-b border-gray-200 shadow-sm">
             <div className="max-w-7xl mx-auto">
                 <nav className="flex space-x-8 px-6" aria-label="Tabs">
                     {tabs.map((tab) => {
@@ -75,9 +80,9 @@ const TabNavigation = () => {
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id)}
                                 className={`${isActive
-                                    ? 'border-blue-500 text-blue-600 bg-blue-50'
-                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                                    } whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm flex items-center gap-2 transition-all duration-200 relative`}
+                                     ? `${activeStyles[tab.id]}`
+                                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                     } whitespace-nowrap py-4 px-6 font-medium text-sm flex items-center gap-2 transition-all duration-200`}
                             >
                                 <Icon size={18} />
                                 <div className="text-left">

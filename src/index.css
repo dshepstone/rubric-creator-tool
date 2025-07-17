@@ -1,6 +1,11 @@
 /* Complete CSS for Enhanced Grading System & Rubric Creation Tool */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* === CUSTOM CSS VARIABLES AND STYLES === */
 :root {
   --primary-blue: #1e40af;
   --primary-blue-dark: #1e3a8a;
@@ -102,7 +107,7 @@ body {
   background-color: white;
 }
 
-/* override the default gray-100 “New Import” style, give it dark text */
+/* override the default gray-100 "New Import" style, give it dark text */
 .bg-gray-100 {
   background: var(--gray-100);
   color: var(--gray-800);
@@ -162,7 +167,18 @@ body {
 .bg-gradient-to-r {
   background: linear-gradient(135deg, var(--green-50) 0%, #d1fae5 100%);
 }
+/* === ACTIVE-TAB BACKGROUNDS ======================================= */
+.active-rubric {
+  background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%);
+}
 
+.active-class {
+  background: linear-gradient(135deg, #eef2ff 0%, #dbeafe 100%);
+}
+
+.active-grading {
+  background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+}
 .from-green-50 {
   background: linear-gradient(135deg, var(--green-50) 0%, #d1fae5 100%);
 }
@@ -907,7 +923,14 @@ button:disabled {
   background: linear-gradient(135deg, var(--primary-blue-light) 0%, var(--primary-blue) 100%);
   color: white;
 }
-
+/* index.css – just below the .bg-blue-600 block */
+.bg-blue-500 {
+  /* same gradient formula you use for 600/700 */
+  background: linear-gradient(135deg,
+      var(--primary-blue-light) 0%,
+      var(--primary-blue) 100%);
+  color: white;
+}
 .bg-blue-700 {
   background: linear-gradient(135deg, var(--primary-blue) 0%, var(--primary-blue-dark) 100%);
   color: white;
@@ -1773,6 +1796,7 @@ button.p-3.rounded-lg.border-2 {
     background: white !important;
   }
 }
+
 /* hover state for green-700 */
 .hover\:bg-green-700:hover {
   background: linear-gradient(135deg, var(--green-700) 0%, var(--green-800) 100%);
@@ -1787,7 +1811,118 @@ button.p-3.rounded-lg.border-2 {
 .disabled\:text-gray-800:disabled {
   color: var(--gray-800);
 }
-/* make “disabled:text-gray-800” do what it says */
+
+/* make "disabled:text-gray-800" do what it says */
 .disabled\:text-gray-800:disabled {
   color: var(--gray-800) !important;
+}
+/* --- PRIMARY BLUE (already present) -------------------------------- */
+.bg-blue-500 {
+  background: linear-gradient(135deg, var(--primary-blue-light) 0%, var(--primary-blue) 100%);
+  color: #fff;
+}
+
+.bg-blue-700 {
+  background: linear-gradient(135deg, var(--primary-blue) 0%, var(--primary-blue-dark) 100%);
+  color: #fff;
+}
+
+/* --- SUCCESS GREEN ------------------------------------------------- */
+.bg-green-600 {
+  background: linear-gradient(135deg, var(--green-600) 0%, var(--green-700) 100%);
+  color: #fff;
+}
+
+.bg-green-700 {
+  background: linear-gradient(135deg, var(--green-700) 0%, var(--green-800) 100%);
+  color: #fff;
+}
+
+/* --- WARNING ORANGE ------------------------------------------------ */
+.bg-orange-600 {
+  background: linear-gradient(135deg, var(--warning-orange) 0%, #d65f00 100%);
+  color: #fff;
+}
+
+.bg-orange-700 {
+  background: linear-gradient(135deg, #d65f00 0%, #b54f00 100%);
+  color: #fff;
+}
+
+/* --- NEUTRAL GRAYS (disabled / new-import) ------------------------- */
+.bg-gray-600 {
+  background: linear-gradient(135deg, var(--gray-600) 0%, var(--gray-700) 100%);
+  color: #fff;
+}
+
+.bg-gray-700 {
+  background: linear-gradient(135deg, var(--gray-700) 0%, var(--gray-800) 100%);
+  color: #fff;
+}
+
+.bg-gray-400 {
+  background: linear-gradient(135deg, var(--gray-400) 0%, var(--gray-500) 100%);
+  color: #fff;
+}
+/* --- INDIGO (Grade button when no draft) --------------------------- */
+.bg-indigo-600 {
+  background: linear-gradient(135deg,
+      var(--indigo-600) 0%,
+      var(--indigo-700) 100%);
+  color: white;
+}
+
+.bg-indigo-700 {
+  background: linear-gradient(135deg,
+      var(--indigo-700) 0%,
+      #302ecf 100%
+      /* a hair darker for hover */
+    );
+  color: white;
+}
+
+/* Optional hover helper if you like explicit rules */
+.hover\:bg-indigo-700:hover {
+  background: linear-gradient(135deg,
+      var(--indigo-700) 0%,
+      #302ecf 100%);
+}
+/* --- INDIGO 500  (lighter hover for “Grade” button) ---------------- */
+.bg-indigo-500 {
+  background: linear-gradient(135deg,
+      #5254ff 0%,
+      /* lighter than --indigo-600 */
+      var(--indigo-600) 100%);
+  color: white;
+}
+
+/* explicit hover helper */
+.hover\:bg-indigo-500:hover {
+  background: linear-gradient(135deg,
+      #5254ff 0%,
+      var(--indigo-600) 100%);
+}
+/* --- DANGER RED (Cancel button) ----------------------------------- */
+.bg-red-600 {
+  background: linear-gradient(135deg,
+      var(--danger-red) 0%,
+      /* #dc2626 by your variable list */
+      #b91c1c 100%
+      /* a shade darker */
+    );
+  color: white;
+}
+
+.bg-red-700 {
+  background: linear-gradient(135deg,
+      #b91c1c 0%,
+      #991b1b 100%);
+  color: white;
+}
+
+/* optional explicit hover helper */
+.hover\:bg-red-700:hover {
+  background: linear-gradient(135deg,
+      #b91c1c 0%,
+      #991b1b 100%);
 }
