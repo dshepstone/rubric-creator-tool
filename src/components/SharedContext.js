@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+// Updated SharedContext.js with Enhanced Draft/Final Grade Management
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 
 const AssessmentContext = createContext();
 
@@ -13,22 +14,18 @@ export const useAssessment = () => {
 export const AssessmentProvider = ({ children }) => {
     // Shared rubric state
     const [sharedRubric, setSharedRubric] = useState(null);
-
-    // Shared course-details state (for your GradingTemplate’s setSharedCourseDetails)
     const [sharedCourseDetails, setSharedCourseDetails] = useState(null);
-
-    // Active tab state
     const [activeTab, setActiveTab] = useState('rubric-creator');
-    // ─── Persist imported class-list across tabs ───────────────────────
-    const [classList, setClassList] = useState(null);
 
-    // ─── Which student is being graded right now ──────────────────────
+    // Class list and student management
+    const [classList, setClassList] = useState(null);
     const [currentStudent, setCurrentStudent] = useState(null);
 
-    // ─── In-progress grading drafts, keyed by student ID ─────────────
+    // ENHANCED: Separate storage for draft and final grades
     const [drafts, setDrafts] = useState({});
+    const [finalGrades, setFinalGrades] = useState({});
 
-    // ─── Batch grading session state ───────────────────────────────────
+    // Batch grading session state
     const [gradingSession, setGradingSession] = useState({
         active: false,
         startTime: null,
@@ -38,7 +35,7 @@ export const AssessmentProvider = ({ children }) => {
         currentStudentIndex: 0
     });
 
-    // Comprehensive persistent form data for grading tool
+    // Form data states
     const [gradingFormData, setGradingFormData] = useState({
         student: { name: '', id: '', email: '' },
         course: { code: '', name: '', instructor: '', term: '' },
@@ -56,122 +53,6 @@ export const AssessmentProvider = ({ children }) => {
         }
     });
 
-    // Replace the existing navigation functions in SharedContext.js:
-    // Navigate to next student in grading session
-    const nextStudentInSession = useCallback(() => {
-        if (!gradingSession.active || !classList || gradingSession.currentStudentIndex >= classList.students.length - 1) {
-            return false; // End of session or no active session
-        }
-
-        const nextIndex = gradingSession.currentStudentIndex + 1;
-        const nextStudent = classList.students[nextIndex];
-
-        // Update session state
-        setGradingSession(prev => ({
-            ...prev,
-            currentStudentIndex: nextIndex,
-            currentStudent: nextStudent,
-            gradedStudents: [...prev.gradedStudents, classList.students[gradingSession.currentStudentIndex].id]
-        }));
-
-        // Update current student
-        setCurrentStudent(nextStudent);
-
-        // Update grading form data with new student info
-        setGradingFormData(prev => ({
-            ...prev,
-            student: {
-                name: nextStudent.name,
-                id: nextStudent.id,
-                email: nextStudent.email
-            }
-        }));
-
-        // Update class list progress
-        const updatedProgress = [...classList.gradingProgress];
-        updatedProgress[gradingSession.currentStudentIndex] = {
-            ...updatedProgress[gradingSession.currentStudentIndex],
-            status: 'completed',
-            lastModified: new Date().toISOString()
-        };
-
-        setClassList(prev => ({
-            ...prev,
-            gradingProgress: updatedProgress
-        }));
-
-        return true; // Successfully moved to next student
-    }, [gradingSession, classList, setGradingSession, setCurrentStudent, setClassList, setGradingFormData]);
-
-    // Navigate to previous student in grading session
-    const previousStudentInSession = useCallback(() => {
-        if (!gradingSession.active || gradingSession.currentStudentIndex <= 0) {
-            return false;
-        }
-
-        const prevIndex = gradingSession.currentStudentIndex - 1;
-        const prevStudent = classList.students[prevIndex];
-
-        setGradingSession(prev => ({
-            ...prev,
-            currentStudentIndex: prevIndex,
-            currentStudent: prevStudent
-        }));
-
-        setCurrentStudent(prevStudent);
-
-        // Update grading form data with student info
-        setGradingFormData(prev => ({
-            ...prev,
-            student: {
-                name: prevStudent.name,
-                id: prevStudent.id,
-                email: prevStudent.email
-            }
-        }));
-
-        return true;
-    }, [gradingSession, classList, setGradingSession, setCurrentStudent, setGradingFormData]);
-
-    // Jump to specific student by index
-    const jumpToStudentInSession = useCallback((index) => {
-        if (!gradingSession.active || !classList || index < 0 || index >= classList.students.length) {
-            return false;
-        }
-
-        const targetStudent = classList.students[index];
-
-        setGradingSession(prev => ({
-            ...prev,
-            currentStudentIndex: index,
-            currentStudent: targetStudent
-        }));
-
-        setCurrentStudent(targetStudent);
-
-        // Update grading form data with student info
-        setGradingFormData(prev => ({
-            ...prev,
-            student: {
-                name: targetStudent.name,
-                id: targetStudent.id,
-                email: targetStudent.email
-            }
-        }));
-
-        return true;
-    }, [gradingSession, classList, setGradingSession, setCurrentStudent, setGradingFormData]);
-
-
-    // Update grading session state
-    const updateGradingSession = useCallback((updates) => {
-        setGradingSession(prev => ({
-            ...prev,
-            ...updates
-        }));
-    }, [setGradingSession]);
-
-    // Persistent form data for rubric creator
     const [rubricFormData, setRubricFormData] = useState({
         assignmentInfo: {
             title: '',
@@ -210,93 +91,32 @@ export const AssessmentProvider = ({ children }) => {
         modalEdit: { show: false, content: '', field: null, onSave: null }
     });
 
-    // Transfer rubric to grading tool and switch tabs
-    const transferRubricToGrading = useCallback((rubricData) => {
-        setSharedRubric(rubricData);
-
-        // Update grading form data with rubric information
-        setGradingFormData(prev => ({
-            ...prev,
-            assignment: {
-                ...prev.assignment,
-                name: rubricData.assignmentInfo?.title || prev.assignment.name,
-                maxPoints: rubricData.assignmentInfo?.totalPoints || prev.assignment.maxPoints
-            },
-            metadata: {
-                ...prev.metadata,
-                rubricIntegrated: true
-            }
-        }));
-
-        setActiveTab('grading-tool');
-    }, []);
-
-    // Enhanced transfer function that preserves all form data
-    const transferRubricToGradingWithDetails = useCallback((rubricData) => {
-        setSharedRubric(rubricData);
-
-        // Update grading form data with rubric information
-        setGradingFormData(prev => ({
-            ...prev,
-            assignment: {
-                ...prev.assignment,
-                name: rubricData.assignmentInfo?.title || prev.assignment.name,
-                maxPoints: rubricData.assignmentInfo?.totalPoints || prev.assignment.maxPoints
-            },
-            metadata: {
-                ...prev.metadata,
-                rubricIntegrated: true
-            }
-        }));
-
-        setActiveTab('grading-tool');
-    }, []);
-
-    // Update functions for grading form data
-    const updateGradingFormData = useCallback((updates) => {
-        setGradingFormData(prev => ({
-            ...prev,
-            ...updates
-        }));
-    }, []);
-
+    // Form update functions
     const updateStudentInfo = useCallback((studentInfo) => {
         setGradingFormData(prev => ({
             ...prev,
-            student: {
-                ...prev.student,
-                ...studentInfo
-            }
+            student: { ...prev.student, ...studentInfo }
         }));
     }, []);
 
     const updateCourseInfo = useCallback((courseInfo) => {
         setGradingFormData(prev => ({
             ...prev,
-            course: {
-                ...prev.course,
-                ...courseInfo
-            }
+            course: { ...prev.course, ...courseInfo }
         }));
     }, []);
 
     const updateAssignmentInfo = useCallback((assignmentInfo) => {
         setGradingFormData(prev => ({
             ...prev,
-            assignment: {
-                ...prev.assignment,
-                ...assignmentInfo
-            }
+            assignment: { ...prev.assignment, ...assignmentInfo }
         }));
     }, []);
 
     const updateFeedbackInfo = useCallback((feedbackInfo) => {
         setGradingFormData(prev => ({
             ...prev,
-            feedback: {
-                ...prev.feedback,
-                ...feedbackInfo
-            }
+            feedback: { ...prev.feedback, ...feedbackInfo }
         }));
     }, []);
 
@@ -314,10 +134,10 @@ export const AssessmentProvider = ({ children }) => {
         }));
     }, []);
 
-    const updateLatePolicy = useCallback((latePolicy) => {
+    const updateLatePolicyInfo = useCallback((latePolicyInfo) => {
         setGradingFormData(prev => ({
             ...prev,
-            latePolicy
+            latePolicy: { ...prev.latePolicy, ...latePolicyInfo }
         }));
     }, []);
 
@@ -331,51 +151,189 @@ export const AssessmentProvider = ({ children }) => {
     const updateMetadata = useCallback((metadata) => {
         setGradingFormData(prev => ({
             ...prev,
-            metadata: {
-                ...prev.metadata,
-                ...metadata
-            }
+            metadata: { ...prev.metadata, ...metadata }
         }));
     }, []);
 
-    // Update functions for rubric form data
-    const updateRubricFormData = useCallback((updates) => {
-        setRubricFormData(prev => ({
+    // ENHANCED: Draft and Final Grade Management
+    const saveDraft = useCallback((studentId, gradingData) => {
+        const draftData = {
+            ...gradingData,
+            metadata: {
+                ...gradingData.metadata,
+                savedAt: new Date().toISOString(),
+                status: 'draft'
+            }
+        };
+
+        setDrafts(prev => ({
+            ...prev,
+            [studentId]: draftData
+        }));
+
+        console.log('✅ Draft saved for student:', studentId);
+        return true;
+    }, []);
+
+    const loadDraft = useCallback((studentId) => {
+        const draft = drafts[studentId];
+        if (draft) {
+            console.log('📝 Draft loaded for student:', studentId);
+            return draft;
+        }
+        console.log('⚠️ No draft found for student:', studentId);
+        return null;
+    }, [drafts]);
+
+    const saveFinalGrade = useCallback((studentId, gradingData) => {
+        const finalData = {
+            ...gradingData,
+            metadata: {
+                ...gradingData.metadata,
+                savedAt: new Date().toISOString(),
+                status: 'final'
+            }
+        };
+
+        setFinalGrades(prev => ({
+            ...prev,
+            [studentId]: finalData
+        }));
+
+        // Remove from drafts when finalized
+        setDrafts(prev => {
+            const updated = { ...prev };
+            delete updated[studentId];
+            return updated;
+        });
+
+        console.log('🎯 Final grade saved for student:', studentId);
+        return true;
+    }, []);
+
+    const loadFinalGrade = useCallback((studentId) => {
+        const finalGrade = finalGrades[studentId];
+        if (finalGrade) {
+            console.log('🎯 Final grade loaded for student:', studentId);
+            return finalGrade;
+        }
+        console.log('⚠️ No final grade found for student:', studentId);
+        return null;
+    }, [finalGrades]);
+
+    const getGradeStatus = useCallback((studentId) => {
+        if (finalGrades[studentId]) return 'final';
+        if (drafts[studentId]) return 'draft';
+        return 'not_started';
+    }, [drafts, finalGrades]);
+
+    // Navigation helpers for grading sessions
+    const nextStudentInSession = useCallback((saveType = 'draft') => {
+        if (!gradingSession?.active || !classList) return false;
+
+        const currentIndex = gradingSession.currentStudentIndex;
+        const students = classList.students;
+
+        if (currentIndex < students.length - 1) {
+            const nextIndex = currentIndex + 1;
+            const nextStudent = students[nextIndex];
+
+            setGradingSession(prev => ({
+                ...prev,
+                currentStudentIndex: nextIndex,
+                currentStudent: nextStudent,
+                gradedStudents: [...prev.gradedStudents, currentStudent.id]
+            }));
+
+            setCurrentStudent(nextStudent);
+            return true;
+        }
+
+        // End of session
+        setGradingSession(prev => ({
+            ...prev,
+            active: false,
+            gradedStudents: [...prev.gradedStudents, currentStudent.id]
+        }));
+        return false;
+    }, [gradingSession, classList, currentStudent]);
+
+    const previousStudentInSession = useCallback(() => {
+        if (!gradingSession?.active || !classList) return false;
+
+        const currentIndex = gradingSession.currentStudentIndex;
+        if (currentIndex > 0) {
+            const prevIndex = currentIndex - 1;
+            const prevStudent = classList.students[prevIndex];
+
+            setGradingSession(prev => ({
+                ...prev,
+                currentStudentIndex: prevIndex,
+                currentStudent: prevStudent
+            }));
+
+            setCurrentStudent(prevStudent);
+            return true;
+        }
+        return false;
+    }, [gradingSession, classList]);
+
+    // Initialize grading session with first student
+    const initializeGradingSession = useCallback((classListData) => {
+        if (!classListData || !classListData.students.length) {
+            return false;
+        }
+
+        const firstStudent = classListData.students[0];
+        const session = {
+            active: true,
+            startTime: new Date().toISOString(),
+            gradedStudents: [],
+            totalStudents: classListData.students.length,
+            currentStudent: firstStudent,
+            currentStudentIndex: 0
+        };
+
+        setGradingSession(session);
+        setCurrentStudent(firstStudent);
+
+        // Load first student into grading form
+        setGradingFormData(prev => ({
+            ...prev,
+            student: {
+                name: firstStudent.name,
+                id: firstStudent.id,
+                email: firstStudent.email
+            }
+        }));
+
+        console.log('🚀 Grading session started for', classListData.students.length, 'students');
+        return true;
+    }, []);
+
+    // Update grading session
+    const updateGradingSession = useCallback((updates) => {
+        setGradingSession(prev => ({
             ...prev,
             ...updates
         }));
     }, []);
 
-    const updateRubricAssignmentInfo = useCallback((assignmentInfo) => {
-        setRubricFormData(prev => ({
-            ...prev,
-            assignmentInfo: {
-                ...prev.assignmentInfo,
-                ...assignmentInfo
-            }
-        }));
-    }, []);
+    // Rubric management functions
+    const transferRubricToGrading = useCallback(() => {
+        if (rubricFormData) {
+            setSharedRubric(rubricFormData);
+            setActiveTab('grading-tool');
+        }
+    }, [rubricFormData]);
 
-    const updateRubricCriteria = useCallback((criteria) => {
-        setRubricFormData(prev => ({
-            ...prev,
-            criteria
-        }));
-    }, []);
-
-    const updateRubricLevels = useCallback((rubricLevels) => {
-        setRubricFormData(prev => ({
-            ...prev,
-            rubricLevels
-        }));
-    }, []);
-
-    const updateRubricSettings = useCallback((settings) => {
-        setRubricFormData(prev => ({
-            ...prev,
-            ...settings
-        }));
-    }, []);
+    const transferRubricToGradingWithDetails = useCallback((details) => {
+        if (rubricFormData) {
+            setSharedRubric(rubricFormData);
+            setSharedCourseDetails(details);
+            setActiveTab('grading-tool');
+        }
+    }, [rubricFormData]);
 
     // Clear functions
     const clearSharedRubric = useCallback(() => {
@@ -447,84 +405,16 @@ export const AssessmentProvider = ({ children }) => {
         clearRubricFormData();
     }, [clearGradingFormData, clearRubricFormData]);
 
-    // ─── Draft save/load ───────────────────────────────────────────────
-    function saveDraft(studentId, data) {
-        setDrafts(prev => ({ ...prev, [studentId]: data }));
-    }
-    function loadDraft(studentId) {
-        return drafts[studentId] || null;
-    }
-
-    // Helper to check if a student has a saved draft
-    const hasDraft = useCallback((studentId) => {
-        return studentId && drafts[studentId] != null;
-    }, [drafts]);
-
-    // Initialize grading session with first student
-    const initializeGradingSession = useCallback((classListData) => {
-        if (!classListData || !classListData.students.length) {
-            return false;
-        }
-
-        const firstStudent = classListData.students[0];
-        const session = {
-            active: true,
-            startTime: new Date().toISOString(),
-            gradedStudents: [],
-            totalStudents: classListData.students.length,
-            currentStudent: firstStudent,
-            currentStudentIndex: 0
-        };
-
-        setGradingSession(session);
-        setCurrentStudent(firstStudent);
-
-        // Load first student into grading form
-        setGradingFormData(prev => ({
-            ...prev,
-            student: {
-                name: firstStudent.name,
-                id: firstStudent.id,
-                email: firstStudent.email
-            }
-        }));
-
-        // Auto-populate course from Excel import
-        if (classListData.courseMetadata) {
-            updateCourseInfo({
-                code: classListData.courseMetadata.courseCode || '',
-                name: classListData.courseMetadata.courseName || '',
-                instructor: classListData.courseMetadata.professors || '',
-                term: classListData.courseMetadata.term || ''
-            });
-        }
-
-        // Auto-populate assignment from loaded rubric
-        if (sharedRubric?.assignmentInfo) {
-            updateAssignmentInfo({
-                name: sharedRubric.assignmentInfo.title || '',
-                maxPoints: sharedRubric.assignmentInfo.totalPoints || 100
-            });
-        }
-
-        return true;
-    }, [
-        setGradingSession,
-        setCurrentStudent,
-        setGradingFormData,
-        updateCourseInfo,
-        updateAssignmentInfo,
-        sharedRubric
-    ]);
-
     // Legacy compatibility - map persistent form data
     const persistentFormData = gradingFormData;
-    const updatePersistentFormData = updateGradingFormData;
+    const updatePersistentFormData = setGradingFormData;
 
     const value = {
         // Shared state
         sharedRubric,
         setSharedRubric,
+        sharedCourseDetails,
+        setSharedCourseDetails,
 
         // Navigation
         activeTab,
@@ -540,53 +430,48 @@ export const AssessmentProvider = ({ children }) => {
         updateFeedbackInfo,
         updateAttachments,
         updateVideoLinks,
-        updateLatePolicy,
+        updateLatePolicyInfo,
         updateRubricGrading,
         updateMetadata,
 
-        // Rubric form data
-        rubricFormData,
-        setRubricFormData,
-        updateRubricFormData,
-        updateRubricAssignmentInfo,
-        updateRubricCriteria,
-        updateRubricLevels,
-        updateRubricSettings,
+        // Draft and Final Grade Management
+        saveDraft,
+        loadDraft,
+        saveFinalGrade,
+        loadFinalGrade,
+        finalGrades,
+        drafts,
+        getGradeStatus,
 
-        // Actions - rubric management
-        transferRubricToGrading,
-        transferRubricToGradingWithDetails,
-        clearSharedRubric,
-
-        // Actions - clear functions
-        clearGradingFormData,
-        clearRubricFormData,
-        clearAllData,
-
-        // ─── Class & grading flow ────────────────────────────────────────
+        // Class management
         classList,
         setClassList,
         currentStudent,
         setCurrentStudent,
-        drafts,
-        saveDraft,
-        loadDraft,
-        hasDraft,
+
+        // Grading session
+        gradingSession,
+        setGradingSession,
         nextStudentInSession,
         previousStudentInSession,
-        jumpToStudentInSession,
         updateGradingSession,
         initializeGradingSession,
 
-        // ─── Expose grading session ───────────────────────────────────────
-        gradingSession,
-        setGradingSession,
+        // Rubric form data
+        rubricFormData,
+        setRubricFormData,
+
+        // Utility functions
+        transferRubricToGrading,
+        transferRubricToGradingWithDetails,
+        clearSharedRubric,
+        clearGradingFormData,
+        clearRubricFormData,
+        clearAllData,
 
         // Legacy compatibility
         persistentFormData,
-        updatePersistentFormData,
-        sharedCourseDetails,
-        setSharedCourseDetails,
+        updatePersistentFormData
     };
 
     return (
