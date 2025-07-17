@@ -175,6 +175,10 @@ export const AssessmentProvider = ({ children }) => {
         return true;
     }, []);
 
+    const hasDraft = useCallback((studentId) => {
+        return drafts[studentId] !== undefined;
+    }, [drafts]);
+
     const loadDraft = useCallback((studentId) => {
         const draft = drafts[studentId];
         if (draft) {
@@ -185,47 +189,45 @@ export const AssessmentProvider = ({ children }) => {
         return null;
     }, [drafts]);
 
-    const saveFinalGrade = useCallback((studentId, gradingData) => {
-        const finalData = {
-            ...gradingData,
-            metadata: {
-                ...gradingData.metadata,
-                savedAt: new Date().toISOString(),
-                status: 'final'
-            }
-        };
+    const saveFinalGrade = useCallback((studentId, data) => {
+        console.log('✅ Saving final grade for student:', studentId);
+        setFinalGrades(prev => ({ ...prev, [studentId]: data }));
 
-        setFinalGrades(prev => ({
-            ...prev,
-            [studentId]: finalData
-        }));
-
-        // Remove from drafts when finalized
+        // Remove from drafts once finalized
         setDrafts(prev => {
             const updated = { ...prev };
             delete updated[studentId];
             return updated;
         });
 
-        console.log('🎯 Final grade saved for student:', studentId);
-        return true;
-    }, []);
+        // Update class list progress
+        if (classList) {
+            const studentIndex = classList.students.findIndex(s => s.id === studentId);
+            if (studentIndex >= 0) {
+                const updatedProgress = [...classList.gradingProgress];
+                updatedProgress[studentIndex] = {
+                    ...updatedProgress[studentIndex],
+                    status: 'completed_final',
+                    lastModified: new Date().toISOString(),
+                    gradeType: 'final'
+                };
+                setClassList(prev => ({
+                    ...prev,
+                    gradingProgress: updatedProgress
+                }));
+            }
+        }
+    }, [classList, setDrafts, setClassList]);
 
     const loadFinalGrade = useCallback((studentId) => {
-        const finalGrade = finalGrades[studentId];
-        if (finalGrade) {
-            console.log('🎯 Final grade loaded for student:', studentId);
-            return finalGrade;
-        }
-        console.log('⚠️ No final grade found for student:', studentId);
-        return null;
+        return finalGrades[studentId] || null;
     }, [finalGrades]);
 
     const getGradeStatus = useCallback((studentId) => {
         if (finalGrades[studentId]) return 'final';
         if (drafts[studentId]) return 'draft';
         return 'not_started';
-    }, [drafts, finalGrades]);
+    }, [finalGrades, drafts]);
 
     // Navigation helpers for grading sessions
     const nextStudentInSession = useCallback((saveType = 'draft') => {
@@ -278,38 +280,54 @@ export const AssessmentProvider = ({ children }) => {
         return false;
     }, [gradingSession, classList]);
 
-    // Initialize grading session with first student
+    // **FIX APPLIED HERE: Replaced the old function with the new, corrected version.**
     const initializeGradingSession = useCallback((classListData) => {
-        if (!classListData || !classListData.students.length) {
+        // 1. Guard against missing or empty class list
+        if (!classListData || !classListData.students?.length) {
             return false;
         }
 
-        const firstStudent = classListData.students[0];
+        // 2. Extract the students array and the imported course metadata
+        const { students, courseMetadata } = classListData;
+
+        // 3. Pick the first student to start the session
+        const firstStudent = students[0];
+
+        // 4. Build and set the grading session state
         const session = {
             active: true,
             startTime: new Date().toISOString(),
             gradedStudents: [],
-            totalStudents: classListData.students.length,
+            totalStudents: students.length,
             currentStudent: firstStudent,
             currentStudentIndex: 0
         };
-
         setGradingSession(session);
         setCurrentStudent(firstStudent);
 
-        // Load first student into grading form
+        // 5. Prefill the grading form: student + course details
         setGradingFormData(prev => ({
             ...prev,
             student: {
                 name: firstStudent.name,
                 id: firstStudent.id,
                 email: firstStudent.email
-            }
+            },
+            course: {
+                code: courseMetadata?.courseCode ?? prev.course.code,
+                name: courseMetadata?.courseName ?? prev.course.name,
+                instructor: courseMetadata?.instructor ?? prev.course.instructor,
+                term: courseMetadata?.term ?? prev.course.term,
+            },
+            assignment: sharedCourseDetails?.assignment ?? prev.assignment
         }));
 
-        console.log('🚀 Grading session started for', classListData.students.length, 'students');
+        console.log(
+            `🚀 Grading session started for ${students.length} students`
+        );
         return true;
-    }, []);
+
+    }, [sharedCourseDetails]);
 
     // Update grading session
     const updateGradingSession = useCallback((updates) => {
@@ -399,13 +417,55 @@ export const AssessmentProvider = ({ children }) => {
         });
     }, []);
 
+    // Finalize a draft grade
+    const finalizeGrade = useCallback((studentId) => {
+        const draftData = drafts[studentId];
+        if (draftData) {
+            saveFinalGrade(studentId, draftData);
+            console.log('🎯 Finalized draft for student:', studentId);
+        }
+    }, [drafts, saveFinalGrade]);
+
+    // Unlock a final grade (convert back to draft)
+    const unlockGrade = useCallback((studentId) => {
+        const finalData = finalGrades[studentId];
+        if (finalData) {
+            // Move from final back to draft
+            setDrafts(prev => ({ ...prev, [studentId]: finalData }));
+            setFinalGrades(prev => {
+                const updated = { ...prev };
+                delete updated[studentId];
+                return updated;
+            });
+
+            // Update class list progress
+            if (classList) {
+                const studentIndex = classList.students.findIndex(s => s.id === studentId);
+                if (studentIndex >= 0) {
+                    const updatedProgress = [...classList.gradingProgress];
+                    updatedProgress[studentIndex] = {
+                        ...updatedProgress[studentIndex],
+                        status: 'completed_draft',
+                        lastModified: new Date().toISOString(),
+                        gradeType: 'draft'
+                    };
+                    setClassList(prev => ({
+                        ...prev,
+                        gradingProgress: updatedProgress
+                    }));
+                }
+            }
+
+            console.log('🔓 Unlocked final grade for student:', studentId);
+        }
+    }, [finalGrades, setDrafts, setFinalGrades, classList, setClassList]);
+
     const clearAllData = useCallback(() => {
         setSharedRubric(null);
         clearGradingFormData();
         clearRubricFormData();
     }, [clearGradingFormData, clearRubricFormData]);
 
-    // Legacy compatibility - map persistent form data
     const persistentFormData = gradingFormData;
     const updatePersistentFormData = setGradingFormData;
 
@@ -422,7 +482,6 @@ export const AssessmentProvider = ({ children }) => {
 
         // Grading form data
         gradingData: gradingFormData,
-        setGradingFormData,
         setGradingData: setGradingFormData,
         updateStudentInfo,
         updateCourseInfo,
@@ -434,14 +493,17 @@ export const AssessmentProvider = ({ children }) => {
         updateRubricGrading,
         updateMetadata,
 
-        // Draft and Final Grade Management
+        // Draft and Final Grade Management - ENHANCED
+        drafts,
+        finalGrades,
         saveDraft,
         loadDraft,
         saveFinalGrade,
         loadFinalGrade,
-        finalGrades,
-        drafts,
         getGradeStatus,
+        hasDraft,
+        finalizeGrade,
+        unlockGrade,
 
         // Class management
         classList,

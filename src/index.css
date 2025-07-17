@@ -414,7 +414,7 @@ body {
 }
 
 .text-blue-200 {
-  color: #bfdbfe;
+  color: var(--gray-800);
 }
 
 .text-yellow-300 {

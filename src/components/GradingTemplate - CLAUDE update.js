@@ -204,36 +204,60 @@ const sampleRubric = {
 };
 
 const GradingTemplate = () => {
-  // Get shared context - ENHANCED with new functions
+  // Get shared context - FIXED: Removed updateRubricGrading from imports since it's defined locally
   const {
+    // Shared state
     sharedRubric,
     sharedCourseDetails,
     setSharedCourseDetails,
+
+    // Grading form data
     gradingData: sharedGradingData,
     setGradingData: setSharedGradingData,
     updateStudentInfo,
     updateCourseInfo,
     updateAssignmentInfo,
-    clearGradingFormData,
+    updateFeedbackInfo,
+    updateAttachments,
+    updateVideoLinks,
+    
+    // updateRubricGrading, // ← REMOVED: This is causing the duplicate declaration error
+    updateMetadata,
+
+    // Class management
     classList,
     setClassList,
+    currentStudent,
     setCurrentStudent,
+
+    // Grading session
     gradingSession,
     setGradingSession,
     nextStudentInSession,
     previousStudentInSession,
     updateGradingSession,
     initializeGradingSession,
+
+    // Navigation
+    activeTab,
     setActiveTab,
-    currentStudent,
+
+    // Draft and Final Grade Management
+    drafts,
+    finalGrades,
     saveDraft,
     loadDraft,
-    // NEW: Add the draft/final grade functions
     saveFinalGrade,
     loadFinalGrade,
-    finalGrades,
-    getGradeStatus
+    getGradeStatus,
+    hasDraft,
+
+    // Utility functions
+    clearGradingFormData,
+    clearSharedRubric,
+    transferRubricToGrading
   } = useAssessment();
+
 
   // Helper function to convert HTML content to readable text format
   const renderFormattedContent = (htmlContent) => {
@@ -262,36 +286,25 @@ const GradingTemplate = () => {
     return textContent;
   };
 
-  // State for all grading data - initialize from shared context or defaults
-  const [localGradingData, setLocalGradingData] = useState(() => {
-    // 1) Try loading a saved draft first
-    if (currentStudent?.id) {
-      const draft = loadDraft(currentStudent.id);
-      if (draft) {
-        return draft;
-      }
-    }
-    // 2) If rubric was just transferred, use that
-    if (sharedGradingData) {
-      return { ...sharedGradingData, student: currentStudent || sharedGradingData.student };
-    }
-    // 3) Otherwise, start fresh for this student
-    return {
-      student: currentStudent || { name: '', id: '', email: '' },
-      course: sharedCourseDetails?.course || { code: '', name: '', instructor: '', term: '' },
-      assignment: sharedCourseDetails?.assignment || { name: '', dueDate: '', maxPoints: 100 },
-      feedback: { general: '', strengths: '', improvements: '' },
-      attachments: [],
-      videoLinks: [],
-      latePolicy: { level: 'none', penaltyApplied: false },
-      metadata: {
-        gradedBy: '',
-        gradedDate: '',
-        aiAssisted: false,
-        rubricIntegrated: false
-      },
-      rubricGrading: {}
-    };
+  // Rubric grading state (separate from localGradingData)
+  const [rubricGrading, setRubricGrading] = useState({});
+
+  // State for all grading data - initialize with defaults first
+  const [localGradingData, setLocalGradingData] = useState({
+    student: { name: '', id: '', email: '' },
+    course: { code: '', name: '', instructor: '', term: '', section: '', campus: '' },
+    assignment: { name: '', dueDate: '', maxPoints: 100 },
+    feedback: { general: '', strengths: '', improvements: '' },
+    attachments: [],
+    videoLinks: [],
+    latePolicy: { level: 'none', penaltyApplied: false },
+    metadata: {
+      gradedBy: '',
+      gradedDate: '',
+      aiAssisted: false,
+      rubricIntegrated: false
+    },
+    rubricGrading: {}
   });
 
   // Use local grading data as the main state - THIS IS NOW THE SINGLE SOURCE OF TRUTH
@@ -328,17 +341,6 @@ const GradingTemplate = () => {
     return () => clearTimeout(timeoutId);
   }, [gradingData, setSharedGradingData, setSharedCourseDetails]);
 
-  // ── When we get new sharedCourseDetails, merge them in
-  useEffect(() => {
-    if (!sharedCourseDetails) return;
-    setLocalGradingData(prev => ({
-      ...prev,
-      student: sharedCourseDetails.student || prev.student,
-      course: sharedCourseDetails.course || prev.course,
-      assignment: sharedCourseDetails.assignment || prev.assignment
-    }));
-  }, [sharedCourseDetails]);
-
   // Load shared data when available
   useEffect(() => {
     if (sharedRubric) {
@@ -346,38 +348,16 @@ const GradingTemplate = () => {
     }
   }, [sharedRubric]);
 
-  // ── When student changes, load any saved draft/final but keep course+assignment
   useEffect(() => {
-    // A. If there’s no student loaded yet, do nothing
-    if (!currentStudent?.id) return;
-
-    // B. Figure out if they’ve got a saved final or a draft
-    const status = getGradeStatus(currentStudent.id);
-    let saved = null;
-    if (status === 'final' && loadFinalGrade) {
-      saved = loadFinalGrade(currentStudent.id);
-    } else if (status === 'draft') {
-      saved = loadDraft(currentStudent.id);
-    }
-
-    // C. If we found saved data, merge it into our local form
-    if (saved) {
-      setLocalGradingData(prev => ({
-        ...saved,                    // 1. all the saved answers, ratings, feedback, etc.
-        student: currentStudent,  // 2. make sure the student info is correct
-        course: prev.course,     // 3. keep whatever course info was already in the form
-        assignment: prev.assignment, // 4. keep whatever assignment info was already in the form
-        metadata: prev.metadata    // 5. preserve any extra metadata
+    if (sharedCourseDetails) {
+      setGradingData(prevData => ({
+        ...prevData,
+        student: sharedCourseDetails.student || prevData.student,
+        course: sharedCourseDetails.course || prevData.course,
+        assignment: sharedCourseDetails.assignment || prevData.assignment
       }));
-      // D. reset any small inputs (like video link fields)
-      setVideoLinkInput('');
-      setVideoTitle('');
-    } else {
-      // E. otherwise, we start fresh
-      resetGradingForm();
     }
-  }, [currentStudent, getGradeStatus, loadDraft, loadFinalGrade]);
-
+  }, [sharedCourseDetails]);
 
   // Late Policy Levels
   const latePolicyLevels = {
@@ -431,45 +411,152 @@ const GradingTemplate = () => {
     }
   }, [loadedRubric]);
 
-  // **FIX:** Load saved data when student changes, simplifying the state update AND preserving course info.
   useEffect(() => {
     if (currentStudent?.id) {
       console.log('🔍 Loading data for student:', currentStudent.name);
 
+      // Get the grade status for this student
       const gradeStatus = getGradeStatus(currentStudent.id);
       console.log('📊 Grade status:', gradeStatus);
 
       let savedData = null;
 
       if (gradeStatus === 'final') {
+        // Load final grade data
         savedData = loadFinalGrade ? loadFinalGrade(currentStudent.id) : null;
         console.log('📋 Loading final grade data:', savedData ? 'FOUND' : 'NOT FOUND');
       } else if (gradeStatus === 'draft') {
+        // Load draft data
         savedData = loadDraft(currentStudent.id);
         console.log('📝 Loading draft data:', savedData ? 'FOUND' : 'NOT FOUND');
       }
 
       if (savedData) {
         console.log('✅ Successfully loaded saved grade data');
-        // **FIX:** Merge saved data with current course/assignment details
-        // instead of overwriting them.
-        setLocalGradingData(prevData => ({
-          ...savedData, // Load the draft data (feedback, rubric selections, etc.)
-          course: prevData.course, // But preserve the current course info
-          assignment: prevData.assignment, // And the current assignment info
-          student: currentStudent, // And ensure the student is the current one
-          metadata: prevData.metadata // And preserve metadata
-        }));
 
-        setVideoLinkInput('');
-        setVideoTitle('');
+        // Load the complete saved grading data
+        setLocalGradingData(savedData);
+
+        // Restore rubric grading state if it exists
+        if (savedData.rubricGrading) {
+          setRubricGrading(savedData.rubricGrading);
+          console.log('📊 Restored rubric grading state');
+        }
+
+        // Restore feedback
+        if (savedData.feedback) {
+          console.log('💬 Restored feedback text');
+        }
+
+        // Restore attachments
+        if (savedData.attachments) {
+          console.log('📎 Restored attachments:', savedData.attachments.length);
+        }
+
+        // Restore video links
+        if (savedData.videoLinks) {
+          console.log('📹 Restored video links:', savedData.videoLinks.length);
+        }
+
+        // Restore late policy
+        if (savedData.latePolicy) {
+          console.log('⏰ Restored late policy:', savedData.latePolicy);
+        }
+
+        // IMPORTANT: Maintain course information even when loading saved data
+        if (classList && classList.courseMetadata) {
+          setLocalGradingData(prevData => ({
+            ...prevData,
+            course: {
+              ...prevData.course,
+              code: classList.courseMetadata.courseCode || '',
+              name: classList.courseMetadata.courseName || '',
+              instructor: classList.courseMetadata.professors || classList.courseMetadata.instructor || '',
+              term: classList.courseMetadata.term || '',
+              section: classList.courseMetadata.section || '',
+              campus: classList.courseMetadata.campus || ''
+            }
+          }));
+        }
       } else {
-        console.log('🆕 No saved data found, starting fresh');
-        resetGradingForm();
+        console.log('🆕 No saved data found, starting fresh for:', currentStudent.name);
+
+        // No saved data, update student info and populate course information
+        setLocalGradingData(prev => ({
+          ...prev,
+          student: {
+            name: currentStudent.name,
+            id: currentStudent.id,
+            email: currentStudent.email
+          },
+          // Ensure course information is populated
+          course: classList?.courseMetadata ? {
+            code: classList.courseMetadata.courseCode || '',
+            name: classList.courseMetadata.courseName || '',
+            instructor: classList.courseMetadata.professors || classList.courseMetadata.instructor || '',
+            term: classList.courseMetadata.term || '',
+            section: classList.courseMetadata.section || '',
+            campus: classList.courseMetadata.campus || ''
+          } : prev.course
+        }));
       }
     }
-  }, [currentStudent, getGradeStatus, loadDraft, loadFinalGrade]);
+  }, [currentStudent, getGradeStatus, loadDraft, loadFinalGrade, classList, setLocalGradingData, setRubricGrading]);
 
+
+  // ===== COURSE INFORMATION POPULATION FIX =====
+  useEffect(() => {
+    // Populate course information when classList is available
+    if (classList && classList.courseMetadata) {
+      console.log('📚 Loading course information from classList:', classList.courseMetadata);
+
+      // Update the course information in the grading form
+      setGradingData(prevData => ({
+        ...prevData,
+        course: {
+          ...prevData.course,
+          code: classList.courseMetadata.courseCode || '',
+          name: classList.courseMetadata.courseName || '',
+          instructor: classList.courseMetadata.professors || classList.courseMetadata.instructor || '',
+          term: classList.courseMetadata.term || '',
+          section: classList.courseMetadata.section || '',
+          campus: classList.courseMetadata.campus || ''
+        }
+      }));
+
+      // Also update the shared context
+      updateCourseInfo({
+        code: classList.courseMetadata.courseCode || '',
+        name: classList.courseMetadata.courseName || '',
+        instructor: classList.courseMetadata.professors || classList.courseMetadata.instructor || '',
+        term: classList.courseMetadata.term || '',
+        section: classList.courseMetadata.section || '',
+        campus: classList.courseMetadata.campus || ''
+      });
+
+      console.log('✅ Course information populated successfully');
+    }
+  }, [classList, setGradingData, updateCourseInfo]);
+
+  useEffect(() => {
+    if (gradingSession?.active && classList?.courseMetadata) {
+      console.log('🔄 Maintaining course information during batch grading session');
+
+      // Ensure course information persists during batch grading
+      setLocalGradingData(prevData => ({
+        ...prevData,
+        course: {
+          ...prevData.course,
+          code: classList.courseMetadata.courseCode || '',
+          name: classList.courseMetadata.courseName || '',
+          instructor: classList.courseMetadata.professors || classList.courseMetadata.instructor || '',
+          term: classList.courseMetadata.term || '',
+          section: classList.courseMetadata.section || '',
+          campus: classList.courseMetadata.campus || ''
+        }
+      }));
+    }
+  }, [gradingSession, classList, setLocalGradingData]);
 
   // Calculate total score with late policy applied
   const calculateTotalScore = () => {
@@ -636,34 +723,82 @@ const GradingTemplate = () => {
 
   // ENHANCED: New student navigation functions for draft/final system
   const handleNextStudentAsDraft = () => {
-    if (currentStudent?.id) {
-      console.log('💾 Saving as draft for student:', currentStudent.name);
-      saveDraft(currentStudent.id, localGradingData);
-    }
+    // Save current student's work as draft
+    const currentData = {
+      ...localGradingData,
+      rubricGrading,
+      metadata: {
+        ...localGradingData.metadata,
+        completedAt: new Date().toISOString(),
+        gradeType: 'draft'
+      }
+    };
 
-    const success = nextStudentInSession('draft');
-    if (!success) {
-      alert('Grading session completed! All students have been graded.');
-      setActiveTab('class-manager');
+    saveDraft(currentStudent.id, currentData);
+    console.log('💾 Saved draft for:', currentStudent.name);
+
+    // Move to next student
+    const moved = nextStudentInSession('draft');
+    if (moved) {
+      console.log('➡️ Moved to next student in batch grading');
+
+      // Ensure course information is maintained
+      if (classList?.courseMetadata) {
+        setLocalGradingData(prevData => ({
+          ...prevData,
+          course: {
+            code: classList.courseMetadata.courseCode || '',
+            name: classList.courseMetadata.courseName || '',
+            instructor: classList.courseMetadata.professors || classList.courseMetadata.instructor || '',
+            term: classList.courseMetadata.term || '',
+            section: classList.courseMetadata.section || '',
+            campus: classList.courseMetadata.campus || ''
+          }
+        }));
+      }
     } else {
-      resetGradingForm();
-      console.log('✅ Draft saved, moved to next student');
+      console.log('✅ Batch grading session completed');
+      alert('Batch grading session completed!');
     }
   };
 
   const handleNextStudentAsFinal = () => {
-    if (currentStudent?.id) {
-      console.log('✅ Finalizing grade for student:', currentStudent.name);
-      saveFinalGrade(currentStudent.id, localGradingData);
-    }
+    // Save current student's work as final
+    const currentData = {
+      ...localGradingData,
+      rubricGrading,
+      metadata: {
+        ...localGradingData.metadata,
+        completedAt: new Date().toISOString(),
+        gradeType: 'final'
+      }
+    };
 
-    const success = nextStudentInSession('final');
-    if (!success) {
-      alert('Grading session completed! All students have been graded.');
-      setActiveTab('class-manager');
+    saveFinalGrade(currentStudent.id, currentData);
+    console.log('🎯 Saved final grade for:', currentStudent.name);
+
+    // Move to next student
+    const moved = nextStudentInSession('final');
+    if (moved) {
+      console.log('➡️ Moved to next student in batch grading');
+
+      // Ensure course information is maintained
+      if (classList?.courseMetadata) {
+        setLocalGradingData(prevData => ({
+          ...prevData,
+          course: {
+            code: classList.courseMetadata.courseCode || '',
+            name: classList.courseMetadata.courseName || '',
+            instructor: classList.courseMetadata.professors || classList.courseMetadata.instructor || '',
+            term: classList.courseMetadata.term || '',
+            section: classList.courseMetadata.section || '',
+            campus: classList.courseMetadata.campus || ''
+          }
+        }));
+      }
     } else {
-      resetGradingForm();
-      console.log('✅ Final grade saved, moved to next student');
+      console.log('✅ Batch grading session completed');
+      alert('Batch grading session completed!');
     }
   };
 
@@ -680,19 +815,14 @@ const GradingTemplate = () => {
       });
     }
 
-    // Reset only the grading-specific data, but pull in the full course+instructor
+    // Reset only the grading-specific data, but preserve session-wide info
     setLocalGradingData(prev => ({
       ...prev,
-      // 1) Use the course info (including instructor) from context
-      course: sharedCourseDetails?.course ?? prev.course,
-      assignment: sharedCourseDetails?.assignment ?? prev.assignment,
-
-      // 2) Then reset just the student-by-student bits
       feedback: { general: '', strengths: '', improvements: '' },
       attachments: [],
       videoLinks: [],
       latePolicy: { level: 'none', penaltyApplied: false },
-      rubricGrading: initialRubricGrading
+      rubricGrading: initialRubricGrading // <-- Resets the rubric state here
     }));
   };
 

@@ -587,10 +587,16 @@ const ClassListManager = () => {
                 fileName: file.name,
                 fileSize: file.size,
                 importTime: new Date().toISOString(),
-                courseMetadata: result.courseMetadata || {
-                    courseCode: 'IMPORTED',
-                    courseName: 'Excel Import',
-                    section: 'DEFAULT'
+                // Now include "instructor" (falls back to 'TBD' if none)
+                courseMetadata: {
+                    courseCode: result.courseMetadata?.courseCode || 'IMPORTED',
+                    courseName: result.courseMetadata?.courseName || 'Excel Import',
+                    section: result.courseMetadata?.section || 'DEFAULT',
+                    // ← Try .instructor first, then .professors (your Excel parser writes the names there)
+                    instructor: result.courseMetadata?.instructor     // if you manually had an "Instructor" column
+                        || result.courseMetadata?.professors     // fall back to your "Professors" column
+                        || 'TBD',
+                    term: result.courseMetadata?.term || 'TBD'
                 },
                 validation: {
                     validationScore: validation.validationScore || 100,
@@ -648,11 +654,11 @@ const ClassListManager = () => {
         <div className="min-h-screen bg-gray-50">
             <div className="max-w-7xl mx-auto">
                 {/* Header */}
-                <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-6 rounded-t-lg shadow-lg">
+                <div className="bg-gradient-to-r text-gray-800 p-6 rounded-t-lg shadow-lg">
                     <div className="flex justify-between items-center">
                         <div>
                             <h1 className="text-3xl font-bold mb-2">Class List Manager</h1>
-                            <p className="text-indigo-100">
+                            <p className="text-gray-600">
                                 Import, manage, and grade entire classes efficiently
                             </p>
                         </div>
@@ -662,12 +668,12 @@ const ClassListManager = () => {
                                     <div className="text-2xl font-bold">
                                         {classList.students.length}
                                     </div>
-                                    <div className="text-sm text-indigo-200">
+                                    <div className="text-sm text-gray-700">
                                         Students
                                     </div>
                                 </div>
                             )}
-                            <Users size={48} className="text-indigo-200" />
+                            <Users size={48} className="text-gray-700" />
                         </div>
                     </div>
                 </div>
@@ -754,6 +760,10 @@ const ClassListManager = () => {
                                         <div>
                                             <strong>Section:</strong>{' '}
                                             {classList.courseMetadata?.section || 'N/A'}
+                                        </div>
+                                        <div>
+                                            <strong>Professor:</strong>{' '}
+                                            {classList.courseMetadata?.instructor || 'N/A'}
                                         </div>
                                     </div>
                                 </div>
