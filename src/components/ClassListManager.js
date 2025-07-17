@@ -540,18 +540,52 @@ const ClassListManager = () => {
         URL.revokeObjectURL(url);
     };
 
-    // Export class grades as PDF (using print)
+    // ── PDF export stub ────────────────────────────────────────────────────────
+    // This makes your “PDF” button call the browser’s print dialog.
     const exportClassGradesPDF = () => {
+        // If no class list is loaded, do nothing
         if (!classList) return;
 
-        // Create HTML content and open in new window for printing
-        exportClassGradesHTML();
-
-        // Give user instructions for PDF
-        setTimeout(() => {
-            alert('The HTML report has been downloaded. To create a PDF:\n\n1. Open the downloaded HTML file in your browser\n2. Press Ctrl+P (or Cmd+P on Mac)\n3. Select "Save as PDF" as destination\n4. Click "Save"');
-        }, 1000);
+        // Fire the print dialog (user can choose “Save as PDF”)
+        window.print();
     };
+    // ──────────────────────────────
+
+    // ── New: Export a single student's grade as CSV ───────────────────────────────
+    const exportStudentGrade = (studentId) => {
+        // 1. Make sure we have a classList
+        if (!classList) return;
+
+        // 2. Find the student record
+        const student = classList.students.find(s => s.id === studentId);
+        if (!student) return;
+
+        // 3. Calculate their grade (score, percentage, etc.)
+        const { score, maxPossible, percentage } = calculateStudentGrade(studentId);
+
+        // 4. Build a 2-row CSV: headers + this student's data
+        const rows = [
+            ['Student ID', 'Name', 'Email', 'Score', 'Percentage'],
+            [
+                student.id,
+                student.name,
+                student.email,
+                `${score}/${maxPossible}`,
+                `${percentage}%`
+            ]
+        ];
+        const csvContent = rows.map(r => r.join(',')).join('\n');
+
+        // 5. Trigger download
+        const blob = new Blob([csvContent], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${classList.courseMetadata?.courseCode || 'grade'}_${student.id}.csv`;
+        link.click();
+        URL.revokeObjectURL(url);
+    };
+    // ────────────────────────────
 
     const handleFileUpload = async (event) => {
         const file = event.target.files[0];
@@ -857,7 +891,7 @@ const ClassListManager = () => {
                             </div>
 
                             {/* Student Table */}
-                            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                            <div className="bg-white border border-gray-200 rounded-lg">
                                 <div className="px-6 py-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
                                     <h3 className="text-lg font-semibold text-gray-800">
                                         Student Roster
@@ -865,7 +899,7 @@ const ClassListManager = () => {
                                     <div className="flex gap-2">
                                         <button
                                             onClick={exportClassGradesCSV}
-                                            className="flex items-center gap-1 px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium transition-colors"
+                                            className="px-2 py-1 rounded text-xs font-medium text-white bg-green-500 hover:bg-green-700 focus:ring-2 focus:ring-green-500 transition-colors duration-150"
                                         >
                                             <Download size={14} />
                                             CSV
@@ -888,10 +922,11 @@ const ClassListManager = () => {
                                 </div>
 
                                 <div className="overflow-x-auto">
-                                    <table className="w-full">
+                                 {/* w-max = width: max-content; mx-auto centers if you want */}
+                                    <table className="table-auto w-max mx-auto">
                                         <thead className="bg-gray-50">
                                             <tr>
-                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                                     #
                                                 </th>
                                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -924,11 +959,11 @@ const ClassListManager = () => {
                                                     <tr
                                                         key={student.id}
                                                         className={`${isCurrentStudent
-                                                                ? 'bg-blue-50 border-l-4 border-blue-500'
-                                                                : 'hover:bg-gray-50'
+                                                            ? 'bg-blue-50 border-l-4 border-blue-500'
+                                                            : 'hover:bg-gray-50'
                                                             } transition-colors`}
                                                     >
-                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                        <td className="px-4 py-2 whitespace-normal break-words text-sm text-gray-900 max-w-xs">
                                                             {index + 1}
                                                         </td>
                                                         <td className="px-6 py-4 whitespace-nowrap">
@@ -937,53 +972,55 @@ const ClassListManager = () => {
                                                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                                                             {student.id}
                                                         </td>
-                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                        <td className="px-4 py-2 whitespace-normal break-words text-sm text-gray-900 max-w-xs">
                                                             {student.name}
                                                         </td>
-                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                        <td className="px-4 py-2 whitespace-normal break-words text-sm text-gray-500 max-w-xs">
                                                             {student.email}
                                                         </td>
                                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                                             {student.program}
                                                         </td>
-                                                        <td className="px-6 py-4 whitespace-nowrap text-sm">
-                                                            <div className="flex items-center gap-2">
-                                                                {/* Main action button */}
+                                                          {/* Remove `whitespace-nowrap` and `overflow-x-auto`, add `flex-wrap` */}
+                                                        {/* Keep the cell from wrapping, allow horizontal scroll if needed */}
+                                                        <td className="px-4 py-2 text-sm whitespace-normal">
+                                                              <div className="flex flex-wrap items-center gap-2">
+                                                                {/* View or Edit */}
                                                                 <button
                                                                     onClick={() => loadStudentForGrading(student)}
-                                                                    className="px-3 py-1 rounded text-sm font-medium text-white bg-blue-500 hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 transition-colors duration-150"
+                                                                    className="flex items-center gap-1 px-3 py-1 bg-blue-500 hover:bg-blue-700 text-white rounded text-sm font-medium transition-colors focus:ring-2 focus:ring-blue-500 duration-150"
                                                                 >
                                                                     {gradeStatus === 'final' ? 'View' : 'Edit'}
                                                                 </button>
 
-                                                                {/* Finalize button for drafts */}
+                                                                {/* Finalize draft */}
                                                                 {gradeStatus === 'draft' && (
                                                                     <button
                                                                         onClick={() => finalizeGrade(student.id)}
-                                                                        className="px-3 py-1 rounded text-sm font-medium text-white bg-green-500 hover:bg-green-700 focus:ring-2 focus:ring-green-500 transition-colors duration-150"
+                                                                        className="flex items-center gap-1 px-3 py-1 bg-green-500 hover:bg-green-700 text-white rounded text-sm font-medium transition-colors focus:ring-2 focus:ring-green-500 duration-150"
                                                                     >
                                                                         Finalize
                                                                     </button>
                                                                 )}
 
-                                                                {/* Final grade actions */}
+                                                                {/* Export Grade (always visible) */}
+                                                                <button
+                                                                    onClick={() => exportStudentGrade(student.id)}
+                                                                    className="flex items-center gap-1 px-3 py-1 bg-purple-500 hover:bg-purple-700 text-white rounded text-sm font-medium transition-colors focus:ring-2 focus:ring-purple-500 duration-150"
+                                                                >
+                                                                    <ExternalLink size={14} />
+                                                                    Export Grade
+                                                                </button>
+
+                                                                {/* Unlock (only for final) */}
                                                                 {gradeStatus === 'final' && (
-                                                                    <>
-                                                                        <button
-                                                                            onClick={() => loadStudentForGrading(student)}
-                                                                            className="px-3 py-1 rounded text-sm font-medium text-white bg-purple-500 hover:bg-purple-700 focus:ring-2 focus:ring-purple-500 transition-colors duration-150 flex items-center gap-1"
-                                                                        >
-                                                                            <ExternalLink size={14} />
-                                                                            Export Grade
-                                                                        </button>
-                                                                        <button
-                                                                            onClick={() => unlockGrade(student.id)}
-                                                                            className="px-3 py-1 rounded text-sm font-medium text-white bg-orange-500 hover:bg-orange-700 focus:ring-2 focus:ring-orange-500 transition-colors duration-150 flex items-center gap-1"
-                                                                        >
-                                                                            <Unlock size={14} />
-                                                                            Unlock
-                                                                        </button>
-                                                                    </>
+                                                                    <button
+                                                                        onClick={() => unlockGrade(student.id)}
+                                                                        className="flex items-center gap-1 px-3 py-1 bg-orange-500 hover:bg-orange-700 text-white rounded text-sm font-medium transition-colors focus:ring-2 focus:ring-orange-500 duration-150"
+                                                                    >
+                                                                        <Unlock size={14} />
+                                                                        Unlock
+                                                                    </button>
                                                                 )}
                                                             </div>
                                                         </td>
