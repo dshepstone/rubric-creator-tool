@@ -328,6 +328,17 @@ const GradingTemplate = () => {
     return () => clearTimeout(timeoutId);
   }, [gradingData, setSharedGradingData, setSharedCourseDetails]);
 
+  // ── When we get new sharedCourseDetails, merge them in
+  useEffect(() => {
+    if (!sharedCourseDetails) return;
+    setLocalGradingData(prev => ({
+      ...prev,
+      student: sharedCourseDetails.student || prev.student,
+      course: sharedCourseDetails.course || prev.course,
+      assignment: sharedCourseDetails.assignment || prev.assignment
+    }));
+  }, [sharedCourseDetails]);
+
   // Load shared data when available
   useEffect(() => {
     if (sharedRubric) {
@@ -335,16 +346,38 @@ const GradingTemplate = () => {
     }
   }, [sharedRubric]);
 
+  // ── When student changes, load any saved draft/final but keep course+assignment
   useEffect(() => {
-    if (sharedCourseDetails) {
-      setGradingData(prevData => ({
-        ...prevData,
-        student: sharedCourseDetails.student || prevData.student,
-        course: sharedCourseDetails.course || prevData.course,
-        assignment: sharedCourseDetails.assignment || prevData.assignment
-      }));
+    // A. If there’s no student loaded yet, do nothing
+    if (!currentStudent?.id) return;
+
+    // B. Figure out if they’ve got a saved final or a draft
+    const status = getGradeStatus(currentStudent.id);
+    let saved = null;
+    if (status === 'final' && loadFinalGrade) {
+      saved = loadFinalGrade(currentStudent.id);
+    } else if (status === 'draft') {
+      saved = loadDraft(currentStudent.id);
     }
-  }, [sharedCourseDetails]);
+
+    // C. If we found saved data, merge it into our local form
+    if (saved) {
+      setLocalGradingData(prev => ({
+        ...saved,                    // 1. all the saved answers, ratings, feedback, etc.
+        student: currentStudent,  // 2. make sure the student info is correct
+        course: prev.course,     // 3. keep whatever course info was already in the form
+        assignment: prev.assignment, // 4. keep whatever assignment info was already in the form
+        metadata: prev.metadata    // 5. preserve any extra metadata
+      }));
+      // D. reset any small inputs (like video link fields)
+      setVideoLinkInput('');
+      setVideoTitle('');
+    } else {
+      // E. otherwise, we start fresh
+      resetGradingForm();
+    }
+  }, [currentStudent, getGradeStatus, loadDraft, loadFinalGrade]);
+
 
   // Late Policy Levels
   const latePolicyLevels = {
@@ -647,14 +680,19 @@ const GradingTemplate = () => {
       });
     }
 
-    // Reset only the grading-specific data, but preserve session-wide info
+    // Reset only the grading-specific data, but pull in the full course+instructor
     setLocalGradingData(prev => ({
       ...prev,
+      // 1) Use the course info (including instructor) from context
+      course: sharedCourseDetails?.course ?? prev.course,
+      assignment: sharedCourseDetails?.assignment ?? prev.assignment,
+
+      // 2) Then reset just the student-by-student bits
       feedback: { general: '', strengths: '', improvements: '' },
       attachments: [],
       videoLinks: [],
       latePolicy: { level: 'none', penaltyApplied: false },
-      rubricGrading: initialRubricGrading // <-- Resets the rubric state here
+      rubricGrading: initialRubricGrading
     }));
   };
 
