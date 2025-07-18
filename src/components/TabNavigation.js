@@ -58,7 +58,8 @@ const TabNavigation = () => {
     const getGradingProgress = () => {
         if (!classList || !classList.gradingProgress) return { completed: 0, total: 0, percentage: 0 };
 
-        const completed = classList.gradingProgress.filter(p => p.status === 'completed').length;
+        // FIX: Changed filter to check for any status that starts with 'completed'
+        const completed = classList.gradingProgress.filter(p => p.status?.startsWith('completed')).length;
         const total = classList.students.length;
         const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
 
@@ -80,9 +81,9 @@ const TabNavigation = () => {
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id)}
                                 className={`${isActive
-                                     ? `${activeStyles[tab.id]}`
-                                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                                     } whitespace-nowrap py-4 px-6 font-medium text-sm flex items-center gap-2 transition-all duration-200`}
+                                    ? `${activeStyles[tab.id]}`
+                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                    } whitespace-nowrap py-4 px-6 font-medium text-sm flex items-center gap-2 transition-all duration-200`}
                             >
                                 <Icon size={18} />
                                 <div className="text-left">
