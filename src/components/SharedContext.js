@@ -417,6 +417,55 @@ export const AssessmentProvider = ({ children }) => {
         });
     }, []);
 
+    // NEW: Export Session Function
+    const exportSession = useCallback(() => {
+        const sessionData = {
+            sharedRubric,
+            classList,
+            drafts,
+            finalGrades,
+            activeTab,
+            currentStudent,
+            gradingSession,
+            sharedCourseDetails,
+        };
+        const dataStr = JSON.stringify(sessionData, null, 2);
+        const dataBlob = new Blob([dataStr], { type: 'application/json' });
+        const url = URL.createObjectURL(dataBlob);
+        const link = document.createElement('a');
+        link.href = url;
+        const timestamp = new Date().toISOString().replace(/:/g, '-').slice(0, 19);
+        link.download = `grading-session-${timestamp}.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    }, [sharedRubric, classList, drafts, finalGrades, activeTab, currentStudent, gradingSession, sharedCourseDetails]);
+
+    // NEW: Import Session Function
+    const importSession = useCallback((jsonContent) => {
+        try {
+            const sessionData = JSON.parse(jsonContent);
+            if (sessionData && typeof sessionData === 'object') {
+                setSharedRubric(sessionData.sharedRubric || null);
+                setClassList(sessionData.classList || null);
+                setDrafts(sessionData.drafts || {});
+                setFinalGrades(sessionData.finalGrades || {});
+                setActiveTab(sessionData.activeTab || 'rubric-creator');
+                setCurrentStudent(sessionData.currentStudent || null);
+                setGradingSession(sessionData.gradingSession || { active: false });
+                setSharedCourseDetails(sessionData.sharedCourseDetails || null);
+                alert('Session loaded successfully!');
+            } else {
+                throw new Error('Invalid file format.');
+            }
+        } catch (error) {
+            console.error("Failed to import session:", error);
+            alert("Error: Could not load the session file. Please ensure it's a valid session file.");
+        }
+    }, [/* All setter functions are dependencies */ setSharedRubric, setClassList, setDrafts, setFinalGrades, setActiveTab, setCurrentStudent, setGradingSession, setSharedCourseDetails]);
+
+
     // Finalize a draft grade
     const finalizeGrade = useCallback((studentId) => {
         const draftData = drafts[studentId];
@@ -530,6 +579,10 @@ export const AssessmentProvider = ({ children }) => {
         clearGradingFormData,
         clearRubricFormData,
         clearAllData,
+
+        // NEW: Session management
+        exportSession,
+        importSession,
 
         // Legacy compatibility
         persistentFormData,
