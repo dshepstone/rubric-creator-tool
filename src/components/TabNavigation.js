@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { useAssessment } from './SharedContext';
 import {
     FileText, GraduationCap, Users, ArrowRight, Database,
-    PlayCircle, Clock, CheckCircle, AlertTriangle
+    PlayCircle, Clock, CheckCircle, AlertTriangle, Save, Upload
 } from 'lucide-react';
 
 const TabNavigation = () => {
@@ -13,8 +13,26 @@ const TabNavigation = () => {
         persistentFormData,
         classList,
         gradingSession,
-        initializeGradingSession
+        initializeGradingSession,
+        exportSession,
+        importSession,
     } = useAssessment();
+
+    const importSessionInputRef = useRef(null);
+
+    const handleSessionImport = (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const content = e.target.result;
+            importSession(content);
+        };
+        reader.readAsText(file);
+        event.target.value = ''; // Reset input to allow re-uploading the same file
+    };
+
 
     const tabs = [
         {
@@ -58,7 +76,6 @@ const TabNavigation = () => {
     const getGradingProgress = () => {
         if (!classList || !classList.gradingProgress) return { completed: 0, total: 0, percentage: 0 };
 
-        // FIX: Changed filter to check for any status that starts with 'completed'
         const completed = classList.gradingProgress.filter(p => p.status?.startsWith('completed')).length;
         const total = classList.students.length;
         const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
@@ -194,6 +211,31 @@ const TabNavigation = () => {
 
                         {/* Quick Action Buttons */}
                         <div className="flex items-center gap-3">
+                            {/* NEW: Session Management Buttons */}
+                            <button
+                                onClick={() => importSessionInputRef.current?.click()}
+                                className="flex items-center gap-2 text-gray-700 hover:text-gray-800 text-sm font-medium bg-white px-3 py-1.5 rounded-lg border border-gray-200 hover:border-gray-300 transition-all duration-200 shadow-sm hover:shadow"
+                            >
+                                <Upload size={14} />
+                                Load Session
+                            </button>
+                            <input
+                                type="file"
+                                ref={importSessionInputRef}
+                                onChange={handleSessionImport}
+                                accept=".json"
+                                className="hidden"
+                            />
+                            <button
+                                onClick={exportSession}
+                                className="flex items-center gap-2 text-gray-700 hover:text-gray-800 text-sm font-medium bg-white px-3 py-1.5 rounded-lg border border-gray-200 hover:border-gray-300 transition-all duration-200 shadow-sm hover:shadow"
+                            >
+                                <Save size={14} />
+                                Save Session
+                            </button>
+                            <div className="w-px h-6 bg-gray-300"></div>
+
+
                             {/* Workflow indicators and quick actions */}
                             {!hasRubricData && activeTab !== 'rubric-creator' && (
                                 <div className="flex items-center gap-2 text-yellow-700 bg-yellow-50 px-3 py-1.5 rounded-lg border border-yellow-200">
