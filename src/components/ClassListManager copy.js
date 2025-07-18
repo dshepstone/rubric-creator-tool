@@ -17,39 +17,6 @@ import {
 import { useAssessment } from './SharedContext';
 import { parseExcelFile, validateStudentData } from '../utils/excelParser';
 
-/**
- * Map a percentage to a letter grade, per programType
- */
-const getLetterGrade = (percentage, programType) => {
-    // Example scales — customize these thresholds to match your policy!
-    const scales = {
-        degree: [
-            { min: 90, grade: 'A+' },
-            { min: 80, grade: 'A' },
-            { min: 70, grade: 'B' },
-            { min: 60, grade: 'C' },
-            { min: 50, grade: 'D' },
-            { min: 0, grade: 'F' },
-        ],
-        diploma: [
-            { min: 70, grade: 'PASS' },
-            { min: 0, grade: 'FAIL' }
-        ],
-        certificate: [
-            { min: 50, grade: 'P' },
-            { min: 0, grade: 'F' }
-        ]
-        // …add other programType scales as needed
-    };
-
-    const scale = scales[programType] || scales.diploma;
-    for (let tier of scale) {
-        if (percentage >= tier.min) return tier.grade;
-    }
-    return 'N/A';
-};
-
-
 const ClassListManager = () => {
     const fileInputRef = useRef(null);
     const [importStatus, setImportStatus] = useState('');
@@ -58,20 +25,20 @@ const ClassListManager = () => {
      * FIXES COMPLETED IN THIS UPDATE:
      * ===============================
      * ✅ Excel import functionality (instead of CSV)
-     * ✅ Start batch grading session with pause/resume functionality
+     * ✅ Start batch grading session with pause/resume functionality  
      * ✅ Enhanced status indicators with proper draft/final states
      * ✅ Export entire class grades as CSV, HTML, and PDF with Final Grade column
      * ✅ Action buttons properly handle Edit/View, Finalize, Export Grade, Unlock
      * ✅ Grade calculation function added for exports
      * ✅ CSV and HTML exports now include calculated final grades and percentages
-     *
+     * 
      * PENDING FIX (requires GradingTemplate update):
      * ==============================================
      * ❌ View action still opens empty grade sheet for saved grades
-     *
+     * 
      * SOLUTION: Add the useEffect from gradingtemplate_fix artifact to GradingTemplate.js
      * and add loadFinalGrade + finalGrades to SharedContext value object.
-     *
+     * 
      * Once implemented, the View action will properly load saved rubric selections,
      * feedback, attachments, video links, and late policy for both draft and final grades.
      */
@@ -94,20 +61,8 @@ const ClassListManager = () => {
         updateStudentInfo,
         updateAssignmentInfo,
         loadFinalGrade, // This should be available after SharedContext fix
-        finalGrades // This should be available after SharedContext fix
+        finalGrades     // This should be available after SharedContext fix
     } = useAssessment();
-
-    // NEW: Handler to change the program type for grading
-    const handleProgramTypeChange = (e) => {
-        const newType = e.target.value;
-        setClassList(prev => ({
-            ...prev,
-            courseMetadata: {
-                ...prev.courseMetadata,
-                programType: newType,
-            },
-        }));
-    };
 
     // Helper function for status display
     const getStatusDisplay = (progress, studentId) => {
@@ -206,14 +161,14 @@ const ClassListManager = () => {
             return loadFinalGrade(studentId);
         }
         // Fallback: check finalGrades directly if available
-        if (finalGrades && finalGrades[studentId]) { // FIX: Corrected 'finalGrdes' to 'finalGrades'
+        if (finalGrades && finalGrades[studentId]) {
             return finalGrades[studentId];
         }
         // Last resort: check drafts (this maintains current behavior)
         return drafts[studentId] || null;
     };
 
-    // **FIXED**: This function now correctly calculates the grade based on the rubric structure.
+    // Helper function to calculate grade for a student  
     const calculateStudentGrade = (studentId) => {
         const gradeStatus = getGradeStatus(studentId);
         let gradeData = null;
@@ -224,54 +179,53 @@ const ClassListManager = () => {
             gradeData = loadDraft(studentId);
         }
 
-        // The grade calculation relies on having the student's saved grade data AND the rubric structure.
-        // If any part is missing, we can't calculate the grade.
-        if (!gradeData || !gradeData.rubricGrading || !sharedRubric || !sharedRubric.criteria || !sharedRubric.rubricLevels) {
-            return { score: 'N/A', maxPossible: 'N/A', percentage: 'N/A', letterGrade: 'N/A' };
+        if (!gradeData || !gradeData.rubricGrading) {
+            return { score: 'N/A', percentage: 'N/A', maxPossible: 'N/A' };
         }
 
+        // Calculate total score from rubric grading
         let totalScore = 0;
         let maxPossible = 0;
 
-        // Correctly calculate score based on criterion points and level multipliers
-        sharedRubric.criteria.forEach(criterion => {
-            const gradingSelection = gradeData.rubricGrading[criterion.id];
-            const criterionMaxPoints = Number(criterion.maxPoints) || 0;
-            maxPossible += criterionMaxPoints;
-
-            if (gradingSelection && gradingSelection.selectedLevel) {
-                const levelData = sharedRubric.rubricLevels.find(l => l.level === gradingSelection.selectedLevel);
-                if (levelData) {
-                    const levelMultiplier = Number(levelData.multiplier) || 0;
-                    totalScore += criterionMaxPoints * levelMultiplier;
+        if (sharedRubric && sharedRubric.criteria) {
+            sharedRubric.criteria.forEach(criterion => {
+                const grading = gradeData.rubricGrading[criterion.id];
+                if (grading && grading.selectedLevel !== null) {
+                    const level = criterion.levels[grading.selectedLevel];
+                    if (level) {
+                        totalScore += level.points * criterion.weight;
+                    }
                 }
-            }
-        });
+                // Calculate max possible for this criterion
+                if (criterion.levels && criterion.levels.length > 0) {
+                    const maxLevel = criterion.levels[criterion.levels.length - 1];
+                    maxPossible += maxLevel.points * criterion.weight;
+                }
+            });
 
-        // Apply late penalty if applicable
-        if (gradeData.latePolicy && gradeData.latePolicy.level !== 'none') {
-            const latePenalties = { within24: 0.8, after24: 0.0 };
-            const multiplier = latePenalties[gradeData.latePolicy.level] || 1.0;
-            totalScore *= multiplier;
+            // Apply late penalty if applicable
+            if (gradeData.latePolicy && gradeData.latePolicy.level !== 'none') {
+                const latePenalties = {
+                    within24: 0.8,
+                    after24: 0.0
+                };
+                const multiplier = latePenalties[gradeData.latePolicy.level] || 1.0;
+                totalScore *= multiplier;
+            }
+        } else {
+            // Fallback: use assignment max points if no rubric
+            maxPossible = gradeData.assignment?.maxPoints || 100;
+            // Without rubric data, we can't calculate the score
+            return { score: 'N/A', percentage: 'N/A', maxPossible };
         }
 
-        const numericScore = Math.round(totalScore * 10) / 10;
-        const maxScore = Math.round(maxPossible * 10) / 10;
-        const percentage = maxScore > 0 ? Math.round((numericScore / maxScore) * 100) : 0;
-
-        const letterGrade = getLetterGrade(
-            percentage,
-            classList.courseMetadata?.programType
-        );
-
+        const percentage = maxPossible > 0 ? Math.round((totalScore / maxPossible) * 100) : 0;
         return {
-            score: numericScore,
-            maxPossible: maxScore,
-            percentage,
-            letterGrade
+            score: Math.round(totalScore * 10) / 10,
+            maxPossible: Math.round(maxPossible * 10) / 10,
+            percentage
         };
     };
-
 
     // Helper function to load student for grading
     const loadStudentForGrading = (student) => {
@@ -336,7 +290,7 @@ const ClassListManager = () => {
         if (!classList) return;
 
         const csvContent = [
-            ['Student ID', 'Student Name', 'Email', 'Program', 'Status', 'Grade Type', 'Numeric Grade', 'Letter Grade', 'Percentage', 'Last Modified'],
+            ['Student ID', 'Student Name', 'Email', 'Program', 'Status', 'Grade Type', 'Final Grade', 'Percentage', 'Last Modified'],
             ...classList.students.map((student, index) => {
                 const progress = classList.gradingProgress[index];
                 const gradeInfo = calculateStudentGrade(student.id);
@@ -348,13 +302,11 @@ const ClassListManager = () => {
                     progress?.status || 'pending',
                     progress?.gradeType || 'none',
                     gradeInfo.score !== 'N/A' ? `${gradeInfo.score}/${gradeInfo.maxPossible}` : 'N/A',
-                    gradeInfo.letterGrade || 'N/A',
                     gradeInfo.percentage !== 'N/A' ? `${gradeInfo.percentage}%` : 'N/A',
                     progress?.lastModified ? new Date(progress.lastModified).toLocaleDateString() : 'Never'
                 ];
             })
         ].map(row => row.join(',')).join('\n');
-
 
         const blob = new Blob([csvContent], { type: 'text/csv' });
         const url = URL.createObjectURL(blob);
@@ -496,8 +448,8 @@ const ClassListManager = () => {
         <div class="header">
             <h1>📊 Class Grade Report</h1>
             <div class="course-info">
-                <strong>${classList.courseMetadata?.courseCode || 'N/A'}</strong> -
-                ${classList.courseMetadata?.courseName || 'Imported Class'} |
+                <strong>${classList.courseMetadata?.courseCode || 'N/A'}</strong> - 
+                ${classList.courseMetadata?.courseName || 'Imported Class'} | 
                 Section: ${classList.courseMetadata?.section || 'N/A'}
             </div>
         </div>
@@ -609,19 +561,19 @@ const ClassListManager = () => {
         if (!student) return;
 
         // 3. Calculate their grade (score, percentage, etc.)
-        const gradeInfo = calculateStudentGrade(studentId);
+        const { score, maxPossible, percentage } = calculateStudentGrade(studentId);
 
         // 4. Build a 2-row CSV: headers + this student's data
         const rows = [
-            ['Student ID', 'Numeric Score', 'Letter Grade', 'Percentage'],
+            ['Student ID', 'Name', 'Email', 'Score', 'Percentage'],
             [
                 student.id,
-                `${gradeInfo.score}/${gradeInfo.maxPossible}`,
-                gradeInfo.letterGrade,
-                `${gradeInfo.percentage}%`
+                student.name,
+                student.email,
+                `${score}/${maxPossible}`,
+                `${percentage}%`
             ]
         ];
-
         const csvContent = rows.map(r => r.join(',')).join('\n');
 
         // 5. Trigger download
@@ -674,13 +626,10 @@ const ClassListManager = () => {
                     courseCode: result.courseMetadata?.courseCode || 'IMPORTED',
                     courseName: result.courseMetadata?.courseName || 'Excel Import',
                     section: result.courseMetadata?.section || 'DEFAULT',
-                    programType: result.courseMetadata?.programType || 'degree', // e.g. 'degree' | 'diploma' | 'certificate'
                     // ← Try .instructor first, then .professors (your Excel parser writes the names there)
-                    instructor: result.courseMetadata?.instructor // if you manually had an "Instructor" column
-                        ||
-                        result.courseMetadata?.professors // fall back to your "Professors" column
-                        ||
-                        'TBD',
+                    instructor: result.courseMetadata?.instructor     // if you manually had an "Instructor" column
+                        || result.courseMetadata?.professors     // fall back to your "Professors" column
+                        || 'TBD',
                     term: result.courseMetadata?.term || 'TBD'
                 },
                 validation: {
@@ -850,21 +799,6 @@ const ClassListManager = () => {
                                             <strong>Professor:</strong>{' '}
                                             {classList.courseMetadata?.instructor || 'N/A'}
                                         </div>
-                                        {/* NEW: Program type selector */}
-                                        <div className="mt-3">
-                                            <label htmlFor="programType" className="block text-sm font-bold text-gray-700">Program Type:</label>
-                                            <select
-                                                id="programType"
-                                                name="programType"
-                                                value={classList.courseMetadata?.programType || 'degree'}
-                                                onChange={handleProgramTypeChange}
-                                                className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
-                                            >
-                                                <option value="degree">Degree</option>
-                                                <option value="diploma">Diploma</option>
-                                                <option value="certificate">Certificate</option>
-                                            </select>
-                                        </div>
                                     </div>
                                 </div>
 
@@ -988,7 +922,7 @@ const ClassListManager = () => {
                                 </div>
 
                                 <div className="overflow-x-auto">
-                                    {/* w-max = width: max-content; mx-auto centers if you want */}
+                                 {/* w-max = width: max-content; mx-auto centers if you want */}
                                     <table className="table-auto w-max mx-auto">
                                         <thead className="bg-gray-50">
                                             <tr>
@@ -1010,8 +944,8 @@ const ClassListManager = () => {
                                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                                     Program
                                                 </th>
-                                                {/* limit Actions col to 12rem */}
-                                                <th className="w-48 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                    {/* limit Actions col to 12rem */}
+                                                    <th className="w-48 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                                     Actions
                                                 </th>
                                             </tr>
@@ -1048,11 +982,11 @@ const ClassListManager = () => {
                                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                                             {student.program}
                                                         </td>
-
-
-                                                        {/* match the header width here so the cell can’t grow beyond 12rem */}
-                                                        <td className="w-48 px-4 py-2 text-sm whitespace-normal">
-                                                            <div className="flex flex-wrap items-center gap-2">
+                                                         
+                                                        
+                                                           {/* match the header width here so the cell can’t grow beyond 12rem */}
+                                                           <td className="w-48 px-4 py-2 text-sm whitespace-normal">
+                                                              <div className="flex flex-wrap items-center gap-2">
                                                                 {/* View or Edit */}
                                                                 <button
                                                                     onClick={() => loadStudentForGrading(student)}
