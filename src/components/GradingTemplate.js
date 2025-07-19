@@ -734,6 +734,202 @@ const GradingTemplate = () => {
     return htmlContent;
   };
 
+  // Function to export student grade data for AI feedback generation
+  const exportAIFeedbackData = () => {
+    if (!localGradingData.student?.name) {
+      alert('Please ensure student information is loaded before exporting for AI feedback.');
+      return;
+    }
+
+    // Calculate scores
+    const scoreCalculation = calculateTotalScore();
+    const maxPoints = loadedRubric ? loadedRubric.assignmentInfo.totalPoints : gradingData.assignment.maxPoints;
+    const percentage = maxPoints > 0 ? Math.round((scoreCalculation.finalScore / maxPoints) * 100) : 0;
+
+    // Determine letter grade
+    const getLetterGrade = (percentage) => {
+      if (percentage >= 90) return 'A';
+      if (percentage >= 80) return 'B';
+      if (percentage >= 70) return 'C';
+      if (percentage >= 60) return 'D';
+      return 'F';
+    };
+
+    // Build criteria performance data
+    const criteriaPerformance = [];
+    if (loadedRubric && localGradingData.rubricGrading) {
+      loadedRubric.criteria.forEach(criterion => {
+        const grading = localGradingData.rubricGrading[criterion.id];
+        if (grading && grading.selectedLevel) {
+          const level = loadedRubric.rubricLevels.find(l => l.level === grading.selectedLevel);
+          const earnedPoints = criterion.maxPoints * (level?.multiplier || 0);
+          const criterionPercentage = Math.round((earnedPoints / criterion.maxPoints) * 100);
+
+          criteriaPerformance.push({
+            name: criterion.name,
+            description: criterion.description,
+            maxPoints: criterion.maxPoints,
+            earnedPoints: Math.round(earnedPoints * 10) / 10,
+            level: grading.selectedLevel,
+            levelName: level?.name || 'Unknown',
+            levelDescription: level?.description || '',
+            percentage: criterionPercentage,
+            customComments: grading.customComments || ''
+          });
+        }
+      });
+    }
+
+    // Create the structured data for AI
+    const aiGradeData = {
+      student: {
+        firstName: localGradingData.student.name.split(' ')[0] || localGradingData.student.name,
+        lastName: localGradingData.student.name.split(' ').slice(1).join(' ') || '',
+        fullName: localGradingData.student.name,
+        id: localGradingData.student.id,
+        email: localGradingData.student.email
+      },
+      course: {
+        code: localGradingData.course.code,
+        name: localGradingData.course.name,
+        instructor: localGradingData.course.instructor,
+        term: localGradingData.course.term
+      },
+      assignment: {
+        title: localGradingData.assignment.name || (loadedRubric?.assignmentInfo?.title),
+        description: loadedRubric?.assignmentInfo?.description || '',
+        totalPoints: maxPoints,
+        passingThreshold: loadedRubric?.assignmentInfo?.passingThreshold || 60,
+        dueDate: localGradingData.assignment.dueDate
+      },
+      gradeData: {
+        overallScore: Math.round(scoreCalculation.finalScore * 10) / 10,
+        rawScore: Math.round(scoreCalculation.rawScore * 10) / 10,
+        overallPercentage: percentage,
+        letterGrade: getLetterGrade(percentage),
+        passed: percentage >= (loadedRubric?.assignmentInfo?.passingThreshold || 60),
+        latePenaltyApplied: scoreCalculation.penaltyApplied,
+        latePolicyDescription: scoreCalculation.latePolicyDescription,
+        criteria: criteriaPerformance
+      },
+      existingFeedback: {
+        general: localGradingData.feedback.general || '',
+        strengths: localGradingData.feedback.strengths || '',
+        improvements: localGradingData.feedback.improvements || ''
+      },
+      metadata: {
+        gradedDate: new Date().toISOString(),
+        rubricUsed: loadedRubric?.assignmentInfo?.title || 'Custom Rubric',
+        totalCriteria: criteriaPerformance.length,
+        exportedForAI: true
+      }
+    };
+
+    // Export as JSON file
+    const dataStr = JSON.stringify(aiGradeData, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `AI_Feedback_Data_${localGradingData.student.name.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+
+    return aiGradeData;
+  };
+
+  // Updated function to generate concise AI feedback prompt
+  const generateAIFeedbackPrompt = () => {
+    const gradeData = exportAIFeedbackData();
+    if (!gradeData) return;
+
+    const studentFirstName = gradeData.student.firstName;
+    const courseName = gradeData.course.name || 'this course';
+    const assignmentTitle = gradeData.assignment.title || 'assignment';
+
+    // Determine student level context
+    const getStudentLevel = () => {
+      const courseCode = gradeData.course.code.toUpperCase();
+      if (courseCode.includes('100') || courseCode.includes('1')) return 'first-year undergraduate';
+      if (courseCode.includes('200') || courseCode.includes('2')) return 'second-year undergraduate';
+      if (courseCode.includes('300') || courseCode.includes('3')) return 'third-year undergraduate';
+      if (courseCode.includes('400') || courseCode.includes('4')) return 'senior undergraduate';
+      if (courseCode.includes('500') || courseCode.includes('6') || courseCode.includes('8')) return 'graduate';
+      return 'undergraduate';
+    };
+
+    const prompt = `You are an experienced instructor writing concise, personal feedback for a student. Write feedback that sounds natural and conversational, but keep it brief and focused.
+
+STUDENT GRADE DATA:
+${JSON.stringify(gradeData, null, 2)}
+
+Write feedback in this exact structure:
+
+**Opening Paragraph:** 
+Start with "${studentFirstName}" and write 2-3 sentences giving your overall impression of their ${assignmentTitle}. Mention their ${gradeData.gradeData.overallPercentage}% (${gradeData.gradeData.letterGrade}) performance and whether they ${gradeData.gradeData.passed ? 'met' : 'did not meet'} course standards. ${gradeData.gradeData.latePenaltyApplied ? 'Briefly acknowledge the late submission but focus on work quality.' : ''} Keep it warm but honest, appropriate for a ${getStudentLevel()} student.
+
+**Key Observations:**
+Write 3-5 concise bullet points (use actual bullet points •) covering:
+• Their strongest performance area (mention specific criteria that scored highest)
+• One area showing good progress or solid competency  
+• One specific area for improvement with a concrete suggestion
+• ${gradeData.gradeData.latePenaltyApplied ? 'A brief note about time management for future assignments' : 'An encouragement about their overall skill development'}
+• One forward-looking suggestion for growth in ${courseName}
+
+**Conclusion:**
+Write 1-2 sentences encouraging ${studentFirstName}'s continued development and expressing confidence in their potential.
+
+**Final Note:**
+Add: "Your complete grade report with detailed rubric assessment is attached for download."
+
+**WRITING STYLE:**
+- Conversational and personal, like speaking directly to ${studentFirstName}
+- Specific to their actual performance levels and criteria
+- Encouraging but honest
+- Professional yet warm
+- Use their actual criterion names and performance levels from the data
+- Keep each bullet point to 1-2 sentences maximum
+
+**Context:**
+- Student: ${gradeData.student.fullName}
+- Course: ${gradeData.course.code} - ${gradeData.course.name}
+- Assignment: ${assignmentTitle}
+- Instructor: ${gradeData.course.instructor}
+
+Write the feedback now, making it sound personal and genuine while keeping it concise and well-structured.`;
+
+    // Export prompt as text file
+    const promptBlob = new Blob([prompt], { type: 'text/plain' });
+    const url = URL.createObjectURL(promptBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `AI_Feedback_Prompt_${gradeData.student.firstName}_${new Date().toISOString().slice(0, 10)}.txt`;
+    link.click();
+    URL.revokeObjectURL(url);
+
+    console.log('AI Feedback Prompt Generated:', prompt);
+    return prompt;
+  };
+
+  // Combined function to export both files at once
+  const exportForAIFeedback = () => {
+    try {
+      // First export the grade data
+      const gradeData = exportAIFeedbackData();
+      if (!gradeData) return;
+
+      // Then generate and export the prompt
+      setTimeout(() => {
+        generateAIFeedbackPrompt();
+        alert(`AI feedback files exported successfully for ${gradeData.student.fullName}!\n\nFiles created:\n1. Grade data JSON\n2. AI prompt text file\n\nUse these files with your preferred AI service to generate personalized feedback.`);
+      }, 500); // Small delay to ensure first download completes
+
+    } catch (error) {
+      console.error('Error exporting AI feedback data:', error);
+      alert('Error exporting AI feedback data. Please check the console for details.');
+    }
+  };
+
   const exportToHTML = () => {
     const htmlContent = generateStudentReportHTML();
     const htmlBlob = new Blob([htmlContent], { type: 'text/html' });
@@ -816,6 +1012,26 @@ const GradingTemplate = () => {
                 Export PDF
               </button>
 
+              {/* ADD THE NEW AI FEEDBACK BUTTON HERE */}
+              <button
+                onClick={exportForAIFeedback}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  background: '#7c3aed',
+                  color: 'white',
+                  padding: '0.5rem 1rem',
+                  borderRadius: '0.5rem',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '0.875rem'
+                }}
+                title="Export grade data and AI prompt for generating personalized feedback"
+              >
+                <Bot size={16} />
+                Export for AI Feedback
+              </button>
             </div>
           </div>
         </div>
