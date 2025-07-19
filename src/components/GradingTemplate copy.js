@@ -204,81 +204,36 @@ const sampleRubric = {
 };
 
 const GradingTemplate = () => {
-
-  // ─── Handlers to advance session ─────────────────────
-  const handleSaveDraft = () => {
-    // Try to move to next student, saving as draft
-    const success = nextStudentInSession('draft');
-    if (!success) {
-      // Nothing left to grade as draft
-      alert('Last student graded as draft. Session complete!');
-      setActiveTab('class-manager');
-    } else {
-      // We did advance: clear out the form
-      resetFormForNextStudent();
-    }
-  };
-
-  const handleSubmitFinal = () => {
-    // Try to move to next student, saving as final
-    const success = nextStudentInSession('final');
-    if (!success) {
-      // Session is over: all finals done
-      alert('Grading session completed! All students have been finalized.');
-      setActiveTab('class-manager');
-    } else {
-      // We did advance: clear out the form
-      resetFormForNextStudent();
-    }
-  };
-
-  // Get shared context, including new functions
+  // Get shared context - ENHANCED with new functions
   const {
-    // ── Rubric & Course Details ───────────────────
     sharedRubric,
     sharedCourseDetails,
     setSharedCourseDetails,
-
-    // ── Grading Form Data ─────────────────────────
     gradingData: sharedGradingData,
     setGradingData: setSharedGradingData,
-
-    // ── Update Helpers ────────────────────────────
     updateStudentInfo,
     updateCourseInfo,
     updateAssignmentInfo,
     clearGradingFormData,
-
-    // ── Class List State ─────────────────────────
     classList,
     setClassList,
-
-    // ── Current Student ──────────────────────────
-    currentStudent,
     setCurrentStudent,
-
-    // ── Draft & Final Helpers ────────────────────
-    saveDraft,
-    loadDraft,
-    saveFinalGrade,
-    loadFinalGrade,  
-    finalGrades,     
-    getGradeStatus,
-
-    // ── Batch Grading Session ────────────────────
     gradingSession,
     setGradingSession,
-    updateGradingSession,
-    initializeGradingSession,
     nextStudentInSession,
     previousStudentInSession,
-
-    
-
-    // ── Navigation ───────────────────────────────
+    updateGradingSession,
+    initializeGradingSession,
     setActiveTab,
+    currentStudent,
+    saveDraft,
+    loadDraft,
+    // NEW: Add the draft/final grade functions
+    saveFinalGrade,
+    loadFinalGrade,
+    finalGrades,
+    getGradeStatus
   } = useAssessment();
-
 
   // Helper function to convert HTML content to readable text format
   const renderFormattedContent = (htmlContent) => {
@@ -339,7 +294,7 @@ const GradingTemplate = () => {
     };
   });
 
-  // Use local grading data as the main state
+  // Use local grading data as the main state - THIS IS NOW THE SINGLE SOURCE OF TRUTH
   const gradingData = localGradingData;
   const setGradingData = setLocalGradingData;
 
@@ -347,7 +302,6 @@ const GradingTemplate = () => {
   const [loadedRubric, setLoadedRubric] = useState(() => {
     return sharedRubric || sampleRubric;
   });
-  const [rubricGrading, setRubricGrading] = useState({});
   const [showRubricComments, setShowRubricComments] = useState({});
   const [showHeaderGuide, setShowHeaderGuide] = useState(false);
 
@@ -373,6 +327,17 @@ const GradingTemplate = () => {
     return () => clearTimeout(timeoutId);
   }, [gradingData, setSharedGradingData, setSharedCourseDetails]);
 
+  // ── When we get new sharedCourseDetails, merge them in
+  useEffect(() => {
+    if (!sharedCourseDetails) return;
+    setLocalGradingData(prev => ({
+      ...prev,
+      student: sharedCourseDetails.student || prev.student,
+      course: sharedCourseDetails.course || prev.course,
+      assignment: sharedCourseDetails.assignment || prev.assignment
+    }));
+  }, [sharedCourseDetails]);
+
   // Load shared data when available
   useEffect(() => {
     if (sharedRubric) {
@@ -380,16 +345,33 @@ const GradingTemplate = () => {
     }
   }, [sharedRubric]);
 
+  // ── When student changes, load any saved draft/final but keep course+assignment
   useEffect(() => {
-    if (sharedCourseDetails) {
-      setGradingData(prevData => ({
-        ...prevData,
-        student: sharedCourseDetails.student || prevData.student,
-        course: sharedCourseDetails.course || prevData.course,
-        assignment: sharedCourseDetails.assignment || prevData.assignment
-      }));
+    if (!currentStudent?.id) return;
+
+    const status = getGradeStatus(currentStudent.id);
+    let saved = null;
+    if (status === 'final' && loadFinalGrade) {
+      saved = loadFinalGrade(currentStudent.id);
+    } else if (status === 'draft') {
+      saved = loadDraft(currentStudent.id);
     }
-  }, [sharedCourseDetails]);
+
+    if (saved) {
+      setLocalGradingData(prev => ({
+        ...saved,
+        student: currentStudent,
+        course: prev.course,
+        assignment: prev.assignment,
+        metadata: prev.metadata
+      }));
+      setVideoLinkInput('');
+      setVideoTitle('');
+    } else {
+      resetGradingForm();
+    }
+  }, [currentStudent, getGradeStatus, loadDraft, loadFinalGrade]);
+
 
   // Late Policy Levels
   const latePolicyLevels = {
@@ -413,174 +395,83 @@ const GradingTemplate = () => {
     }
   };
 
-  // Initialize rubric grading state when component mounts or rubric changes
   useEffect(() => {
     if (loadedRubric) {
-      // 🔑 KEY FIX: Only initialize rubric grading if there's no saved data for current student
-      const hasCurrentStudentData = currentStudent?.id && (
-        getGradeStatus(currentStudent.id) === 'final' && loadFinalGrade?.(currentStudent.id) ||
-        getGradeStatus(currentStudent.id) === 'draft' && loadDraft(currentStudent.id)
-      );
+      const initialGrading = {};
+      loadedRubric.criteria.forEach(criterion => {
+        initialGrading[criterion.id] = {
+          criterionId: criterion.id,
+          selectedLevel: null,
+          customComments: ''
+        };
+      });
 
-      if (!hasCurrentStudentData) {
-        console.log('🔄 Initializing empty rubric grading for new student or no saved data');
-        const initialGrading = {};
-        loadedRubric.criteria.forEach(criterion => {
-          initialGrading[criterion.id] = {
-            criterionId: criterion.id,
-            selectedLevel: null,
-            customComments: ''
-          };
-        });
-        setRubricGrading(initialGrading);
-      } else {
-        console.log('⚡ Skipping rubric grading initialization - saved data exists for current student');
-      }
-
-      // Always update assignment details (this is safe to do)
-      setGradingData(prevData => ({
+      setLocalGradingData(prevData => ({
         ...prevData,
         assignment: {
           ...prevData.assignment,
           name: loadedRubric.assignmentInfo?.title || prevData.assignment.name,
           maxPoints: loadedRubric.assignmentInfo?.totalPoints || prevData.assignment.maxPoints
         },
+        rubricGrading: prevData.rubricGrading && Object.keys(prevData.rubricGrading).length > 0 ? prevData.rubricGrading : initialGrading,
         metadata: {
           ...prevData.metadata,
           rubricIntegrated: true
         }
       }));
     }
-  }, [loadedRubric, currentStudent, getGradeStatus, loadDraft, loadFinalGrade]);
+  }, [loadedRubric]);
 
-  // FIND THIS useEffect:
   useEffect(() => {
     if (currentStudent?.id) {
       console.log('🔍 Loading data for student:', currentStudent.name);
-      // ... existing code ...
-    }
-  }, [currentStudent, getGradeStatus, loadDraft, loadFinalGrade]);
-
-  // REPLACE WITH THIS COMPLETE VERSION:
-  useEffect(() => {
-    if (currentStudent?.id) {
-      console.log('🔍 Loading data for student:', currentStudent.name);
-
-      // Get the grade status for this student
       const gradeStatus = getGradeStatus(currentStudent.id);
       console.log('📊 Grade status:', gradeStatus);
-
       let savedData = null;
 
       if (gradeStatus === 'final') {
-        // Load final grade data
         savedData = loadFinalGrade ? loadFinalGrade(currentStudent.id) : null;
         console.log('📋 Loading final grade data:', savedData ? 'FOUND' : 'NOT FOUND');
       } else if (gradeStatus === 'draft') {
-        // Load draft data
         savedData = loadDraft(currentStudent.id);
         console.log('📝 Loading draft data:', savedData ? 'FOUND' : 'NOT FOUND');
       }
 
       if (savedData) {
         console.log('✅ Successfully loaded saved grade data');
-
-        // CRITICAL: Update BOTH local and shared data
-        setLocalGradingData(savedData);
-        setSharedGradingData(savedData);
-
-        // Restore rubric grading state if it exists
-        if (savedData.rubricGrading) {
-          setRubricGrading(savedData.rubricGrading);
-          console.log('🔄 Restored rubric grading:', Object.keys(savedData.rubricGrading).length, 'criteria');
-        }
-
-        // Log what was restored for debugging
-        if (savedData.feedback) {
-          console.log('💬 Restored feedback:', {
-            general: savedData.feedback.general ? 'YES' : 'NO',
-            strengths: savedData.feedback.strengths ? 'YES' : 'NO',
-            improvements: savedData.feedback.improvements ? 'YES' : 'NO'
-          });
-        }
-
-        if (savedData.attachments) {
-          console.log('📎 Restored attachments:', savedData.attachments.length);
-        }
-
-        if (savedData.videoLinks) {
-          console.log('🎥 Restored video links:', savedData.videoLinks.length);
-        }
-
-        if (savedData.latePolicy) {
-          console.log('⏰ Restored late policy:', savedData.latePolicy.level);
-        }
-
+        setLocalGradingData(prevData => ({
+          ...savedData,
+          course: prevData.course,
+          assignment: prevData.assignment,
+          student: currentStudent,
+          metadata: prevData.metadata
+        }));
+        setVideoLinkInput('');
+        setVideoTitle('');
       } else {
-        console.log('⚠️ No saved data found, starting fresh for:', currentStudent.name);
-
-        // No saved data, just update student info
-        const freshStudentData = {
-          student: {
-            name: currentStudent.name,
-            id: currentStudent.id,
-            email: currentStudent.email
-          },
-          feedback: { general: '', strengths: '', improvements: '' },
-          attachments: [],
-          videoLinks: [],
-          latePolicy: { level: 'none', penaltyApplied: false }
-        };
-
-        setLocalGradingData(prev => ({
-          ...prev,
-          ...freshStudentData
-        }));
-
-        setSharedGradingData(prev => ({
-          ...prev,
-          ...freshStudentData
-        }));
-
-        // Reset rubric grading to initial state
-        if (loadedRubric) {
-          const initialGrading = {};
-          loadedRubric.criteria.forEach(criterion => {
-            initialGrading[criterion.id] = {
-              criterionId: criterion.id,
-              selectedLevel: null,
-              customComments: ''
-            };
-          });
-          setRubricGrading(initialGrading);
-        }
+        console.log('🆕 No saved data found, starting fresh');
+        resetGradingForm();
       }
     }
-  }, [currentStudent, getGradeStatus, loadDraft, loadFinalGrade, loadedRubric, setLocalGradingData, setSharedGradingData]);
+  }, [currentStudent, getGradeStatus, loadDraft, loadFinalGrade]);
 
 
-
-
-  // Calculate total score with late policy applied
   const calculateTotalScore = () => {
     let rawScore = 0;
-
-    if (loadedRubric) {
-      rawScore = Object.values(rubricGrading).reduce((total, grading) => {
+    if (loadedRubric && gradingData.rubricGrading) {
+      rawScore = Object.values(gradingData.rubricGrading).reduce((total, grading) => {
         const criterion = loadedRubric.criteria.find(c => c.id === grading.criterionId);
         if (criterion && grading.selectedLevel) {
           const level = loadedRubric.rubricLevels.find(l => l.level === grading.selectedLevel);
-          return total + (criterion.maxPoints * level.multiplier);
+          if (level) {
+            return total + (criterion.maxPoints * level.multiplier);
+          }
         }
         return total;
       }, 0);
-    } else {
-      rawScore = gradingData.rubric.reduce((total, item) => total + item.score, 0);
     }
-
     const latePolicyLevel = latePolicyLevels[gradingData.latePolicy.level];
     const finalScore = rawScore * latePolicyLevel.multiplier;
-
     return {
       rawScore: rawScore,
       finalScore: finalScore,
@@ -589,7 +480,6 @@ const GradingTemplate = () => {
     };
   };
 
-  // Update late policy
   const updateLatePolicy = (level) => {
     setGradingData(prevData => ({
       ...prevData,
@@ -600,41 +490,46 @@ const GradingTemplate = () => {
     }));
   };
 
-  // Update rubric grading
   const updateRubricGrading = (criterionId, level, comments = null) => {
-    setRubricGrading(prev => {
-      const existingGrading = prev[criterionId];
+    setLocalGradingData(prevData => {
+      const existingGrading = prevData.rubricGrading[criterionId];
       const existingComments = existingGrading?.customComments || '';
-
-      return {
-        ...prev,
+      const newRubricState = {
+        ...prevData.rubricGrading,
         [criterionId]: {
           criterionId,
           selectedLevel: level,
           customComments: comments !== null ? comments : existingComments
         }
       };
+      return {
+        ...prevData,
+        rubricGrading: newRubricState
+      };
     });
   };
 
-  // Add feedback comment to criterion
   const addCriterionFeedback = (criterionId, comment) => {
-    const currentGrading = rubricGrading[criterionId];
-    const currentComments = currentGrading?.customComments || '';
-    const newComments = currentComments ? `${currentComments}\n• ${comment}` : `• ${comment}`;
-
-    setRubricGrading(prev => ({
-      ...prev,
-      [criterionId]: {
-        ...prev[criterionId],
-        criterionId,
-        selectedLevel: currentGrading?.selectedLevel || null,
-        customComments: newComments
-      }
-    }));
+    setLocalGradingData(prevData => {
+      const currentGrading = prevData.rubricGrading[criterionId];
+      const currentComments = currentGrading?.customComments || '';
+      const newComments = currentComments ? `${currentComments}\n• ${comment}` : `• ${comment}`;
+      const newRubricState = {
+        ...prevData.rubricGrading,
+        [criterionId]: {
+          ...currentGrading,
+          criterionId,
+          selectedLevel: currentGrading?.selectedLevel || null,
+          customComments: newComments
+        }
+      };
+      return {
+        ...prevData,
+        rubricGrading: newRubricState
+      };
+    });
   };
 
-  // Toggle rubric comments visibility
   const toggleRubricComments = (criterionId) => {
     setShowRubricComments(prev => ({
       ...prev,
@@ -642,7 +537,6 @@ const GradingTemplate = () => {
     }));
   };
 
-  // Add video link
   const addVideoLink = () => {
     if (videoLinkInput.trim()) {
       setGradingData(prevData => ({
@@ -658,7 +552,6 @@ const GradingTemplate = () => {
     }
   };
 
-  // Remove video link
   const removeVideoLink = (id) => {
     setGradingData(prevData => ({
       ...prevData,
@@ -666,7 +559,6 @@ const GradingTemplate = () => {
     }));
   };
 
-  // Handle file uploads
   const handleFileUpload = (files) => {
     const newAttachments = Array.from(files).map(file => ({
       id: Date.now() + Math.random(),
@@ -697,7 +589,6 @@ const GradingTemplate = () => {
     });
   };
 
-  // Remove attachment
   const removeAttachment = (id) => {
     setGradingData(prevData => ({
       ...prevData,
@@ -705,9 +596,43 @@ const GradingTemplate = () => {
     }));
   };
 
-  // Student Navigation Functions (NEW IMPLEMENTATION)
-  const resetFormForNextStudent = () => {
-    // Reset only the grading-specific data, let useEffect handle student info
+  const handleNextStudent = () => {
+    handleNextStudentAsDraft();
+  };
+
+  const handleNextStudentAsDraft = () => {
+    if (currentStudent?.id) {
+      console.log('💾 Saving as draft for student:', currentStudent.name);
+      saveDraft(currentStudent.id, localGradingData);
+    }
+    const success = nextStudentInSession('draft');
+    if (!success) {
+      alert('Grading session completed! All students have been graded.');
+      setActiveTab('class-manager');
+    } else {
+      resetGradingForm();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      console.log('✅ Draft saved, moved to next student (and scrolled to top)');
+    }
+  };
+
+  const handleNextStudentAsFinal = () => {
+    if (currentStudent?.id) {
+      console.log('✅ Finalizing grade for student:', currentStudent.name);
+      saveFinalGrade(currentStudent.id, localGradingData);
+    }
+    const success = nextStudentInSession('final');
+    if (!success) {
+      alert('Grading session completed! All students have been graded.');
+      setActiveTab('class-manager');
+    } else {
+      resetGradingForm();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      console.log('✅ Final grade saved, moved to next student (and scrolled to top)');
+    }
+  };
+
+  const resetGradingForm = () => {
     const initialRubricGrading = {};
     if (loadedRubric) {
       loadedRubric.criteria.forEach(criterion => {
@@ -718,10 +643,10 @@ const GradingTemplate = () => {
         };
       });
     }
-    setRubricGrading(initialRubricGrading);
-
     setLocalGradingData(prev => ({
-      ...prev, // Keep course, assignment, student info from context
+      ...prev,
+      course: sharedCourseDetails?.course ?? prev.course,
+      assignment: sharedCourseDetails?.assignment ?? prev.assignment,
       feedback: { general: '', strengths: '', improvements: '' },
       attachments: [],
       videoLinks: [],
@@ -730,59 +655,23 @@ const GradingTemplate = () => {
     }));
   };
 
-  const handleNextStudentAsDraft = () => {
-    if (currentStudent?.id) {
-      saveDraft(currentStudent.id, localGradingData);
-    }
-    const success = nextStudentInSession('draft');
-    if (!success) {
-      alert('Last student graded as draft. Session complete!');
-      setActiveTab('class-manager');
-    } else {
-      resetFormForNextStudent();
-    }
-  };
-
-  const handleNextStudentAsFinal = () => {
-    if (currentStudent?.id) {
-      saveFinalGrade(currentStudent.id, localGradingData);
-    }
-    const success = nextStudentInSession('final');
-    if (!success) {
-      alert('Grading session completed! All students have been finalized.');
-      setActiveTab('class-manager');
-    } else {
-      resetFormForNextStudent();
-    }
-  };
-
   const handlePreviousStudent = () => {
     if (currentStudent?.id) {
       saveDraft(currentStudent.id, localGradingData);
     }
     const success = previousStudentInSession();
-    if (success) {
-      const prevStudentId = classList.students[gradingSession.currentStudentIndex - 1].id;
-      const draft = loadDraft(prevStudentId);
-      if (draft) {
-        setLocalGradingData(draft);
-        setRubricGrading(draft.rubricGrading || {});
-      } else {
-        resetFormForNextStudent();
-      }
+    if (!success) {
+      console.log('Already at first student or no active session');
     }
   };
 
-  // Get current student info for navigation display
   const getCurrentStudentInfo = () => {
     if (!classList || !gradingSession?.active || !gradingSession.currentStudent) {
       return null;
     }
-
     const currentIndex = gradingSession.currentStudentIndex;
     const totalStudents = classList.students.length;
     const student = gradingSession.currentStudent;
-
     return {
       student,
       position: currentIndex + 1,
@@ -794,59 +683,27 @@ const GradingTemplate = () => {
 
   const currentStudentInfo = getCurrentStudentInfo();
 
-  // Export functions
-  const exportToHTML = () => {
+  // --- START: CODE FIX ---
+
+  // Helper function to generate the student report HTML. This avoids code duplication.
+  const generateStudentReportHTML = () => {
     const scoreCalculation = calculateTotalScore();
     const totalScore = scoreCalculation.finalScore;
     const rawScore = scoreCalculation.rawScore;
     const maxPoints = loadedRubric ? loadedRubric.assignmentInfo.totalPoints : gradingData.assignment.maxPoints;
-    const percentage = ((totalScore / maxPoints) * 100).toFixed(1);
+    const percentage = ((totalScore / (maxPoints || 1)) * 100).toFixed(1);
     const penaltyApplied = scoreCalculation.penaltyApplied;
 
-    // Build attachments HTML with embedded Base64 images
     const attachmentsHTML = gradingData.attachments.map((att, index) => {
       if (att.base64Data) {
-        return `
-                  <div class="attachment-item">
-                      <img src="${att.base64Data}" 
-                           alt="${att.name}" 
-                           class="clickable-image"
-                           data-index="${index}"
-                           style="max-width: 200px; max-height: 200px; object-fit: contain; display: block; margin-bottom: 0.5rem; border: 1px solid #ddd; border-radius: 4px;" />
-                      <div style="font-size: 0.875rem; font-weight: 500; word-break: break-word;">${att.name}</div>
-                      <div style="font-size: 0.75rem; color: #666;">${(att.size / 1024).toFixed(1)} KB</div>
-                      <div style="font-size: 0.75rem; color: #007bff; margin-top: 4px;">Click to enlarge</div>
-                  </div>
-              `;
+        return `<div class="attachment-item"><img src="${att.base64Data}" alt="${att.name}" class="clickable-image" data-index="${index}" style="max-width: 200px; max-height: 200px; object-fit: contain; display: block; margin-bottom: 0.5rem; border: 1px solid #ddd; border-radius: 4px;" /><div style="font-size: 0.875rem; font-weight: 500; word-break: break-word;">${att.name}</div><div style="font-size: 0.75rem; color: #666;">${(att.size / 1024).toFixed(1)} KB</div><div style="font-size: 0.75rem; color: #007bff; margin-top: 4px;">Click to enlarge</div></div>`;
       } else {
-        return `
-                  <div class="attachment-item">
-                      <div style="width: 40px; height: 40px; background: #f3f4f6; border-radius: 4px; display: flex; align-items: center; justify-content: center; margin: 0 auto 0.5rem auto;">
-                          📄
-                      </div>
-                      <div style="font-size: 0.875rem; font-weight: 500; word-break: break-word;">${att.name}</div>
-                      <div style="font-size: 0.75rem; color: #666;">${(att.size / 1024).toFixed(1)} KB</div>
-                  </div>
-              `;
+        return `<div class="attachment-item"><div style="width: 40px; height: 40px; background: #f3f4f6; border-radius: 4px; display: flex; align-items: center; justify-content: center; margin: 0 auto 0.5rem auto;">📄</div><div style="font-size: 0.875rem; font-weight: 500; word-break: break-word;">${att.name}</div><div style="font-size: 0.75rem; color: #666;">${(att.size / 1024).toFixed(1)} KB</div></div>`;
       }
     }).join('');
 
+    const videoLinksHTML = gradingData.videoLinks.map(link => `<div class="video-link-item" style="background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 8px; padding: 1rem; margin-bottom: 1rem;"><div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;"><span style="font-size: 1.25rem;">🎥</span><strong style="color: #495057;">${link.title}</strong></div><a href="${link.url}" target="_blank" rel="noopener noreferrer" style="color: #007bff; text-decoration: none; word-break: break-all;">${link.url}</a></div>`).join('');
 
-
-    // Build video links HTML
-    const videoLinksHTML = gradingData.videoLinks.map(link => `
-          <div class="video-link-item" style="background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
-              <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
-                  <span style="font-size: 1.25rem;">🎥</span>
-                  <strong style="color: #495057;">${link.title}</strong>
-              </div>
-              <a href="${link.url}" target="_blank" rel="noopener noreferrer" style="color: #007bff; text-decoration: none; word-break: break-all;">
-                  ${link.url}
-              </a>
-          </div>
-      `).join('');
-
-    // Enhanced rubric table with complete comments
     const rubricTableHTML = loadedRubric ? `
       <div class="rubric-section" style="margin-top: 30px;">
           <h3>📋 Detailed Rubric Assessment</h3>
@@ -856,314 +713,29 @@ const GradingTemplate = () => {
               <strong>Weight:</strong> ${loadedRubric.assignmentInfo.weight}% of Final Grade<br>
               <strong>Passing Threshold:</strong> ${loadedRubric.assignmentInfo.passingThreshold}%  
           </div>
-          
           <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px; font-size: 0.9rem;">
-              <thead>
-                  <tr style="background: #2c3e50; color: white;">
-                      <th style="border: 1px solid #ddd; padding: 12px; text-align: left;">Criterion</th>
-                      <th style="border: 1px solid #ddd; padding: 12px; text-align: center;">Max Points</th>
-                      <th style="border: 1px solid #ddd; padding: 12px; text-align: center;">Level Achieved</th>
-                      <th style="border: 1px solid #ddd; padding: 12px; text-align: center;">Points Earned</th>
-                      <th style="border: 1px solid #ddd; padding: 12px; text-align: left;">Assessment & Comments</th>
-                  </tr>
-              </thead>
+              <thead><tr style="background: #2c3e50; color: white;"><th style="border: 1px solid #ddd; padding: 12px; text-align: left;">Criterion</th><th style="border: 1px solid #ddd; padding: 12px; text-align: center;">Max Points</th><th style="border: 1px solid #ddd; padding: 12px; text-align: center;">Level Achieved</th><th style="border: 1px solid #ddd; padding: 12px; text-align: center;">Points Earned</th><th style="border: 1px solid #ddd; padding: 12px; text-align: left;">Assessment & Comments</th></tr></thead>
               <tbody>
                   ${loadedRubric.criteria.map(criterion => {
-      const grading = rubricGrading[criterion.id];
+      const grading = gradingData.rubricGrading[criterion.id];
       const level = grading?.selectedLevel ? loadedRubric.rubricLevels.find(l => l.level === grading.selectedLevel) : null;
       const points = level ? (criterion.maxPoints * level.multiplier).toFixed(1) : '0';
       const levelDescription = level && criterion.levels[level.level] ? renderFormattedContent(criterion.levels[level.level].description) : '';
       const additionalComments = grading?.customComments || '';
-
-      return `
-                          <tr>
-                              <td style="border: 1px solid #ddd; padding: 8px; vertical-align: top;">
-                                  <strong style="color: #2c3e50;">${criterion.name}</strong><br>
-                                  <small style="color: #666; font-style: italic;">${renderFormattedContent(criterion.description)}</small>
-                              </td>
-                              <td style="border: 1px solid #ddd; padding: 8px; text-align: center; font-weight: bold;">${criterion.maxPoints}</td>
-                              <td style="border: 1px solid #ddd; padding: 8px; text-align: center; ${level ? `background-color: ${level.color}15; color: ${level.color}; font-weight: bold;` : ''}">${level ? level.name : 'Not Assessed'}</td>
-                              <td style="border: 1px solid #ddd; padding: 8px; text-align: center; font-weight: bold; font-size: 1.1em; color: #2c3e50;">${points}</td>
-                              <td style="border: 1px solid #ddd; padding: 8px; vertical-align: top;">
-                                  ${levelDescription ? `
-                                      <div style="margin-bottom: 10px; padding: 8px; background: #f8f9fa; border-left: 4px solid ${level.color}; border-radius: 4px;">
-                                          <strong style="color: ${level.color};">Level Description:</strong><br>
-                                          <span style="font-size: 0.85em; line-height: 1.4;">${levelDescription}</span>
-                                      </div>
-                                  ` : ''}
-                                  ${additionalComments ? `
-                                      <div style="margin-top: 8px; padding: 8px; background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px;">
-                                          <strong style="color: #856404;">Additional Comments:</strong><br>
-                                          <span style="font-size: 0.85em; line-height: 1.4; white-space: pre-wrap;">${additionalComments}</span>
-                                      </div>
-                                  ` : ''}
-                                  ${(!levelDescription && !additionalComments) ? '<em style="color: #999;">No assessment provided</em>' : ''}
-                              </td>
-                          </tr>
-                      `;
+      return `<tr><td style="border: 1px solid #ddd; padding: 8px; vertical-align: top;"><strong style="color: #2c3e50;">${criterion.name}</strong><br><small style="color: #666; font-style: italic;">${renderFormattedContent(criterion.description)}</small></td><td style="border: 1px solid #ddd; padding: 8px; text-align: center; font-weight: bold;">${criterion.maxPoints}</td><td style="border: 1px solid #ddd; padding: 8px; text-align: center; ${level ? `background-color: ${level.color}15; color: ${level.color}; font-weight: bold;` : ''}">${level ? level.name : 'Not Assessed'}</td><td style="border: 1px solid #ddd; padding: 8px; text-align: center; font-weight: bold; font-size: 1.1em; color: #2c3e50;">${points}</td><td style="border: 1px solid #ddd; padding: 8px; vertical-align: top;">${levelDescription ? `<div style="margin-bottom: 10px; padding: 8px; background: #f8f9fa; border-left: 4px solid ${level.color}; border-radius: 4px;"><strong style="color: ${level.color};">Level Description:</strong><br><span style="font-size: 0.85em; line-height: 1.4;">${levelDescription}</span></div>` : ''}${additionalComments ? `<div style="margin-top: 8px; padding: 8px; background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px;"><strong style="color: #856404;">Additional Comments:</strong><br><span style="font-size: 0.85em; line-height: 1.4; white-space: pre-wrap;">${additionalComments}</span></div>` : ''}${(!levelDescription && !additionalComments) ? '<em style="color: #999;">No assessment provided</em>' : ''}</td></tr>`;
     }).join('')}
               </tbody>
           </table>
-          
-          <div style="background: #e8f5e8; border: 1px solid #4caf50; border-radius: 8px; padding: 15px; margin-top: 20px;">
-              <h4 style="color: #2e7d32; margin-bottom: 10px;">📊 Rubric Score Summary</h4>
-              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
-                  <div>
-                      <strong>Total Score:</strong> ${Math.round(totalScore * 10) / 10} / ${maxPoints}<br>
-                      <strong>Percentage:</strong> ${percentage}%
-                  </div>
-                  <div>
-                      <strong>Grade Status:</strong> 
-                      <span style="color: ${percentage >= loadedRubric.assignmentInfo.passingThreshold ? '#4caf50' : '#f44336'}; font-weight: bold;">
-                          ${percentage >= loadedRubric.assignmentInfo.passingThreshold ? '✓ PASSING' : '✗ NEEDS IMPROVEMENT'}
-                      </span>
-                  </div>
-                  ${penaltyApplied ? `
-                      <div style="color: #ff9800;">
-                          <strong>Late Penalty Applied:</strong><br>
-                          Raw Score: ${Math.round(rawScore * 10) / 10}
-                      </div>
-                  ` : ''}
-              </div>
-          </div>
-      </div>
-      ` : '';
+          <div style="background: #e8f5e8; border: 1px solid #4caf50; border-radius: 8px; padding: 15px; margin-top: 20px;"><h4 style="color: #2e7d32; margin-bottom: 10px;">📊 Rubric Score Summary</h4><div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;"><div><strong>Total Score:</strong> ${Math.round(totalScore * 10) / 10} / ${maxPoints}<br><strong>Percentage:</strong> ${percentage}%</div><div><strong>Grade Status:</strong><span style="color: ${percentage >= loadedRubric.assignmentInfo.passingThreshold ? '#4caf50' : '#f44336'}; font-weight: bold;">${percentage >= loadedRubric.assignmentInfo.passingThreshold ? '✓ PASSING' : '✗ NEEDS IMPROVEMENT'}</span></div>${penaltyApplied ? `<div style="color: #ff9800;"><strong>Late Penalty Applied:</strong><br>Raw Score: ${Math.round(rawScore * 10) / 10}</div>` : ''}</div></div>
+      </div>` : '';
 
-    const htmlContent = `
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Grade Report - ${gradingData.student.name}</title>
-      <style>
-          body { font-family: Arial, sans-serif; max-width: 800px; margin: 20px auto; padding: 20px; line-height: 1.6; }
-          .header { background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 30px; }
-          .score-summary { background: #e8f5e8; border: 2px solid #4caf50; border-radius: 8px; padding: 20px; margin: 20px 0; text-align: center; }
-          .late-policy-section { margin: 30px 0; background: #fff5f5; border: 1px solid #f87171; border-radius: 8px; padding: 20px; }
-          .feedback-section { margin: 20px 0; padding: 15px; background: #f9f9f9; border-radius: 8px; }
-          .attachments { margin: 30px 0; }
-          .attachment-item { 
-              display: inline-block; 
-              text-align: center; 
-              margin: 1rem; 
-              padding: 1rem; 
-              background: #fff; 
-              border: 1px solid #ddd; 
-              border-radius: 8px; 
-              box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-              max-width: 250px;
-              vertical-align: top;
-          }
-          .clickable-image {
-              cursor: pointer;
-              transition: all 0.3s ease;
-              position: relative;
-          }
-          .clickable-image:hover {
-              transform: scale(1.05);
-              box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-          }
-          .video-links { margin: 30px 0; }
-          .video-link-item { margin-bottom: 1rem; }
-          .video-link-item a { color: #007bff; text-decoration: none; }
-          .video-link-item a:hover { text-decoration: underline; }
-          h1, h2, h3 { color: #333; }
-          
-          /* Modal styles for full-size image viewing */
-          .image-modal {
-              display: none;
-              position: fixed;
-              z-index: 1000;
-              left: 0;
-              top: 0;
-              width: 100%;
-              height: 100%;
-              background-color: rgba(0,0,0,0.9);
-              animation: fadeIn 0.3s ease;
-          }
-          .image-modal.show {
-              display: flex;
-              align-items: center;
-              justify-content: center;
-          }
-          .modal-content {
-              max-width: 95%;
-              max-height: 95%;
-              object-fit: contain;
-              border-radius: 8px;
-              box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-              animation: zoomIn 0.3s ease;
-          }
-          .close-modal {
-              position: absolute;
-              top: 20px;
-              right: 30px;
-              color: white;
-              font-size: 40px;
-              font-weight: bold;
-              cursor: pointer;
-              z-index: 1001;
-              background: rgba(0,0,0,0.5);
-              border-radius: 50%;
-              width: 50px;
-              height: 50px;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              line-height: 1;
-          }
-          .close-modal:hover {
-              background: rgba(0,0,0,0.8);
-          }
-          .modal-caption {
-              position: absolute;
-              bottom: 20px;
-              left: 50%;
-              transform: translateX(-50%);
-              color: white;
-              background: rgba(0,0,0,0.7);
-              padding: 10px 20px;
-              border-radius: 6px;
-              text-align: center;
-              max-width: 80%;
-          }
-          
-          @keyframes fadeIn {
-              from { opacity: 0; }
-              to { opacity: 1; }
-          }
-          @keyframes zoomIn {
-              from { transform: scale(0.5); opacity: 0; }
-              to { transform: scale(1); opacity: 1; }
-          }
-          
-          @media print {
-              .attachment-item { break-inside: avoid; }
-              .video-link-item { break-inside: avoid; }
-              .image-modal { display: none !important; }
-          }
-      </style>
-    </head>
-    <body>
-      <div class="header">
-          <h1>📋 Grade Report</h1>
-          <p><strong>Student:</strong> ${gradingData.student.name} (${gradingData.student.id})</p>
-          <p><strong>Course:</strong> ${gradingData.course.code} - ${gradingData.course.name}</p>
-          <p><strong>Assignment:</strong> ${gradingData.assignment.name}</p>
-          <p><strong>Instructor:</strong> ${gradingData.course.instructor}</p>
-          <p><strong>Term:</strong> ${gradingData.course.term}</p>
-      </div>
-    
-      <div class="score-summary">
-          <h2>📊 Final Score</h2>
-          <div style="font-size: 2rem; font-weight: bold; color: #2e7d32; margin: 15px 0;">
-              ${totalScore.toFixed(1)} / ${maxPoints} (${percentage}%)
-          </div>
-          <p style="margin: 10px 0; color: #555;">
-              ${loadedRubric ? `Rubric: ${loadedRubric.assignmentInfo.title}` : ``}
-              ${penaltyApplied ? ` | Late Policy: ${latePolicyLevels[gradingData.latePolicy.level].name}` : ''}
-          </p>
-      </div>
-    
-      ${penaltyApplied ? `
-      <div class="late-policy-section">
-          <h3 style="color: #dc2626;">📅 Late Submission Policy Applied</h3>
-          <p><strong>Policy Status:</strong> ${latePolicyLevels[gradingData.latePolicy.level].name}</p>
-          <p>${latePolicyLevels[gradingData.latePolicy.level].description}</p>
-          <p><strong>Raw Score:</strong> ${Math.round(rawScore * 10) / 10}/${maxPoints} → <strong>Final Score:</strong> ${Math.round(totalScore * 10) / 10}/${maxPoints}</p>
-      </div>
-      ` : ''}
-    
-      ${rubricTableHTML}
-      
-      ${Object.entries(gradingData.feedback).filter(([key, value]) => value).map(([key, value]) => `
-          <div class="feedback-section">
-              <h3>${key.charAt(0).toUpperCase() + key.slice(1)} Feedback</h3>
-              <p>${value.replace(/\n/g, '<br>')}</p>
-          </div>
-      `).join('')}
-    
-      ${attachmentsHTML ? `
-      <div class="attachments">
-          <h3>📎 File Attachments</h3>
-          <div style="display: flex; flex-wrap: wrap; justify-content: flex-start;">
-              ${attachmentsHTML}
-          </div>
-      </div>
-      ` : ''}
-    
-      ${videoLinksHTML ? `
-      <div class="video-links">
-          <h3>🎥 Video Review Links</h3>
-          ${videoLinksHTML}
-      </div>
-      ` : ''}
-      
-      <p style="margin-top: 40px; text-align: center; color: #666; font-size: 0.9rem;">
-          Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}
-      </p>
-    
-      <div id="imageModal" class="image-modal">
-          <span class="close-modal" onclick="closeImageModal()">&times;</span>
-          <img class="modal-content" id="modalImage">
-          <div class="modal-caption" id="modalCaption"></div>
-      </div>
-    
-      <script>
-          // Store attachment data for modal functionality
-          const attachmentData = ${JSON.stringify(gradingData.attachments)};
-          
-          function openImageModal(imageSrc, caption) {
-              const modal = document.getElementById('imageModal');
-              const modalImg = document.getElementById('modalImage');
-              const modalCaption = document.getElementById('modalCaption');
-              
-              modal.classList.add('show');
-              modalImg.src = imageSrc;
-              modalCaption.textContent = caption;
-              
-              // Prevent body scrolling when modal is open
-              document.body.style.overflow = 'hidden';
-          }
-    
-          function closeImageModal() {
-              const modal = document.getElementById('imageModal');
-              modal.classList.remove('show');
-              document.body.style.overflow = 'auto';
-          }
-    
-          // Add click event listeners when DOM is loaded
-          document.addEventListener('DOMContentLoaded', function() {
-              const clickableImages = document.querySelectorAll('.clickable-image');
-              clickableImages.forEach(img => {
-                  img.addEventListener('click', function() {
-                      const index = parseInt(this.getAttribute('data-index'));
-                      const attachment = attachmentData[index];
-                      if (attachment && attachment.base64Data) {
-                          openImageModal(attachment.base64Data, attachment.name);
-                      }
-                  });
-              });
-    
-              // Close modal when clicking outside the image
-              document.getElementById('imageModal').addEventListener('click', function(e) {
-                  if (e.target === this) {
-                      closeImageModal();
-                  }
-              });
-    
-              // Close modal with Escape key
-              document.addEventListener('keydown', function(e) {
-                  if (e.key === 'Escape') {
-                      closeImageModal();
-                  }
-              });
-          });
-      </script>
-    </body>
-    </html>`;
+    const htmlContent = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Grade Report - ${gradingData.student.name}</title><style>body{font-family:Arial,sans-serif;max-width:800px;margin:20px auto;padding:20px;line-height:1.6}.header{background:#f8f9fa;padding:20px;border-radius:8px;margin-bottom:30px}.score-summary{background:#e8f5e8;border:2px solid #4caf50;border-radius:8px;padding:20px;margin:20px 0;text-align:center}.late-policy-section{margin:30px 0;background:#fff5f5;border:1px solid #f87171;border-radius:8px;padding:20px}.feedback-section{margin:20px 0;padding:15px;background:#f9f9f9;border-radius:8px}.attachments{margin:30px 0}.attachment-item{display:inline-block;text-align:center;margin:1rem;padding:1rem;background:#fff;border:1px solid #ddd;border-radius:8px;box-shadow:0 2px 4px rgba(0,0,0,.1);max-width:250px;vertical-align:top}.clickable-image{cursor:pointer;transition:all .3s ease;position:relative}.clickable-image:hover{transform:scale(1.05);box-shadow:0 4px 8px rgba(0,0,0,.2)}.video-links{margin:30px 0}.video-link-item{margin-bottom:1rem}.video-link-item a{color:#007bff;text-decoration:none}.video-link-item a:hover{text-decoration:underline}h1,h2,h3{color:#333}.image-modal{display:none;position:fixed;z-index:1000;left:0;top:0;width:100%;height:100%;background-color:rgba(0,0,0,.9);animation:fadeIn .3s ease}.image-modal.show{display:flex;align-items:center;justify-content:center}.modal-content{max-width:95%;max-height:95%;object-fit:contain;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,.5);animation:zoomIn .3s ease}.close-modal{position:absolute;top:20px;right:30px;color:#fff;font-size:40px;font-weight:700;cursor:pointer;z-index:1001;background:rgba(0,0,0,.5);border-radius:50%;width:50px;height:50px;display:flex;align-items:center;justify-content:center;line-height:1}.close-modal:hover{background:rgba(0,0,0,.8)}.modal-caption{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);color:#fff;background:rgba(0,0,0,.7);padding:10px 20px;border-radius:6px;text-align:center;max-width:80%}@keyframes fadeIn{from{opacity:0}to{opacity:1}}@keyframes zoomIn{from{transform:scale(.5);opacity:0}to{transform:scale(1);opacity:1}}@media print{.attachment-item,.video-link-item{break-inside:avoid}.image-modal{display:none!important}}</style></head><body><div class="header"><h1>📋 Grade Report</h1><p><strong>Student:</strong> ${gradingData.student.name} (${gradingData.student.id})</p><p><strong>Course:</strong> ${gradingData.course.code} - ${gradingData.course.name}</p><p><strong>Assignment:</strong> ${gradingData.assignment.name}</p><p><strong>Instructor:</strong> ${gradingData.course.instructor}</p><p><strong>Term:</strong> ${gradingData.course.term}</p></div><div class="score-summary"><h2>📊 Final Score</h2><div style="font-size:2rem;font-weight:700;color:#2e7d32;margin:15px 0">${totalScore.toFixed(1)} / ${maxPoints} (${percentage}%)</div><p style="margin:10px 0;color:#555">${loadedRubric ? `Rubric: ${loadedRubric.assignmentInfo.title}` : ""}${penaltyApplied ? ` | Late Policy: ${latePolicyLevels[gradingData.latePolicy.level].name}` : ""}</p></div>${penaltyApplied ? `<div class="late-policy-section"><h3 style="color:#dc2626">📅 Late Submission Policy Applied</h3><p><strong>Policy Status:</strong> ${latePolicyLevels[gradingData.latePolicy.level].name}</p><p>${latePolicyLevels[gradingData.latePolicy.level].description}</p><p><strong>Raw Score:</strong> ${Math.round(rawScore * 10) / 10}/${maxPoints} → <strong>Final Score:</strong> ${Math.round(totalScore * 10) / 10}/${maxPoints}</p></div>` : ""}${rubricTableHTML}${Object.entries(gradingData.feedback).filter(([e, t]) => t).map(([e, t]) => `<div class="feedback-section"><h3>${e.charAt(0).toUpperCase() + e.slice(1)} Feedback</h3><p>${t.replace(/\n/g, "<br>")}</p></div>`).join("")}${attachmentsHTML ? `<div class="attachments"><h3>📎 File Attachments</h3><div style="display: flex; flex-wrap: wrap; justify-content: flex-start;">${attachmentsHTML}</div></div>` : ""}${videoLinksHTML ? `<div class="video-links"><h3>🎥 Video Review Links</h3>${videoLinksHTML}</div>` : ""}<p style="margin-top:40px;text-align:center;color:#666;font-size:.9rem">Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}</p><div id="imageModal" class="image-modal"><span class="close-modal" onclick="closeImageModal()">&times;</span><img class="modal-content" id="modalImage"><div class="modal-caption" id="modalCaption"></div></div><script>const attachmentData=${JSON.stringify(gradingData.attachments)};function openImageModal(e,t){const n=document.getElementById("imageModal"),o=document.getElementById("modalImage"),a=document.getElementById("modalCaption");n.classList.add("show"),o.src=e,a.textContent=t,document.body.style.overflow="hidden"}function closeImageModal(){document.getElementById("imageModal").classList.remove("show"),document.body.style.overflow="auto"}document.addEventListener("DOMContentLoaded",function(){document.querySelectorAll(".clickable-image").forEach(e=>{e.addEventListener("click",function(){const e=parseInt(this.getAttribute("data-index")),t=attachmentData[e];t&&t.base64Data&&openImageModal(t.base64Data,t.name)})}),document.getElementById("imageModal").addEventListener("click",function(e){e.target===this&&closeImageModal()}),document.addEventListener("keydown",function(e){"Escape"===e.key&&closeImageModal()})})</script></body></html>`;
 
+    return htmlContent;
+  };
+
+  const exportToHTML = () => {
+    const htmlContent = generateStudentReportHTML();
     const htmlBlob = new Blob([htmlContent], { type: 'text/html' });
     const url = URL.createObjectURL(htmlBlob);
     const link = document.createElement('a');
@@ -1174,632 +746,16 @@ const GradingTemplate = () => {
   };
 
   const exportToPDF = () => {
-    const scoreCalculation = calculateTotalScore();
-    const totalScore = scoreCalculation.finalScore;
-    const rawScore = scoreCalculation.rawScore;
-    const maxPoints = loadedRubric ? loadedRubric.assignmentInfo.totalPoints : gradingData.assignment.maxPoints;
-    const percentage = ((totalScore / maxPoints) * 100).toFixed(1);
-    const penaltyApplied = scoreCalculation.penaltyApplied;
-    const currentDate = new Date().toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-
-    // Build attachments HTML (PDF optimized)
-    const attachmentsHTML = gradingData.attachments.map((att, index) => {
-      if (att.base64Data) {
-        return `
-                    <div class="attachment-item">
-                        <img src="${att.base64Data}" alt="${att.name}" class="attachment-image" />
-                        <div class="attachment-info">
-                            <div class="attachment-name">${att.name}</div>
-                            <div class="attachment-size">${(att.size / 1024).toFixed(1)} KB</div>
-                        </div>
-                    </div>
-                `;
-      } else {
-        return `
-                    <div class="attachment-item">
-                        <div class="file-icon">📄</div>
-                        <div class="attachment-info">
-                            <div class="attachment-name">${att.name}</div>
-                            <div class="attachment-size">${(att.size / 1024).toFixed(1)} KB</div>
-                        </div>
-                    </div>
-                `;
-      }
-    }).join('');
-
-    // Build video links HTML
-    const videoLinksHTML = gradingData.videoLinks.map(link => `
-            <div class="video-link-item">
-                <span class="video-icon">🎥</span>
-                <div class="video-info">
-                    <div class="video-title">${link.title}</div>
-                    <div class="video-url">${link.url}</div>
-                </div>
-            </div>
-        `).join('');
-
-    // Enhanced rubric table for PDF
-    const rubricTableHTML = loadedRubric ? `
-        <div class="rubric-section">
-            <h3 class="section-title">📋 Detailed Rubric Assessment</h3>
-            <div class="rubric-info">
-                <div class="info-grid">
-                    <div><strong>Assignment:</strong> ${loadedRubric.assignmentInfo.title}</div>
-                    <div><strong>Weight:</strong> ${loadedRubric.assignmentInfo.weight}% of Final Grade</div>
-                    <div><strong>Passing Threshold:</strong> ${loadedRubric.assignmentInfo.passingThreshold}%</div>
-                    <div><strong>Total Points:</strong> ${loadedRubric.assignmentInfo.totalPoints}</div>
-                </div>
-                <div class="assignment-description">${renderFormattedContent(loadedRubric.assignmentInfo.description)}</div>
-            </div>
-            
-            <table class="rubric-table">
-                <thead>
-                    <tr>
-                        <th class="criterion-header">Criterion</th>
-                        <th class="points-header">Max Points</th>
-                        <th class="level-header">Level Achieved</th>
-                        <th class="earned-header">Points Earned</th>
-                        <th class="comments-header">Assessment & Comments</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${loadedRubric.criteria.map(criterion => {
-      const grading = rubricGrading[criterion.id];
-      const level = grading?.selectedLevel ? loadedRubric.rubricLevels.find(l => l.level === grading.selectedLevel) : null;
-      const points = level ? (criterion.maxPoints * level.multiplier).toFixed(1) : '0';
-      const levelDescription = level && criterion.levels[level.level] ? renderFormattedContent(criterion.levels[level.level].description) : '';
-      const additionalComments = grading?.customComments || '';
-
-      return `
-                            <tr class="criterion-row">
-                                <td class="criterion-cell">
-                                    <div class="criterion-name">${criterion.name}</div>
-                                    <div class="criterion-desc">${renderFormattedContent(criterion.description)}</div>
-                                </td>
-                                <td class="points-cell">${criterion.maxPoints}</td>
-                                <td class="level-cell ${level ? 'level-achieved' : ''}" ${level ? `style="background-color: ${level.color}20; color: ${level.color};"` : ''}>
-                                    ${level ? level.name : 'Not Assessed'}
-                                </td>
-                                <td class="earned-cell">${points}</td>
-                                <td class="comments-cell">
-                                    ${levelDescription ? `
-                                        <div class="level-description">
-                                            <strong>Level Description:</strong>
-                                            <p>${levelDescription}</p>
-                                        </div>
-                                    ` : ''}
-                                    ${additionalComments ? `
-                                        <div class="additional-comments">
-                                            <strong>Additional Comments:</strong>
-                                            <p>${additionalComments.replace(/\n/g, '<br>')}</p>
-                                        </div>
-                                    ` : ''}
-                                    ${(!levelDescription && !additionalComments) ? '<em>No assessment provided</em>' : ''}
-                                </td>
-                            </tr>
-                        `;
-    }).join('')}
-                </tbody>
-            </table>
-            
-            <div class="rubric-summary">
-                <div class="summary-grid">
-                    <div class="summary-item">
-                        <strong>Total Score:</strong> ${Math.round(totalScore * 10) / 10} / ${maxPoints}
-                    </div>
-                    <div class="summary-item">
-                        <strong>Percentage:</strong> ${percentage}%
-                    </div>
-                    <div class="summary-item">
-                        <strong>Grade Status:</strong> 
-                        <span class="${percentage >= loadedRubric.assignmentInfo.passingThreshold ? 'passing' : 'needs-improvement'}">
-                            ${percentage >= loadedRubric.assignmentInfo.passingThreshold ? '✓ PASSING' : '✗ NEEDS IMPROVEMENT'}
-                        </span>
-                    </div>
-                    ${penaltyApplied ? `
-                        <div class="summary-item penalty">
-                            <strong>Late Penalty Applied:</strong> Raw Score: ${Math.round(rawScore * 10) / 10}
-                        </div>
-                    ` : ''}
-                </div>
-            </div>
-        </div>
-        ` : '';
-
-    const pdfContent = `
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Grade Report - ${gradingData.student.name}</title>
-        <style>
-            @page {
-                size: A4;
-                margin: 0.75in;
-                @top-center {
-                    content: "Grade Report - ${gradingData.student.name}";
-                    font-size: 10pt;
-                    color: #666;
-                }
-                @bottom-center {
-                    content: "Page " counter(page) " of " counter(pages) " | Generated on ${currentDate}";
-                    font-size: 9pt;
-                    color: #666;
-                }
-            }
-            
-            body {
-                font-family: 'Arial', sans-serif;
-                line-height: 1.4;
-                color: #333;
-                background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
-                margin: 0;
-                padding: 0;
-            }
-            
-            .header {
-                background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
-                color: white;
-                padding: 25px;
-                border-radius: 10px;
-                margin-bottom: 25px;
-                position: relative;
-                overflow: hidden;
-            }
-            
-            .header::before {
-                content: '';
-                position: absolute;
-                top: 0;
-                left: 0;
-                right: 0;
-                bottom: 0;
-                background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.1'%3E%3Cpath d='m36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E") repeat;
-                z-index: 0;
-            }
-            
-            .header-content {
-                position: relative;
-                z-index: 1;
-            }
-            
-            .header h1 {
-                font-size: 28px;
-                margin: 0 0 10px 0;
-                font-weight: 700;
-            }
-            
-            .header-info {
-                display: grid;
-                grid-template-columns: 1fr 1fr;
-                gap: 20px;
-                margin-top: 15px;
-            }
-            
-            .header-info p {
-                margin: 5px 0;
-                font-size: 14px;
-            }
-            
-            .score-summary {
-                background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
-                border: 2px solid #16a34a;
-                border-radius: 12px;
-                padding: 25px;
-                margin: 25px 0;
-                text-align: center;
-                position: relative;
-                overflow: hidden;
-            }
-            
-            .score-summary::before {
-                content: '';
-                position: absolute;
-                top: -50%;
-                left: -50%;
-                width: 200%;
-                height: 200%;
-                background: conic-gradient(from 0deg, transparent, rgba(34, 197, 94, 0.1), transparent);
-                animation: rotate 20s linear infinite;
-                z-index: 0;
-            }
-            
-            .score-content {
-                position: relative;
-                z-index: 1;
-            }
-            
-            .final-score {
-                font-size: 48px;
-                font-weight: 700;
-                color: #15803d;
-                margin: 15px 0;
-            }
-            
-            .score-percentage {
-                font-size: 24px;
-                color: #166534;
-                margin-bottom: 15px;
-            }
-            
-            .section-title {
-                color: #1e40af;
-                font-size: 20px;
-                font-weight: 600;
-                margin: 25px 0 15px 0;
-                padding-bottom: 8px;
-                border-bottom: 2px solid #3b82f6;
-            }
-            
-            .rubric-info {
-                background: #f8fafc;
-                border: 1px solid #e2e8f0;
-                border-radius: 8px;
-                padding: 20px;
-                margin-bottom: 20px;
-            }
-            
-            .info-grid {
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-                gap: 15px;
-                margin-bottom: 15px;
-            }
-            
-            .assignment-description {
-                font-style: italic;
-                color: #64748b;
-                margin-top: 10px;
-                padding-top: 10px;
-                border-top: 1px solid #e2e8f0;
-            }
-            
-            .rubric-table {
-                width: 100%;
-                border-collapse: collapse;
-                margin-bottom: 25px;
-                background: white;
-                border-radius: 8px;
-                overflow: hidden;
-                box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
-            }
-            
-            .rubric-table th {
-                background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
-                color: white;
-                padding: 15px 12px;
-                font-weight: 600;
-                text-align: left;
-                font-size: 14px;
-            }
-            
-            .rubric-table td {
-                padding: 12px;
-                border-bottom: 1px solid #e2e8f0;
-                vertical-align: top;
-                font-size: 13px;
-            }
-            
-            .criterion-cell {
-                background: #f8fafc;
-                border-right: 1px solid #e2e8f0;
-                width: 20%;
-            }
-            
-            .criterion-name {
-                font-weight: 600;
-                color: #1e40af;
-                margin-bottom: 5px;
-            }
-            
-            .criterion-desc {
-                font-size: 12px;
-                color: #64748b;
-                font-style: italic;
-            }
-            
-            .points-cell, .earned-cell {
-                text-align: center;
-                font-weight: 600;
-                width: 10%;
-            }
-            
-            .level-cell {
-                text-align: center;
-                font-weight: 600;
-                width: 15%;
-            }
-            
-            .level-achieved {
-                border-radius: 4px;
-                padding: 8px 4px;
-            }
-            
-            .comments-cell {
-                width: 45%;
-            }
-            
-            .level-description {
-                background: #f1f5f9;
-                border-left: 4px solid #3b82f6;
-                padding: 10px;
-                margin-bottom: 10px;
-                border-radius: 4px;
-            }
-            
-            .level-description strong {
-                color: #1e40af;
-            }
-            
-            .level-description p {
-                margin: 5px 0;
-                line-height: 1.4;
-            }
-            
-            .additional-comments {
-                background: #fffbeb;
-                border: 1px solid #fbbf24;
-                border-radius: 4px;
-                padding: 10px;
-                margin-top: 10px;
-            }
-            
-            .additional-comments strong {
-                color: #92400e;
-            }
-            
-            .additional-comments p {
-                margin: 5px 0;
-                line-height: 1.4;
-            }
-            
-            .rubric-summary {
-                background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
-                border: 2px solid #3b82f6;
-                border-radius: 8px;
-                padding: 20px;
-                margin-top: 25px;
-            }
-            
-            .summary-grid {
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-                gap: 15px;
-            }
-            
-            .summary-item {
-                font-size: 14px;
-            }
-            
-            .passing {
-                color: #16a34a;
-                font-weight: 600;
-            }
-            
-            .needs-improvement {
-                color: #dc2626;
-                font-weight: 600;
-            }
-            
-            .penalty {
-                color: #ea580c;
-            }
-            
-            .late-policy-section {
-                background: #fef2f2;
-                border: 1px solid #fca5a5;
-                border-radius: 8px;
-                padding: 20px;
-                margin: 20px 0;
-            }
-            
-            .feedback-section {
-                background: #f9fafb;
-                border-radius: 8px;
-                padding: 20px;
-                margin: 20px 0;
-                border-left: 4px solid #3b82f6;
-            }
-            
-            .feedback-section h3 {
-                color: #1e40af;
-                margin-top: 0;
-            }
-            
-            .attachments {
-                margin: 25px 0;
-            }
-            
-            .attachment-item {
-                display: inline-block;
-                margin: 10px;
-                padding: 15px;
-                background: white;
-                border: 1px solid #e2e8f0;
-                border-radius: 8px;
-                text-align: center;
-                max-width: 200px;
-                vertical-align: top;
-            }
-            
-            .attachment-image {
-                max-width: 150px;
-                max-height: 150px;
-                object-fit: contain;
-                border-radius: 4px;
-                margin-bottom: 10px;
-            }
-            
-            .file-icon {
-                font-size: 48px;
-                margin-bottom: 10px;
-            }
-            
-            .attachment-name {
-                font-weight: 500;
-                font-size: 12px;
-                word-break: break-word;
-            }
-            
-            .attachment-size {
-                font-size: 11px;
-                color: #64748b;
-            }
-            
-            .video-links {
-                margin: 25px 0;
-            }
-            
-            .video-link-item {
-                background: white;
-                border: 1px solid #e2e8f0;
-                border-radius: 8px;
-                padding: 15px;
-                margin-bottom: 10px;
-                display: flex;
-                align-items: center;
-                gap: 15px;
-            }
-            
-            .video-icon {
-                font-size: 24px;
-            }
-            
-            .video-title {
-                font-weight: 600;
-                margin-bottom: 5px;
-            }
-            
-            .video-url {
-                font-size: 12px;
-                color: #3b82f6;
-                word-break: break-all;
-            }
-            
-            .footer {
-                text-align: center;
-                margin-top: 40px;
-                padding-top: 20px;
-                border-top: 1px solid #e2e8f0;
-                color: #64748b;
-                font-size: 12px;
-            }
-            
-            @keyframes rotate {
-                to {
-                    transform: rotate(360deg);
-                }
-            }
-            
-            @media print {
-                body {
-                    background: white;
-                }
-                .header, .score-summary {
-                    break-inside: avoid;
-                }
-                .rubric-table {
-                    break-inside: avoid;
-                }
-                .attachment-item {
-                    break-inside: avoid;
-                }
-            }
-        </style>
-    </head>
-    <body>
-        <div class="header">
-            <div class="header-content">
-                <h1>📋 Grade Report</h1>
-                <div class="header-info">
-                    <div>
-                        <p><strong>Student:</strong> ${gradingData.student.name}</p>
-                        <p><strong>Student ID:</strong> ${gradingData.student.id}</p>
-                        <p><strong>Email:</strong> ${gradingData.student.email}</p>
-                    </div>
-                    <div>
-                        <p><strong>Course:</strong> ${gradingData.course.code} - ${gradingData.course.name}</p>
-                        <p><strong>Instructor:</strong> ${gradingData.course.instructor}</p>
-                        <p><strong>Term:</strong> ${gradingData.course.term}</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    
-        <div class="score-summary">
-            <div class="score-content">
-                <h2 style="margin: 0 0 10px 0; color: #15803d;">📊 Final Score</h2>
-                <div class="final-score">
-                    ${totalScore.toFixed(1)} / ${maxPoints}
-                </div>
-                <div class="score-percentage">
-                    ${percentage}%
-                </div>
-                <p style="margin: 10px 0; color: #166534;">
-                    ${loadedRubric ? `Assessment: ${loadedRubric.assignmentInfo.title}` : ``}
-                    ${penaltyApplied ? ` | Late Policy: ${latePolicyLevels[gradingData.latePolicy.level].name}` : ''}
-                </p>
-            </div>
-        </div>
-    
-        ${penaltyApplied ? `
-        <div class="late-policy-section">
-            <h3 style="color: #dc2626; margin-top: 0;">📅 Late Submission Policy Applied</h3>
-            <p><strong>Policy Status:</strong> ${latePolicyLevels[gradingData.latePolicy.level].name}</p>
-            <p>${latePolicyLevels[gradingData.latePolicy.level].description}</p>
-            <p><strong>Calculation:</strong> Raw Score ${Math.round(rawScore * 10) / 10}/${maxPoints} → Final Score ${Math.round(totalScore * 10) / 10}/${maxPoints}</p>
-        </div>
-        ` : ''}
-    
-        ${rubricTableHTML}
-        
-        ${Object.entries(gradingData.feedback).filter(([key, value]) => value).map(([key, value]) => `
-            <div class="feedback-section">
-                <h3>${key.charAt(0).toUpperCase() + key.slice(1)} Feedback</h3>
-                <p>${value.replace(/\n/g, '<br>')}</p>
-            </div>
-        `).join('')}
-    
-        ${attachmentsHTML ? `
-        <div class="attachments">
-            <h3 class="section-title">📎 File Attachments</h3>
-            ${attachmentsHTML}
-        </div>
-        ` : ''}
-    
-        ${videoLinksHTML ? `
-        <div class="video-links">
-            <h3 class="section-title">🎥 Video Review Links</h3>
-            ${videoLinksHTML}
-        </div>
-        ` : ''}
-        
-        <div class="footer">
-            <p><strong>Grade Report Generated</strong></p>
-            <p>${currentDate} | ${new Date().toLocaleTimeString()}</p>
-            <p>Assessment Platform v2.0 | Professional Grading System</p>
-        </div>
-    </body>
-    </html>`;
-
-    // Create a new window for PDF printing
-    const printWindow = window.open('', '_blank', 'width=800,height=600');
-    printWindow.document.write(pdfContent);
+    const html = generateStudentReportHTML();
+    const printWindow = window.open('', '_blank');
+    printWindow.document.open();
+    printWindow.document.write(html);
     printWindow.document.close();
-
-    // Wait for content to load then trigger print
-    printWindow.onload = function () {
-      setTimeout(() => {
-        printWindow.print();
-      }, 500);
-    };
+    printWindow.focus();
+    printWindow.print();
   };
+
+  // --- END: CODE FIX ---
 
   return (
     <div style={{ minHeight: '100vh', background: '#f9fafb', padding: '1.5rem' }}>
@@ -1841,13 +797,14 @@ const GradingTemplate = () => {
                 Export HTML
               </button>
               <button
+                type="button"
                 onClick={exportToPDF}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.5rem',
-                  background: '#dc2626',
-                  color: 'white',
+                  backgroundColor: '#dc2626',
+                  color: '#ffffff',
                   padding: '0.5rem 1rem',
                   borderRadius: '0.5rem',
                   border: 'none',
@@ -1858,6 +815,7 @@ const GradingTemplate = () => {
                 <FileText size={16} />
                 Export PDF
               </button>
+
             </div>
           </div>
         </div>
@@ -1953,7 +911,7 @@ const GradingTemplate = () => {
                       </button>
 
                       <button
-                        onClick={handleNextStudentAsFinal}
+                        onClick={handleNextStudent}
                         disabled={currentStudentInfo.isLast}
                         style={{
                           display: 'flex',
@@ -2183,7 +1141,7 @@ const GradingTemplate = () => {
                 <input
                   type="text"
                   placeholder="Student ID"
-                  value={gradingData.student.id}
+                  value={currentStudent?.id || gradingData.student.id}
                   onChange={(e) => {
                     const newValue = e.target.value;
                     setGradingData(prevData => ({
@@ -2205,7 +1163,7 @@ const GradingTemplate = () => {
                 <input
                   type="email"
                   placeholder="Student Email"
-                  value={gradingData.student.email}
+                  value={currentStudent?.email || gradingData.student.email}
                   onChange={(e) => {
                     const newValue = e.target.value;
                     setGradingData(prevData => ({
@@ -2343,7 +1301,7 @@ const GradingTemplate = () => {
                       transition: 'all 0.3s ease',
                       transform: gradingData.latePolicy.level === level ? 'translateY(-2px)' : 'none',
                       boxShadow: gradingData.latePolicy.level === level ? '0 8px 25px rgba(0, 0, 0, 0.15)' : '0 1px 3px rgba(0, 0, 0, 0.1)',
-                      background: gradingData.latePolicy.level === level ? `linear-gradient(135deg, ${policy.color}15 0%, ${policy.color}25 100%)` : 'white'
+                      backgroundColor: gradingData.latePolicy.level === level ? `linear-gradient(135deg, ${policy.color}15 0%, ${policy.color}25 100%)` : 'white'
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
@@ -2430,7 +1388,7 @@ const GradingTemplate = () => {
                 </span>
               </div>
               <div style={{ fontSize: '1.25rem', color: '#6b7280', marginBottom: '1rem' }}>
-                ({Math.round((calculateTotalScore().finalScore / (loadedRubric ? loadedRubric.assignmentInfo.totalPoints : gradingData.assignment.maxPoints)) * 1000) / 10}%)
+                ({Math.round((calculateTotalScore().finalScore / (loadedRubric ? (loadedRubric.assignmentInfo.totalPoints || 1) : (gradingData.assignment.maxPoints || 1))) * 1000) / 10}%)
               </div>
               <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', flexWrap: 'wrap' }}>
                 {loadedRubric && (
@@ -2543,45 +1501,6 @@ const GradingTemplate = () => {
               </div>
             )}
 
-            {/* Level Selection */}
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
-              gap: '0.5rem',
-              marginBottom: '1rem'
-            }}>
-              {loadedRubric.rubricLevels.map((level) => {
-                const isSelected = currentGrading?.selectedLevel === level.level;
-                const points = Math.round(criterion.maxPoints * level.multiplier);
-
-                return (
-                  <button
-                    key={level.level}
-                    onClick={() => updateRubricGrading(criterion.id, level.level)}
-                    style={{
-                      padding: '0.75rem',
-                      borderRadius: '0.5rem',
-                      border: `2px solid ${isSelected ? level.color : '#d1d5db'}`,
-                      fontSize: '0.875rem',
-                      fontWeight: '500',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease',
-                      backgroundColor: isSelected ? level.color : 'white',
-                      color: isSelected ? 'white' : '#374151',
-                      transform: isSelected ? 'scale(1.05)' : 'none',
-                      textAlign: 'center'
-                    }}
-                  >
-                    <div style={{ fontWeight: '600' }}>{level.name}</div>
-                    <div style={{ fontSize: '0.75rem', marginTop: '0.25rem' }}>
-                      {level.level === 'incomplete' ? '0' : points} pts
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-
-
             {/* Loaded Rubric Section */}
             {loadedRubric && (
               <div style={{
@@ -2621,7 +1540,7 @@ const GradingTemplate = () => {
                 {/* Rubric Grading Interface */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                   {loadedRubric.criteria.map((criterion) => {
-                    const currentGrading = rubricGrading[criterion.id];
+                    const currentGrading = gradingData.rubricGrading && gradingData.rubricGrading[criterion.id];
                     const showComments = showRubricComments[criterion.id];
 
                     return (
@@ -2844,7 +1763,7 @@ const GradingTemplate = () => {
                         {Math.round(calculateTotalScore().finalScore * 10) / 10}/{loadedRubric.assignmentInfo.totalPoints}
                       </div>
                       <div style={{ fontSize: '1.125rem', color: '#6b7280' }}>
-                        ({Math.round((calculateTotalScore().finalScore / loadedRubric.assignmentInfo.totalPoints) * 1000) / 10}%)
+                        ({Math.round((calculateTotalScore().finalScore / (loadedRubric.assignmentInfo.totalPoints || 1)) * 1000) / 10}%)
                       </div>
                       {calculateTotalScore().penaltyApplied && (
                         <div style={{ fontSize: '0.875rem', color: '#dc2626', marginTop: '0.25rem' }}>
@@ -2854,10 +1773,10 @@ const GradingTemplate = () => {
                       <div style={{
                         fontSize: '0.875rem',
                         fontWeight: '500',
-                        color: (calculateTotalScore().finalScore / loadedRubric.assignmentInfo.totalPoints) * 100 >= loadedRubric.assignmentInfo.passingThreshold
+                        color: (calculateTotalScore().finalScore / (loadedRubric.assignmentInfo.totalPoints || 1)) * 100 >= loadedRubric.assignmentInfo.passingThreshold
                           ? '#16a34a' : '#dc2626'
                       }}>
-                        {(calculateTotalScore().finalScore / loadedRubric.assignmentInfo.totalPoints) * 100 >= loadedRubric.assignmentInfo.passingThreshold
+                        {(calculateTotalScore().finalScore / (loadedRubric.assignmentInfo.totalPoints || 1)) * 100 >= loadedRubric.assignmentInfo.passingThreshold
                           ? '✓ PASSING' : '✗ NEEDS IMPROVEMENT'}
                       </div>
                     </div>
@@ -2866,60 +1785,99 @@ const GradingTemplate = () => {
               </div>
             )}
 
-            {/* NEW: Enhanced button section BELOW rubric */}
-            {currentStudentInfo && (
+            {/* NEW: Enhanced Complete and Grade Next Section */}
+            {loadedRubric && currentStudentInfo && (
               <div style={{
-                marginTop: '2rem',
-                padding: '1.5rem',
-                background: 'linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%)',
-                border: '1px solid #d1d5db',
+                background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)',
+                border: '2px solid #10b981',
                 borderRadius: '0.75rem',
-                textAlign: 'center',
-                display: 'flex',
-                justifyContent: 'center',
-                gap: '1.5rem'
+                padding: '1.5rem',
+                marginTop: '2rem',
+                textAlign: 'center'
               }}>
-                <button
-                  onClick={handleNextStudentAsDraft}
-                  style={{
-                    background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                    color: 'white',
-                    padding: '1rem 2rem',
-                    borderRadius: '0.75rem',
-                    border: 'none',
-                    cursor: 'pointer',
-                    fontSize: '1rem',
-                    fontWeight: '600',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.75rem'
-                  }}
-                >
-                  <Save size={20} />
-                  {currentStudentInfo.isLast ? 'Save Final Draft' : 'Save as Draft & Continue'}
-                </button>
-                <button
-                  onClick={handleNextStudentAsFinal}
-                  style={{
-                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                    color: 'white',
-                    padding: '1rem 2rem',
-                    borderRadius: '0.75rem',
-                    border: 'none',
-                    cursor: 'pointer',
-                    fontSize: '1rem',
-                    fontWeight: '600',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.75rem'
-                  }}
-                >
-                  <CheckCircle size={20} />
-                  {currentStudentInfo.isLast ? 'Finalize & Complete Session' : 'Finalize & Continue'}
-                </button>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#047857', marginBottom: '1rem' }}>
+                  Ready to move to the next student?
+                </h3>
+                <p style={{ color: '#065f46', marginBottom: '1.5rem', fontSize: '0.875rem' }}>
+                  Choose how to save the current grading before proceeding.
+                </p>
+
+                <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+                  {/* Save as Draft Button */}
+                  <button
+                    onClick={handleNextStudentAsDraft}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
+                      color: 'white',
+                      padding: '0.75rem 1.5rem',
+                      borderRadius: '0.5rem',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      boxShadow: '0 2px 8px rgba(251, 191, 36, 0.4)',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseOver={(e) => {
+                      e.target.style.transform = 'translateY(-2px)';
+                      e.target.style.boxShadow = '0 4px 12px rgba(251, 191, 36, 0.5)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.target.style.transform = 'translateY(0)';
+                      e.target.style.boxShadow = '0 2px 8px rgba(251, 191, 36, 0.4)';
+                    }}
+                  >
+                    <span style={{ fontSize: '1.1rem' }}>📝</span>
+                    Save & Grade Next Student
+                  </button>
+
+                  {/* Finalize & Grade Next Button */}
+                  <button
+                    onClick={handleNextStudentAsFinal}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                      color: 'white',
+                      padding: '0.75rem 1.5rem',
+                      borderRadius: '0.5rem',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      boxShadow: '0 2px 8px rgba(16, 185, 129, 0.4)',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseOver={(e) => {
+                      e.target.style.transform = 'translateY(-2px)';
+                      e.target.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.5)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.target.style.transform = 'translateY(0)';
+                      e.target.style.boxShadow = '0 2px 8px rgba(16, 185, 129, 0.4)';
+                    }}
+                  >
+                    <span style={{ fontSize: '1.1rem' }}>✅</span>
+                    Finalize & Grade Next Student
+                  </button>
+                </div>
+
+                <div style={{
+                  marginTop: '1rem',
+                  padding: '0.75rem',
+                  background: 'rgba(255, 255, 255, 0.6)',
+                  borderRadius: '0.375rem',
+                  fontSize: '0.75rem',
+                  color: '#065f46'
+                }}>
+                  <strong>Draft:</strong> Save progress, can edit later • <strong>Finalize:</strong> Complete grading, ready for student/LMS
+                </div>
               </div>
             )}
-
 
             {/* File Attachments */}
             <div style={{ marginBottom: '2rem' }}>
