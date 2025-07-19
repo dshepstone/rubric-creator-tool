@@ -17,37 +17,62 @@ import {
 import { useAssessment } from './SharedContext';
 import { parseExcelFile, validateStudentData } from '../utils/excelParser';
 
+
+
 /**
- * Map a percentage to a letter grade, per programType
+ * Map a numeric percentage to a letter grade,
+ * following Conestoga’s A+…F policy.
  */
 const getLetterGrade = (percentage, programType) => {
-    // Example scales — customize these thresholds to match your policy!
     const scales = {
         degree: [
             { min: 90, grade: 'A+' },
             { min: 80, grade: 'A' },
+            { min: 75, grade: 'B+' },
             { min: 70, grade: 'B' },
+            { min: 65, grade: 'C+' },
             { min: 60, grade: 'C' },
-            { min: 50, grade: 'D' },
-            { min: 0, grade: 'F' },
+            { min: 0, grade: 'F' }
         ],
         diploma: [
-            { min: 70, grade: 'PASS' },
-            { min: 0, grade: 'FAIL' }
+            { min: 90, grade: 'A+' },
+            { min: 80, grade: 'A' },
+            { min: 75, grade: 'B+' },
+            { min: 70, grade: 'B' },
+            { min: 65, grade: 'C+' },
+            { min: 60, grade: 'C' },
+            { min: 0, grade: 'F' }
         ],
         certificate: [
-            { min: 50, grade: 'P' },
+            { min: 90, grade: 'A+' },
+            { min: 80, grade: 'A' },
+            { min: 75, grade: 'B+' },
+            { min: 70, grade: 'B' },
+            { min: 65, grade: 'C+' },
+            { min: 60, grade: 'C' },
+            { min: 0, grade: 'F' }
+        ],
+        graduateCertificate: [
+            { min: 90, grade: 'A+' },
+            { min: 80, grade: 'A' },
+            { min: 75, grade: 'B+' },
+            { min: 70, grade: 'B' },
+            { min: 65, grade: 'C+' },
+            { min: 60, grade: 'C' },
             { min: 0, grade: 'F' }
         ]
-        // …add other programType scales as needed
     };
 
-    const scale = scales[programType] || scales.diploma;
-    for (let tier of scale) {
-        if (percentage >= tier.min) return tier.grade;
-    }
-    return 'N/A';
+    // Pick the right scale (default to degree if missing)
+    const scale = scales[programType] || scales.degree;
+
+    // Find the first entry where percentage ≥ min
+    const entry = scale.find(e => percentage >= e.min);
+
+    return entry ? entry.grade : 'N/A';
 };
+
+
 
 
 const ClassListManager = () => {
@@ -94,7 +119,9 @@ const ClassListManager = () => {
         updateStudentInfo,
         updateAssignmentInfo,
         loadFinalGrade, // This should be available after SharedContext fix
-        finalGrades // This should be available after SharedContext fix
+        finalGrades, // This should be available after SharedContext fix
+        rubricFormData,
+    
     } = useAssessment();
 
     // NEW: Handler to change the program type for grading
@@ -331,272 +358,363 @@ const ClassListManager = () => {
         return { completed, total, percentage, final, draft };
     };
 
-    // Export class grades as CSV
+    // ── Build a portrait-friendly Class Grade Report ───────────────────────────────
+    const getPortraitClassReportHTML = () => {
+        const now = new Date();
+        const currentDate = now.toLocaleDateString('en-CA');  // YYYY-MM-DD
+        const currentTime = now.toLocaleTimeString('en-CA');
+         // Grab the rubric title from context
+        const rubricName = sharedRubric?.assignmentInfo?.title || 'Unnamed Rubric';
+        // Calculate grades
+        const rowsHtml = classList.students.map((student, idx) => {
+            const info = calculateStudentGrade(student.id);
+            const num = info.score !== 'N/A'
+                ? `${info.score}/${info.maxPossible}`
+                : 'N/A';
+            return `
+      <tr>
+        <td>${idx + 1}</td>
+        <td>${student.id}</td>
+        <td>${student.name}</td>
+        <td>${num}</td>
+        <td>${info.letterGrade || 'N/A'}</td>
+        <td>${info.percentage !== 'N/A' ? info.percentage + '%' : 'N/A'}</td>
+      </tr>`;
+        }).join('');
+
+        return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Portrait Class Report</title>
+  <style>
+  /* Force portrait layout with small margins */
+  @page {
+    size: A4 portrait;
+    margin: 15mm;
+  }
+
+  /* Global resets */
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+  body {
+    margin: 0;
+    padding: 0;
+    font-family: sans-serif;
+    font-size: 12px;
+    line-height: 1.4;
+    color: #333;
+    background: white;
+  }
+
+  /* Header */
+  .header {
+    text-align: center;
+    margin-bottom: 8px;
+  }
+  .header h1 {
+    font-size: 18px;
+    margin: 4px 0;
+  }
+  .header .meta {
+    font-size: 14px;
+    color: #555;
+  }
+
+  /* Container to allow horizontal scroll if needed */
+  .table-container {
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  /* Main table */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;             /* evenly distribute column widths */
+  }
+  thead {
+    display: table-header-group;     /* repeat header on each printed page */
+  }
+  tbody {
+    display: table-row-group;
+  }
+  th, td {
+  padding: 8px 12px;
+  text-align: left;
+  border-bottom: 1px solid #e5e7eb;
+
+  /* allow wrapping anywhere, even inside long words like emails */
+  white-space: normal;
+  word-wrap: break-word;        /* for legacy support */
+  overflow-wrap: anywhere;      /* modern browsers */
+  word-break: break-all;        /* if you really need to force breaks */
+  vertical-align: top;
+}
+
+  
+  tr:nth-child(even) td {
+    background-color: #fafafa;
+  }
+
+  /* Footer */
+  .footer {
+    margin-top: 12px;
+    font-size: 10px;
+    text-align: center;
+    color: #666;
+  }
+
+  /* Print tweaks */
+  @media print {
+    body {
+      background: white;
+    }
+    .table-container {
+      overflow-x: visible;
+    }
+  }
+</style>
+
+</head>
+<body>
+  <div class="header">
+    <h1>Class Grade Report</h1>
+    <div class="meta">
+      ${classList.courseMetadata?.courseCode || ''} –
+      ${classList.courseMetadata?.courseName || ''} |
+      Section: ${classList.courseMetadata?.section || ''}<br>
+      Rubric: ${rubricName}
+      Generated: ${currentDate} ${currentTime}
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width:4%">#</th>
+        <th style="width:15%">Student ID</th>
+        <th style="width:40%">Name</th>
+        <th style="width:15%">Numeric Grade</th>
+        <th style="width:12%">Letter Grade</th>
+        <th style="width:14%">%</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rowsHtml}
+    </tbody>
+  </table>
+
+  <div class="footer">
+    Imported from: ${classList.fileName}
+  </div>
+</body>
+</html>`;
+    };
+    // ───────────────────────────────────────────────────────────────────────────────
+
+
+    // ── Generate the full HTML for class‐grades report ─────────────────────────────
+    const getClassGradesHTML = () => {
+        const progress = getGradingProgress();
+        const currentDate = new Date().toLocaleDateString('en-US', {
+            weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+        });
+        const currentTime = new Date().toLocaleTimeString();
+
+        // ——— Build all the <tr> rows with single‐quoted strings — no back‐ticks inside!  
+        const rowsHtml = classList.students.map((student, i) => {
+            const prog = classList.gradingProgress[i] || {};
+            const info = calculateStudentGrade(student.id);
+            const lm = prog.lastModified
+                ? new Date(prog.lastModified).toLocaleDateString()
+                : 'Never';
+            const statusClass = prog.status?.includes('final')
+                ? 'status-final'
+                : prog.status?.includes('draft')
+                    ? 'status-draft'
+                    : 'status-pending';
+
+            return (
+                '<tr>' +
+                '<td>' + (i + 1) + '</td>' +
+                '<td>' + student.id + '</td>' +
+                '<td>' + student.name + '</td>' +
+                '<td>' + student.email + '</td>' +
+                '<td>' + (student.program || '') + '</td>' +
+                '<td><span class="status-badge ' + statusClass + '">' +
+                (prog.status || 'pending') +
+                '</span></td>' +
+                '<td>' + (prog.gradeType || 'none') + '</td>' +
+                '<td>' + (info.score !== 'N/A'
+                    ? info.score + '/' + info.maxPossible
+                    : 'N/A') + '</td>' +
+                '<td>' + (info.letterGrade || 'N/A') + '</td>' +
+                '<td>' + (info.percentage !== 'N/A'
+                    ? info.percentage + '%'
+                    : 'N/A') + '</td>' +
+                '<td>' + lm + '</td>' +
+                '</tr>'
+            );
+        }).join('');
+
+        // ——— Now splice rowsHtml into one clean back‐tick literal
+        return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Class Grade Report - ${classList.courseMetadata?.courseCode || ''}</title>
+  <style>
+    @page { size: A4 portrait; margin:15mm; }
+    *, *::before, *::after { box-sizing:border-box }
+    body { margin:0; padding:0; font-family:sans-serif; font-size:12px; line-height:1.4; color:#333; }
+    .header { text-align:center; margin-bottom:12px; }
+    .header h1 { font-size:18px; margin:4px 0; }
+    .header .meta { font-size:14px; color:#555; }
+    .table-container { width:100%; overflow-x:auto; margin-bottom:12px; }
+    table { width:100%; border-collapse:collapse; table-layout:fixed; }
+    thead { display:table-header-group; }
+    th, td {
+      padding:8px 12px; text-align:left; border-bottom:1px solid #e5e7eb;
+      white-space:normal; word-wrap:break-word; overflow-wrap:anywhere; word-break:break-all;
+      vertical-align:top;
+    }
+    th { background:#f0f0f0; font-weight:600; position:sticky; top:0; }
+    tr:nth-child(even) td { background:#fafafa; }
+    .footer { font-size:10px; text-align:center; color:#666; margin-top:12px; }
+    @media print { body{background:white} .table-container{overflow-x:visible} }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>📊 Class Grade Report</h1>
+    <div class="meta">
+      ${classList.courseMetadata?.courseCode || ''} – ${classList.courseMetadata?.courseName || ''} |
+      Section: ${classList.courseMetadata?.section || ''}<br>
+      Rubric: ${sharedRubric?.assignmentInfo?.title || 'Unnamed Rubric'}<br>
+      Generated: ${currentDate} | ${currentTime}
+    </div>
+  </div>
+
+  <div class="table-container">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th><th>Student ID</th><th>Name</th><th>Email</th>
+          <th>Program</th><th>Status</th><th>Grade Type</th>
+          <th>Final Grade</th><th>Letter Grade</th><th>Percentage</th><th>Last Modified</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rowsHtml}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="footer">
+    Imported from: ${classList.fileName}
+  </div>
+</body>
+</html>`;
+    };
+
+
+
     const exportClassGradesCSV = () => {
         if (!classList) return;
 
-        const csvContent = [
-            ['Student ID', 'Student Name', 'Email', 'Program', 'Status', 'Grade Type', 'Numeric Grade', 'Letter Grade', 'Percentage', 'Last Modified'],
+        // 1) Build a 2D array where the first column is the row number
+        const rows = [
+            // now 11 headers instead of 10
+            ['#', 'Student ID', 'Student Name', 'Email', 'Program', 'Status', 'Grade Type', 'Numeric Grade', 'Letter Grade', 'Percentage', 'Last Modified'],
             ...classList.students.map((student, index) => {
-                const progress = classList.gradingProgress[index];
+                const progress = classList.gradingProgress[index] || {};
                 const gradeInfo = calculateStudentGrade(student.id);
+                const lm = progress.lastModified
+                    ? new Date(progress.lastModified).toLocaleDateString()
+                    : 'Never';
+
                 return [
+                    index + 1,                            // ← new “#” column
                     student.id,
                     student.name,
                     student.email,
                     student.program || 'N/A',
-                    progress?.status || 'pending',
-                    progress?.gradeType || 'none',
-                    gradeInfo.score !== 'N/A' ? `${gradeInfo.score}/${gradeInfo.maxPossible}` : 'N/A',
+                    progress.status || 'pending',
+                    progress.gradeType || 'none',
+                    gradeInfo.score !== 'N/A'
+                        ? `${gradeInfo.score}/${gradeInfo.maxPossible}`
+                        : 'N/A',
                     gradeInfo.letterGrade || 'N/A',
-                    gradeInfo.percentage !== 'N/A' ? `${gradeInfo.percentage}%` : 'N/A',
-                    progress?.lastModified ? new Date(progress.lastModified).toLocaleDateString() : 'Never'
+                    gradeInfo.percentage !== 'N/A'
+                        ? `${gradeInfo.percentage}%`
+                        : 'N/A',
+                    lm
                 ];
             })
-        ].map(row => row.join(',')).join('\n');
+        ];
 
+        // 2) Quote each cell (handles commas/quotes in names, etc.)
+        const quote = cell => `"${String(cell).trim().replace(/"/g, '""')}"`;
 
+        // 3) Join into a CSV string with CRLFs
+        const csvContent = rows
+            .map(row => row.map(quote).join(','))
+            .join('\r\n');
+
+        // 4) Trigger download (unchanged)
         const blob = new Blob([csvContent], { type: 'text/csv' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = `${classList.courseMetadata?.courseCode || 'class'}_grades_${new Date().toISOString().split('T')[0]}.csv`;
+        link.download = `${classList.courseMetadata?.courseCode || 'class'}_grades_${new Date().toISOString().slice(0, 10)}.csv`;
         link.click();
         URL.revokeObjectURL(url);
     };
 
     // Export class grades as HTML
+    // ── Export class grades as HTML via download ─────────────────────────────────
     const exportClassGradesHTML = () => {
         if (!classList) return;
 
-        const progress = getGradingProgress();
-        const currentDate = new Date().toLocaleDateString('en-US', {
-            weekday: 'long',
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric'
-        });
-
-        const htmlContent = `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Class Grade Report - ${classList.courseMetadata?.courseCode || 'Class'}</title>
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            line-height: 1.6;
-            margin: 0;
-            padding: 20px;
-            background-color: #f8fafc;
-        }
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            padding: 30px;
-        }
-        .header {
-            border-bottom: 3px solid #3b82f6;
-            padding-bottom: 20px;
-            margin-bottom: 30px;
-        }
-        .header h1 {
-            color: #1e40af;
-            margin: 0 0 10px 0;
-            font-size: 2rem;
-        }
-        .header .course-info {
-            color: #6b7280;
-            font-size: 1.1rem;
-        }
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-        .stat-card {
-            background: #f1f5f9;
-            padding: 20px;
-            border-radius: 8px;
-            text-align: center;
-            border-left: 4px solid #3b82f6;
-        }
-        .stat-card .number {
-            font-size: 2rem;
-            font-weight: bold;
-            color: #1e40af;
-            margin-bottom: 5px;
-        }
-        .stat-card .label {
-            color: #64748b;
-            font-size: 0.9rem;
-        }
-        .table-container {
-            overflow-x: auto;
-            margin-bottom: 30px;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            background: white;
-        }
-        th, td {
-            padding: 12px;
-            text-align: left;
-            border-bottom: 1px solid #e5e7eb;
-        }
-        th {
-            background-color: #f8fafc;
-            font-weight: 600;
-            color: #374151;
-            position: sticky;
-            top: 0;
-        }
-        tr:hover {
-            background-color: #f9fafb;
-        }
-        .status-badge {
-            padding: 4px 8px;
-            border-radius: 12px;
-            font-size: 0.75rem;
-            font-weight: 500;
-        }
-        .status-final {
-            background-color: #dcfce7;
-            color: #166534;
-        }
-        .status-draft {
-            background-color: #fef3c7;
-            color: #92400e;
-        }
-        .status-pending {
-            background-color: #f3f4f6;
-            color: #6b7280;
-        }
-        .footer {
-            text-align: center;
-            color: #6b7280;
-            font-size: 0.9rem;
-            border-top: 1px solid #e5e7eb;
-            padding-top: 20px;
-        }
-        @media print {
-            body { background: white; }
-            .container { box-shadow: none; }
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>📊 Class Grade Report</h1>
-            <div class="course-info">
-                <strong>${classList.courseMetadata?.courseCode || 'N/A'}</strong> -
-                ${classList.courseMetadata?.courseName || 'Imported Class'} |
-                Section: ${classList.courseMetadata?.section || 'N/A'}
-            </div>
-        </div>
-
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="number">${progress.total}</div>
-                <div class="label">Total Students</div>
-            </div>
-            <div class="stat-card">
-                <div class="number">${progress.final}</div>
-                <div class="label">Final Grades</div>
-            </div>
-            <div class="stat-card">
-                <div class="number">${progress.draft}</div>
-                <div class="label">Draft Grades</div>
-            </div>
-            <div class="stat-card">
-                <div class="number">${progress.percentage}%</div>
-                <div class="label">Completion Rate</div>
-            </div>
-        </div>
-
-        <div class="table-container">
-            <table>
-                <thead>
-                    <tr>
-                        <th>#</th>
-                        <th>Student ID</th>
-                        <th>Student Name</th>
-                        <th>Email</th>
-                        <th>Program</th>
-                        <th>Status</th>
-                        <th>Grade Type</th>
-                        <th>Final Grade</th>
-                        <th>Percentage</th>
-                        <th>Last Modified</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${classList.students.map((student, index) => {
-            const studentProgress = classList.gradingProgress[index];
-            const gradeInfo = calculateStudentGrade(student.id);
-            const status = studentProgress?.status || 'pending';
-            const gradeType = studentProgress?.gradeType || 'none';
-            const lastModified = studentProgress?.lastModified
-                ? new Date(studentProgress.lastModified).toLocaleDateString()
-                : 'Never';
-
-            let statusClass = 'status-pending';
-            if (status.includes('final')) statusClass = 'status-final';
-            else if (status.includes('draft')) statusClass = 'status-draft';
-
-            return `
-                            <tr>
-                                <td>${index + 1}</td>
-                                <td>${student.id}</td>
-                                <td><strong>${student.name}</strong></td>
-                                <td>${student.email}</td>
-                                <td>${student.program || 'N/A'}</td>
-                                <td><span class="status-badge ${statusClass}">${status}</span></td>
-                                <td>${gradeType}</td>
-                                <td><strong>${gradeInfo.score !== 'N/A' ? `${gradeInfo.score}/${gradeInfo.maxPossible}` : 'N/A'}</strong></td>
-                                <td>${gradeInfo.percentage !== 'N/A' ? `${gradeInfo.percentage}%` : 'N/A'}</td>
-                                <td>${lastModified}</td>
-                            </tr>
-                        `;
-        }).join('')}
-                </tbody>
-            </table>
-        </div>
-
-        <div class="footer">
-            <p><strong>Class Grade Report Generated</strong></p>
-            <p>${currentDate} | ${new Date().toLocaleTimeString()}</p>
-            <p>Imported from: ${classList.fileName} | Assessment Platform v2.0</p>
-        </div>
-    </div>
-</body>
-</html>`;
-
-        const htmlBlob = new Blob([htmlContent], { type: 'text/html' });
-        const url = URL.createObjectURL(htmlBlob);
+        const htmlContent = getClassGradesHTML();
+        const blob = new Blob([htmlContent], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
+
         link.href = url;
-        link.download = `${classList.courseMetadata?.courseCode || 'class'}_grade_report_${new Date().toISOString().split('T')[0]}.html`;
+        link.download = `${classList.courseMetadata?.courseCode || 'Class'}_grades.html`;
+        link.style.display = 'none';
+        document.body.appendChild(link);
         link.click();
+        document.body.removeChild(link);
+
         URL.revokeObjectURL(url);
     };
+    // ───────────────────────────────────────────────────────────────────────────────
 
-    // ── PDF export stub ────────────────────────────────────────────────────────
-    // This makes your “PDF” button call the browser’s print dialog.
-    const exportClassGradesPDF = () => {
-        // If no class list is loaded, do nothing
+
+   
+    // ── Export Class Grades as a portrait PDF ────────────────────────────────────
+    const exportClassGradesPortraitPDF = () => {
         if (!classList) return;
 
-        // Fire the print dialog (user can choose “Save as PDF”)
-        window.print();
+        // Open a new window with our portrait HTML
+        const printWin = window.open('', '_blank', 'width=800,height=600');
+        printWin.document.write(getPortraitClassReportHTML());
+        printWin.document.close();
+        printWin.focus();
+
+        // When it loads, trigger the print dialog
+        printWin.onload = () => {
+            printWin.print();
+            // Optionally close after printing:
+            // printWin.close();
+        };
     };
+    // ───────────────────────────────────────────────────────────────────────────────
+
     // ──────────────────────────────
 
     // ── New: Export a single student's grade as CSV ───────────────────────────────
@@ -613,16 +731,34 @@ const ClassListManager = () => {
 
         // 4. Build a 2-row CSV: headers + this student's data
         const rows = [
-            ['Student ID', 'Numeric Score', 'Letter Grade', 'Percentage'],
-            [
-                student.id,
-                `${gradeInfo.score}/${gradeInfo.maxPossible}`,
-                gradeInfo.letterGrade,
-                `${gradeInfo.percentage}%`
-            ]
+            ['Student ID', 'Student Name', 'Email', 'Program', 'Status', 'Grade Type', 'Numeric Grade', 'Letter Grade', 'Percentage', 'Last Modified'],
+            ...classList.students.map((student, index) => {
+                const prog = classList.gradingProgress[index] || {};
+                const info = calculateStudentGrade(student.id);
+                const lm = prog.lastModified
+                    ? new Date(prog.lastModified).toLocaleDateString()
+                    : 'Never';
+                return [
+                    student.id,
+                    student.name,
+                    student.email,
+                    student.program || 'N/A',
+                    prog.status || 'pending',
+                    prog.gradeType || 'none',
+                    `${info.score}/${info.maxPossible}`,
+                    info.letterGrade || 'N/A',
+                    `${info.percentage}%`,
+                    lm
+                ];
+            })
         ];
 
-        const csvContent = rows.map(r => r.join(',')).join('\n');
+        const quote = (cell) => `"${String(cell).trim().replace(/"/g, '""')}"`;
+
+        const csvContent = rows
+            .map(row => row.map(quote).join(','))
+            .join('\r\n');
+
 
         // 5. Trigger download
         const blob = new Blob([csvContent], { type: 'text/csv' });
@@ -863,6 +999,8 @@ const ClassListManager = () => {
                                                 <option value="degree">Degree</option>
                                                 <option value="diploma">Diploma</option>
                                                 <option value="certificate">Certificate</option>
+                                                <option value="graduateCertificate">Graduate Certificate</option>
+
                                             </select>
                                         </div>
                                     </div>
@@ -978,7 +1116,7 @@ const ClassListManager = () => {
                                             HTML
                                         </button>
                                         <button
-                                            onClick={exportClassGradesPDF}
+                                            onClick={exportClassGradesPortraitPDF}
                                             className="flex items-center gap-1 px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm font-medium transition-colors"
                                         >
                                             <FileText size={14} />

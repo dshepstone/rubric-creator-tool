@@ -65,10 +65,10 @@ const SimpleRichTextEditor = React.forwardRef(({ value, onChange, placeholder },
     };
 
     const sanitizeHtml = (html) => {
-        // First, remove all style blocks, comments, and Microsoft Word specific content
-        let cleanedHtml = html
-            // Remove HTML comments (including the massive style block from Word)
-            .replace(/<!--[\s\S]*?-->/g, '')
+                let cleanedHtml = html
+                       // Remove all HTML comments (<!-- … -->), including Word’s conditional comments
+                        .replace(/<!--[\s\S]*?-->/g, '')      
+           
             // Remove style tags and their content
             .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
             // Remove script tags and their content
@@ -78,8 +78,8 @@ const SimpleRichTextEditor = React.forwardRef(({ value, onChange, placeholder },
             .replace(/<\/?o:p[^>]*>/gi, '')
             .replace(/<\/?v:[^>]*>/gi, '')
             .replace(/<\/?w:[^>]*>/gi, '')
-            // Remove Microsoft Word conditional comments
-            .replace(/<!--\[if[^>]*>[\s\S]*?<!\[endif\]-->/gi, '');
+              // (we already stripped all <!--…--> above)
+              ;
 
         // Create a temporary container
         const tempDiv = document.createElement('div');
@@ -88,30 +88,30 @@ const SimpleRichTextEditor = React.forwardRef(({ value, onChange, placeholder },
         // Remove all style attributes and Microsoft Office attributes
         const removeAttributes = (element) => {
             if (element.nodeType === Node.ELEMENT_NODE) {
-                // Get all attributes to remove
                 const attributesToRemove = [];
                 for (let i = 0; i < element.attributes.length; i++) {
                     const attr = element.attributes[i];
-                    // Remove style attributes, class attributes, and any mso-* attributes
-                    if (attr.name === 'style' ||
+                    if (
+                        attr.name === 'style' ||
                         attr.name === 'class' ||
                         attr.name.startsWith('mso-') ||
                         attr.name.startsWith('data-') ||
                         attr.name === 'lang' ||
-                        attr.name === 'dir') {
+                        attr.name === 'dir'
+                    ) {
                         attributesToRemove.push(attr.name);
                     }
                 }
 
-                // Remove the attributes
-                attributesToRemove.forEach(attrName => {
+                // FIX: Replaced forEach with a standard for...of loop to avoid parser errors
+                for (const attrName of attributesToRemove) {
                     element.removeAttribute(attrName);
-                });
+                }
 
                 // Recursively clean child elements
-                Array.from(element.children).forEach(child => {
+                for (const child of Array.from(element.children)) {
                     removeAttributes(child);
-                });
+                }
             }
         };
 
@@ -119,14 +119,15 @@ const SimpleRichTextEditor = React.forwardRef(({ value, onChange, placeholder },
 
         // Convert Microsoft Word's complex list structures to simple HTML lists
         const convertWordLists = (container) => {
-            // Find paragraphs that are actually list items (they contain bullet symbols or are indented)
             const paragraphs = container.querySelectorAll('p');
             let currentList = null;
             let currentListType = null;
 
-            paragraphs.forEach(p => {
+            // FIX: Replaced forEach with a standard for...of loop to avoid parser errors
+            for (const p of paragraphs) {
                 const text = p.textContent.trim();
-                const isListItem = text.startsWith('·') ||
+                const isListItem =
+                    text.startsWith('·') ||
                     text.startsWith('•') ||
                     text.startsWith('-') ||
                     text.match(/^\d+\./) ||
@@ -134,38 +135,28 @@ const SimpleRichTextEditor = React.forwardRef(({ value, onChange, placeholder },
                     p.className?.includes('List');
 
                 if (isListItem) {
-                    // Determine if it's ordered or unordered
                     const isOrdered = text.match(/^\d+\./);
                     const listType = isOrdered ? 'ol' : 'ul';
 
-                    // Create new list if needed
                     if (!currentList || currentListType !== listType) {
                         currentList = document.createElement(listType);
                         currentListType = listType;
                         p.parentNode.insertBefore(currentList, p);
                     }
 
-                    // Create list item
                     const li = document.createElement('li');
-
-                    // Clean the text (remove bullet symbols and extra spacing)
                     let cleanText = text
-                        .replace(/^[·•\-]\s*/, '') // Remove bullet symbols
-                        .replace(/^\d+\.\s*/, '') // Remove number prefix
+                        .replace(/^[·•\-]\s*/, '')
+                        .replace(/^\d+\.\s*/, '')
                         .trim();
-
-                    // Move the paragraph content to the list item
                     li.innerHTML = cleanText;
                     currentList.appendChild(li);
-
-                    // Remove the original paragraph
                     p.remove();
                 } else {
-                    // Reset list tracking for non-list content
                     currentList = null;
                     currentListType = null;
                 }
-            });
+            }
         };
 
         convertWordLists(tempDiv);
@@ -176,7 +167,6 @@ const SimpleRichTextEditor = React.forwardRef(({ value, onChange, placeholder },
         // Function to recursively clean nodes and remove disallowed tags
         const cleanNode = (node) => {
             if (node.nodeType === Node.TEXT_NODE) {
-                // Clean up text content - remove extra whitespace
                 const cleanText = node.textContent.replace(/\s+/g, ' ').trim();
                 return cleanText ? document.createTextNode(cleanText) : null;
             }
@@ -187,25 +177,24 @@ const SimpleRichTextEditor = React.forwardRef(({ value, onChange, placeholder },
                 if (allowedTags.includes(tagName)) {
                     const newNode = document.createElement(tagName);
 
-                    // Recursively clean children
-                    Array.from(node.childNodes).forEach(child => {
+                    // FIX: Replaced forEach with a standard for...of loop
+                    for (const child of Array.from(node.childNodes)) {
                         const cleanedChild = cleanNode(child);
                         if (cleanedChild) {
                             newNode.appendChild(cleanedChild);
                         }
-                    });
+                    }
 
-                    // Only return the node if it has content
                     return newNode.textContent.trim() || newNode.children.length > 0 ? newNode : null;
                 } else {
-                    // For disallowed tags (like div, span), extract their children
                     const fragment = document.createDocumentFragment();
-                    Array.from(node.childNodes).forEach(child => {
+                    // FIX: Replaced forEach with a standard for...of loop
+                    for (const child of Array.from(node.childNodes)) {
                         const cleanedChild = cleanNode(child);
                         if (cleanedChild) {
                             fragment.appendChild(cleanedChild);
                         }
-                    });
+                    }
                     return fragment.childNodes.length > 0 ? fragment : null;
                 }
             }
@@ -214,18 +203,19 @@ const SimpleRichTextEditor = React.forwardRef(({ value, onChange, placeholder },
         };
 
         const cleanedContainer = document.createElement('div');
-        Array.from(tempDiv.childNodes).forEach(child => {
+        // FIX: Replaced forEach with a standard for...of loop
+        for (const child of Array.from(tempDiv.childNodes)) {
             const cleanedChild = cleanNode(child);
             if (cleanedChild) {
                 cleanedContainer.appendChild(cleanedChild);
             }
-        });
+        }
 
-        // Final cleanup - remove empty paragraphs and normalize spacing
+        // Final cleanup
         const finalHtml = cleanedContainer.innerHTML
-            .replace(/<p[^>]*>\s*<\/p>/g, '') // Remove empty paragraphs
-            .replace(/\n\s*\n/g, '\n') // Remove multiple line breaks
-            .replace(/(<\/[^>]+>)\s+(<[^>]+>)/g, '$1$2') // Remove spaces between tags
+            .replace(/<p[^>]*>\s*<\/p>/g, '')
+            .replace(/\n\s*\n/g, '\n')
+            .replace(/(<\/[^>]+>)\s+(<[^>]+>)/g, '$1$2')
             .trim();
 
         return finalHtml;
@@ -238,19 +228,11 @@ const SimpleRichTextEditor = React.forwardRef(({ value, onChange, placeholder },
     };
 
     const formatText = (command, value = null) => {
-        // Focus the editor first to ensure commands work
         if (editorRef.current) {
             editorRef.current.focus();
-
-            // Small delay to ensure focus is set
             setTimeout(() => {
                 try {
-                    const success = document.execCommand(command, false, value);
-                    if (!success) {
-                        console.warn(`Command ${command} not successful`);
-                    }
-
-                    // Trigger onChange after formatting
+                    document.execCommand(command, false, value);
                     if (onChange && editorRef.current) {
                         onChange(editorRef.current.innerHTML);
                     }
@@ -262,7 +244,6 @@ const SimpleRichTextEditor = React.forwardRef(({ value, onChange, placeholder },
     };
 
     const handleKeyDown = (e) => {
-        // Handle some common keyboard shortcuts
         if (e.ctrlKey || e.metaKey) {
             switch (e.key) {
                 case 'b':
@@ -276,6 +257,8 @@ const SimpleRichTextEditor = React.forwardRef(({ value, onChange, placeholder },
                 case 'u':
                     e.preventDefault();
                     formatText('underline');
+                    break;
+                default:
                     break;
             }
         }
@@ -370,7 +353,7 @@ const SimpleRichTextEditor = React.forwardRef(({ value, onChange, placeholder },
                     →
                 </button>
                 <div className="w-px bg-gray-300"></div>
-                
+
                 {/* ─── Remove formatting (Tx / Eraser) ───────────────────────────── */}
                 <button
                     type="button"
@@ -1091,7 +1074,7 @@ const RubricCreator = () => {
                     <div className="flex justify-between items-center">
                         <div>
                             <h1 className="text-2xl font-bold">Professional Rubric Builder</h1>
-                            <p className="text-blue-200">Create comprehensive assessment rubrics with detailed criteria and feedback</p>
+                            <p className="text-white">Create comprehensive assessment rubrics with detailed criteria and feedback</p>
                         </div>
                         <div className="flex gap-2 flex-wrap">
                             <button
