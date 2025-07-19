@@ -1,4 +1,4 @@
-// Updated SharedContext.js with Enhanced Draft/Final Grade Management + AI Prompt Generator
+// Updated SharedContext.js with Enhanced Draft/Final Grade Management
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 
 const AssessmentContext = createContext();
@@ -15,10 +15,7 @@ export const AssessmentProvider = ({ children }) => {
     // Shared rubric state
     const [sharedRubric, setSharedRubric] = useState(null);
     const [sharedCourseDetails, setSharedCourseDetails] = useState(null);
-    const [activeTab, setActiveTab] = useState('ai-prompt-generator'); // Updated to start with AI prompt generator
-
-    // NEW: AI Prompt Generator state
-    const [aiPromptFormData, setAIPromptFormData] = useState(null);
+    const [activeTab, setActiveTab] = useState('rubric-creator');
 
     // Class list and student management
     const [classList, setClassList] = useState(null);
@@ -93,37 +90,6 @@ export const AssessmentProvider = ({ children }) => {
         expandedFeedback: {},
         modalEdit: { show: false, content: '', field: null, onSave: null }
     });
-
-    // NEW: AI Prompt Generator functions
-    const initializeAIPromptFormData = useCallback(() => {
-        setAIPromptFormData({
-            assignmentType: '',
-            programType: '',
-            programLevel: '',
-            subjectArea: '',
-            assignmentDescription: '',
-            totalPoints: '100',
-            numCriteria: '4',
-            criteriaType: 'ai-suggested',
-            userCriteria: '',
-            learningObjectives: '',
-            studentPopulation: '',
-            timeFrameNumber: '',
-            timeFrameUnit: 'weeks',
-            specialConsiderations: ''
-        });
-    }, []);
-
-    const updateAIPromptFormData = useCallback((field, value) => {
-        setAIPromptFormData(prev => ({
-            ...prev,
-            [field]: value
-        }));
-    }, []);
-
-    const clearAIPromptFormData = useCallback(() => {
-        setAIPromptFormData(null);
-    }, []);
 
     // Form update functions
     const updateStudentInfo = useCallback((studentInfo) => {
@@ -451,7 +417,7 @@ export const AssessmentProvider = ({ children }) => {
         });
     }, []);
 
-    // UPDATED: Export Session Function with AI Prompt Data
+    // NEW: Export Session Function
     const exportSession = useCallback(() => {
         const sessionData = {
             sharedRubric,
@@ -462,7 +428,6 @@ export const AssessmentProvider = ({ children }) => {
             currentStudent,
             gradingSession,
             sharedCourseDetails,
-            aiPromptFormData, // NEW: Include AI prompt data
         };
         const dataStr = JSON.stringify(sessionData, null, 2);
         const dataBlob = new Blob([dataStr], { type: 'application/json' });
@@ -475,9 +440,9 @@ export const AssessmentProvider = ({ children }) => {
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
-    }, [sharedRubric, classList, drafts, finalGrades, activeTab, currentStudent, gradingSession, sharedCourseDetails, aiPromptFormData]);
+    }, [sharedRubric, classList, drafts, finalGrades, activeTab, currentStudent, gradingSession, sharedCourseDetails]);
 
-    // UPDATED: Import Session Function with AI Prompt Data
+    // NEW: Import Session Function
     const importSession = useCallback((jsonContent) => {
         try {
             const sessionData = JSON.parse(jsonContent);
@@ -486,11 +451,10 @@ export const AssessmentProvider = ({ children }) => {
                 setClassList(sessionData.classList || null);
                 setDrafts(sessionData.drafts || {});
                 setFinalGrades(sessionData.finalGrades || {});
-                setActiveTab(sessionData.activeTab || 'ai-prompt-generator');
+                setActiveTab(sessionData.activeTab || 'rubric-creator');
                 setCurrentStudent(sessionData.currentStudent || null);
                 setGradingSession(sessionData.gradingSession || { active: false });
                 setSharedCourseDetails(sessionData.sharedCourseDetails || null);
-                setAIPromptFormData(sessionData.aiPromptFormData || null); // NEW: Restore AI prompt data
                 alert('Session loaded successfully!');
             } else {
                 throw new Error('Invalid file format.');
@@ -499,7 +463,8 @@ export const AssessmentProvider = ({ children }) => {
             console.error("Failed to import session:", error);
             alert("Error: Could not load the session file. Please ensure it's a valid session file.");
         }
-    }, []);
+    }, [/* All setter functions are dependencies */ setSharedRubric, setClassList, setDrafts, setFinalGrades, setActiveTab, setCurrentStudent, setGradingSession, setSharedCourseDetails]);
+
 
     // Finalize a draft grade
     const finalizeGrade = useCallback((studentId) => {
@@ -548,8 +513,7 @@ export const AssessmentProvider = ({ children }) => {
         setSharedRubric(null);
         clearGradingFormData();
         clearRubricFormData();
-        clearAIPromptFormData(); // NEW: Clear AI prompt data
-    }, [clearGradingFormData, clearRubricFormData, clearAIPromptFormData]);
+    }, [clearGradingFormData, clearRubricFormData]);
 
     const persistentFormData = gradingFormData;
     const updatePersistentFormData = setGradingFormData;
@@ -564,12 +528,6 @@ export const AssessmentProvider = ({ children }) => {
         // Navigation
         activeTab,
         setActiveTab,
-
-        // NEW: AI Prompt Generator
-        aiPromptFormData,
-        updateAIPromptFormData,
-        initializeAIPromptFormData,
-        clearAIPromptFormData,
 
         // Grading form data
         gradingData: gradingFormData,
@@ -622,7 +580,7 @@ export const AssessmentProvider = ({ children }) => {
         clearRubricFormData,
         clearAllData,
 
-        // Session management
+        // NEW: Session management
         exportSession,
         importSession,
 

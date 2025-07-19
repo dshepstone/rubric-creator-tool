@@ -2,7 +2,7 @@ import React, { useRef } from 'react';
 import { useAssessment } from './SharedContext';
 import {
     FileText, GraduationCap, Users, ArrowRight, Database,
-    PlayCircle, Clock, CheckCircle, AlertTriangle, Save, Upload, Sparkles
+    PlayCircle, Clock, CheckCircle, AlertTriangle, Save, Upload
 } from 'lucide-react';
 
 const TabNavigation = () => {
@@ -33,13 +33,8 @@ const TabNavigation = () => {
         event.target.value = ''; // Reset input to allow re-uploading the same file
     };
 
+
     const tabs = [
-        {
-            id: 'ai-prompt-generator',
-            name: 'AI Prompt Generator',
-            icon: Sparkles,
-            description: 'Generate AI prompts to create rubric JSON files'
-        },
         {
             id: 'rubric-creator',
             name: 'Rubric Creator',
@@ -59,9 +54,7 @@ const TabNavigation = () => {
             description: 'Grade assignments using rubrics'
         }
     ];
-
     const activeStyles = {
-        'ai-prompt-generator': 'active-ai-prompt border-blue-500 text-blue-700',
         'rubric-creator': 'active-rubric border-purple-500 text-purple-700',
         'class-manager': 'active-class  border-indigo-500 text-indigo-700',
         'grading-tool': 'active-grading border-green-500  text-green-700',
@@ -95,7 +88,7 @@ const TabNavigation = () => {
     return (
         <div className="tab-navigation border-b border-gray-200 shadow-sm">
             <div className="max-w-7xl mx-auto">
-                <nav className="flex space-x-2 px-6 overflow-x-auto" aria-label="Tabs">
+                <nav className="flex space-x-8 px-6" aria-label="Tabs">
                     {tabs.map((tab) => {
                         const Icon = tab.icon;
                         const isActive = activeTab === tab.id;
@@ -107,28 +100,20 @@ const TabNavigation = () => {
                                 className={`${isActive
                                     ? `${activeStyles[tab.id]}`
                                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                                    } flex-shrink-0 py-4 px-4 font-medium text-sm flex items-center gap-2 transition-all duration-200 min-w-max`}
+                                    } whitespace-nowrap py-4 px-6 font-medium text-sm flex items-center gap-2 transition-all duration-200`}
                             >
-                                <Icon size={18} className="flex-shrink-0" />
+                                <Icon size={18} />
                                 <div className="text-left">
-                                    <div className="font-semibold whitespace-nowrap">{tab.name}</div>
-                                    <div className="text-xs opacity-75 whitespace-nowrap">{tab.description}</div>
+                                    <div className="font-semibold">{tab.name}</div>
+                                    <div className="text-xs opacity-75">{tab.description}</div>
                                 </div>
 
                                 {/* Status Indicators */}
-                                <div className="flex flex-col gap-1 ml-2 flex-shrink-0">
-                                    {/* AI Prompt Generator Indicators */}
-                                    {tab.id === 'ai-prompt-generator' && (
-                                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 whitespace-nowrap">
-                                            <Sparkles size={10} className="mr-1 flex-shrink-0" />
-                                            AI Assistant
-                                        </span>
-                                    )}
-
+                                <div className="flex flex-col gap-1 ml-2">
                                     {/* Rubric Creator Indicators */}
                                     {tab.id === 'rubric-creator' && hasRubricData && (
-                                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 whitespace-nowrap">
-                                            <FileText size={10} className="mr-1 flex-shrink-0" />
+                                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                            <FileText size={10} className="mr-1" />
                                             Active Rubric
                                         </span>
                                     )}
@@ -136,19 +121,19 @@ const TabNavigation = () => {
                                     {/* Class Manager Indicators */}
                                     {tab.id === 'class-manager' && hasClassListData && (
                                         <div className="flex flex-col gap-1">
-                                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 whitespace-nowrap">
-                                                <Users size={10} className="mr-1 flex-shrink-0" />
+                                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                                                <Users size={10} className="mr-1" />
                                                 {classList.students.length} Students
                                             </span>
                                             {progress.total > 0 && (
-                                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 whitespace-nowrap">
-                                                    <CheckCircle size={10} className="mr-1 flex-shrink-0" />
+                                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                                    <CheckCircle size={10} className="mr-1" />
                                                     {progress.percentage}% Graded
                                                 </span>
                                             )}
                                             {hasActiveSession && (
-                                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 whitespace-nowrap">
-                                                    <PlayCircle size={10} className="mr-1 flex-shrink-0" />
+                                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                                                    <PlayCircle size={10} className="mr-1" />
                                                     Active Session
                                                 </span>
                                             )}
@@ -159,20 +144,20 @@ const TabNavigation = () => {
                                     {tab.id === 'grading-tool' && (
                                         <div className="flex flex-col gap-1">
                                             {hasRubricData && (
-                                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 whitespace-nowrap">
-                                                    <Database size={10} className="mr-1 flex-shrink-0" />
+                                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                                    <Database size={10} className="mr-1" />
                                                     Rubric Ready
                                                 </span>
                                             )}
                                             {hasFormData && (
-                                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 whitespace-nowrap">
-                                                    <FileText size={10} className="mr-1 flex-shrink-0" />
+                                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                                    <FileText size={10} className="mr-1" />
                                                     Data Saved
                                                 </span>
                                             )}
                                             {hasActiveSession && gradingSession.currentStudent && (
-                                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 whitespace-nowrap">
-                                                    <Clock size={10} className="mr-1 flex-shrink-0" />
+                                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                                    <Clock size={10} className="mr-1" />
                                                     {gradingSession.currentStudent.name}
                                                 </span>
                                             )}
@@ -250,8 +235,9 @@ const TabNavigation = () => {
                             </button>
                             <div className="w-px h-6 bg-gray-300"></div>
 
+
                             {/* Workflow indicators and quick actions */}
-                            {!hasRubricData && activeTab !== 'rubric-creator' && activeTab !== 'ai-prompt-generator' && (
+                            {!hasRubricData && activeTab !== 'rubric-creator' && (
                                 <div className="flex items-center gap-2 text-yellow-700 bg-yellow-50 px-3 py-1.5 rounded-lg border border-yellow-200">
                                     <AlertTriangle size={14} />
                                     <span className="text-sm">Create rubric first</span>
@@ -282,16 +268,6 @@ const TabNavigation = () => {
                             )}
 
                             {/* Tab-specific quick transfer buttons */}
-                            {activeTab === 'ai-prompt-generator' && (
-                                <button
-                                    onClick={() => setActiveTab('rubric-creator')}
-                                    className="flex items-center gap-2 text-purple-700 hover:text-purple-800 text-sm font-medium bg-white px-3 py-1.5 rounded-lg border border-purple-200 hover:border-purple-300 transition-all duration-200 shadow-sm hover:shadow"
-                                >
-                                    <ArrowRight size={14} />
-                                    Go to Rubric Creator
-                                </button>
-                            )}
-
                             {activeTab === 'rubric-creator' && hasRubricData && hasClassListData && (
                                 <button
                                     onClick={() => {
