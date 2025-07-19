@@ -302,7 +302,6 @@ const GradingTemplate = () => {
   const [loadedRubric, setLoadedRubric] = useState(() => {
     return sharedRubric || sampleRubric;
   });
-  // **FIX:** REMOVED `rubricGrading` state to use `localGradingData.rubricGrading` instead
   const [showRubricComments, setShowRubricComments] = useState({});
   const [showHeaderGuide, setShowHeaderGuide] = useState(false);
 
@@ -348,10 +347,8 @@ const GradingTemplate = () => {
 
   // ── When student changes, load any saved draft/final but keep course+assignment
   useEffect(() => {
-    // A. If there’s no student loaded yet, do nothing
     if (!currentStudent?.id) return;
 
-    // B. Figure out if they’ve got a saved final or a draft
     const status = getGradeStatus(currentStudent.id);
     let saved = null;
     if (status === 'final' && loadFinalGrade) {
@@ -360,20 +357,17 @@ const GradingTemplate = () => {
       saved = loadDraft(currentStudent.id);
     }
 
-    // C. If we found saved data, merge it into our local form
     if (saved) {
       setLocalGradingData(prev => ({
-        ...saved,                    // 1. all the saved answers, ratings, feedback, etc.
-        student: currentStudent,  // 2. make sure the student info is correct
-        course: prev.course,     // 3. keep whatever course info was already in the form
-        assignment: prev.assignment, // 4. keep whatever assignment info was already in the form
-        metadata: prev.metadata    // 5. preserve any extra metadata
+        ...saved,
+        student: currentStudent,
+        course: prev.course,
+        assignment: prev.assignment,
+        metadata: prev.metadata
       }));
-      // D. reset any small inputs (like video link fields)
       setVideoLinkInput('');
       setVideoTitle('');
     } else {
-      // E. otherwise, we start fresh
       resetGradingForm();
     }
   }, [currentStudent, getGradeStatus, loadDraft, loadFinalGrade]);
@@ -401,7 +395,6 @@ const GradingTemplate = () => {
     }
   };
 
-  // **FIX:** Initialize rubric grading state within the main `localGradingData` object
   useEffect(() => {
     if (loadedRubric) {
       const initialGrading = {};
@@ -413,7 +406,6 @@ const GradingTemplate = () => {
         };
       });
 
-      // Update assignment details AND the rubricGrading key in the main state object
       setLocalGradingData(prevData => ({
         ...prevData,
         assignment: {
@@ -421,7 +413,6 @@ const GradingTemplate = () => {
           name: loadedRubric.assignmentInfo?.title || prevData.assignment.name,
           maxPoints: loadedRubric.assignmentInfo?.totalPoints || prevData.assignment.maxPoints
         },
-        // Only set initial grading if it doesn't already exist for this student
         rubricGrading: prevData.rubricGrading && Object.keys(prevData.rubricGrading).length > 0 ? prevData.rubricGrading : initialGrading,
         metadata: {
           ...prevData.metadata,
@@ -431,14 +422,11 @@ const GradingTemplate = () => {
     }
   }, [loadedRubric]);
 
-  // **FIX:** Load saved data when student changes, simplifying the state update AND preserving course info.
   useEffect(() => {
     if (currentStudent?.id) {
       console.log('🔍 Loading data for student:', currentStudent.name);
-
       const gradeStatus = getGradeStatus(currentStudent.id);
       console.log('📊 Grade status:', gradeStatus);
-
       let savedData = null;
 
       if (gradeStatus === 'final') {
@@ -451,16 +439,13 @@ const GradingTemplate = () => {
 
       if (savedData) {
         console.log('✅ Successfully loaded saved grade data');
-        // **FIX:** Merge saved data with current course/assignment details
-        // instead of overwriting them.
         setLocalGradingData(prevData => ({
-          ...savedData, // Load the draft data (feedback, rubric selections, etc.)
-          course: prevData.course, // But preserve the current course info
-          assignment: prevData.assignment, // And the current assignment info
-          student: currentStudent, // And ensure the student is the current one
-          metadata: prevData.metadata // And preserve metadata
+          ...savedData,
+          course: prevData.course,
+          assignment: prevData.assignment,
+          student: currentStudent,
+          metadata: prevData.metadata
         }));
-
         setVideoLinkInput('');
         setVideoTitle('');
       } else {
@@ -471,11 +456,8 @@ const GradingTemplate = () => {
   }, [currentStudent, getGradeStatus, loadDraft, loadFinalGrade]);
 
 
-  // Calculate total score with late policy applied
   const calculateTotalScore = () => {
     let rawScore = 0;
-
-    // **FIX:** Read from `localGradingData.rubricGrading`
     if (loadedRubric && gradingData.rubricGrading) {
       rawScore = Object.values(gradingData.rubricGrading).reduce((total, grading) => {
         const criterion = loadedRubric.criteria.find(c => c.id === grading.criterionId);
@@ -488,10 +470,8 @@ const GradingTemplate = () => {
         return total;
       }, 0);
     }
-
     const latePolicyLevel = latePolicyLevels[gradingData.latePolicy.level];
     const finalScore = rawScore * latePolicyLevel.multiplier;
-
     return {
       rawScore: rawScore,
       finalScore: finalScore,
@@ -500,7 +480,6 @@ const GradingTemplate = () => {
     };
   };
 
-  // Update late policy
   const updateLatePolicy = (level) => {
     setGradingData(prevData => ({
       ...prevData,
@@ -511,12 +490,10 @@ const GradingTemplate = () => {
     }));
   };
 
-  // **FIX:** Update rubric grading directly within the main `localGradingData` state object
   const updateRubricGrading = (criterionId, level, comments = null) => {
     setLocalGradingData(prevData => {
       const existingGrading = prevData.rubricGrading[criterionId];
       const existingComments = existingGrading?.customComments || '';
-
       const newRubricState = {
         ...prevData.rubricGrading,
         [criterionId]: {
@@ -525,7 +502,6 @@ const GradingTemplate = () => {
           customComments: comments !== null ? comments : existingComments
         }
       };
-
       return {
         ...prevData,
         rubricGrading: newRubricState
@@ -533,13 +509,11 @@ const GradingTemplate = () => {
     });
   };
 
-  // **FIX:** Add feedback comment directly within the main `localGradingData` state object
   const addCriterionFeedback = (criterionId, comment) => {
     setLocalGradingData(prevData => {
       const currentGrading = prevData.rubricGrading[criterionId];
       const currentComments = currentGrading?.customComments || '';
       const newComments = currentComments ? `${currentComments}\n• ${comment}` : `• ${comment}`;
-
       const newRubricState = {
         ...prevData.rubricGrading,
         [criterionId]: {
@@ -549,7 +523,6 @@ const GradingTemplate = () => {
           customComments: newComments
         }
       };
-
       return {
         ...prevData,
         rubricGrading: newRubricState
@@ -557,7 +530,6 @@ const GradingTemplate = () => {
     });
   };
 
-  // Toggle rubric comments visibility
   const toggleRubricComments = (criterionId) => {
     setShowRubricComments(prev => ({
       ...prev,
@@ -565,7 +537,6 @@ const GradingTemplate = () => {
     }));
   };
 
-  // Add video link
   const addVideoLink = () => {
     if (videoLinkInput.trim()) {
       setGradingData(prevData => ({
@@ -581,7 +552,6 @@ const GradingTemplate = () => {
     }
   };
 
-  // Remove video link
   const removeVideoLink = (id) => {
     setGradingData(prevData => ({
       ...prevData,
@@ -589,7 +559,6 @@ const GradingTemplate = () => {
     }));
   };
 
-  // Handle file uploads
   const handleFileUpload = (files) => {
     const newAttachments = Array.from(files).map(file => ({
       id: Date.now() + Math.random(),
@@ -620,7 +589,6 @@ const GradingTemplate = () => {
     });
   };
 
-  // Remove attachment
   const removeAttachment = (id) => {
     setGradingData(prevData => ({
       ...prevData,
@@ -628,19 +596,15 @@ const GradingTemplate = () => {
     }));
   };
 
-  // Original Student Navigation Function (for original buttons)
   const handleNextStudent = () => {
-    // We'll make it save as a draft by default now for consistency
     handleNextStudentAsDraft();
   };
 
-  // ENHANCED: New student navigation functions for draft/final system
   const handleNextStudentAsDraft = () => {
     if (currentStudent?.id) {
       console.log('💾 Saving as draft for student:', currentStudent.name);
       saveDraft(currentStudent.id, localGradingData);
     }
-
     const success = nextStudentInSession('draft');
     if (!success) {
       alert('Grading session completed! All students have been graded.');
@@ -657,7 +621,6 @@ const GradingTemplate = () => {
       console.log('✅ Finalizing grade for student:', currentStudent.name);
       saveFinalGrade(currentStudent.id, localGradingData);
     }
-
     const success = nextStudentInSession('final');
     if (!success) {
       alert('Grading session completed! All students have been graded.');
@@ -669,7 +632,6 @@ const GradingTemplate = () => {
     }
   };
 
-  // **FIX:** `resetGradingForm` now correctly resets the rubric within the main state object
   const resetGradingForm = () => {
     const initialRubricGrading = {};
     if (loadedRubric) {
@@ -681,15 +643,10 @@ const GradingTemplate = () => {
         };
       });
     }
-
-    // Reset only the grading-specific data, but pull in the full course+instructor
     setLocalGradingData(prev => ({
       ...prev,
-      // 1) Use the course info (including instructor) from context
       course: sharedCourseDetails?.course ?? prev.course,
       assignment: sharedCourseDetails?.assignment ?? prev.assignment,
-
-      // 2) Then reset just the student-by-student bits
       feedback: { general: '', strengths: '', improvements: '' },
       attachments: [],
       videoLinks: [],
@@ -702,24 +659,19 @@ const GradingTemplate = () => {
     if (currentStudent?.id) {
       saveDraft(currentStudent.id, localGradingData);
     }
-
     const success = previousStudentInSession();
     if (!success) {
       console.log('Already at first student or no active session');
     }
-    // No need to reset form here, the `useEffect` on `currentStudent` will handle loading new data
   };
 
-  // Get current student info for navigation display
   const getCurrentStudentInfo = () => {
     if (!classList || !gradingSession?.active || !gradingSession.currentStudent) {
       return null;
     }
-
     const currentIndex = gradingSession.currentStudentIndex;
     const totalStudents = classList.students.length;
     const student = gradingSession.currentStudent;
-
     return {
       student,
       position: currentIndex + 1,
@@ -731,8 +683,10 @@ const GradingTemplate = () => {
 
   const currentStudentInfo = getCurrentStudentInfo();
 
-  // Export functions
-  const exportToHTML = () => {
+  // --- START: CODE FIX ---
+
+  // Helper function to generate the student report HTML. This avoids code duplication.
+  const generateStudentReportHTML = () => {
     const scoreCalculation = calculateTotalScore();
     const totalScore = scoreCalculation.finalScore;
     const rawScore = scoreCalculation.rawScore;
@@ -750,7 +704,6 @@ const GradingTemplate = () => {
 
     const videoLinksHTML = gradingData.videoLinks.map(link => `<div class="video-link-item" style="background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 8px; padding: 1rem; margin-bottom: 1rem;"><div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;"><span style="font-size: 1.25rem;">🎥</span><strong style="color: #495057;">${link.title}</strong></div><a href="${link.url}" target="_blank" rel="noopener noreferrer" style="color: #007bff; text-decoration: none; word-break: break-all;">${link.url}</a></div>`).join('');
 
-    // **FIX:** Read from `gradingData.rubricGrading`
     const rubricTableHTML = loadedRubric ? `
       <div class="rubric-section" style="margin-top: 30px;">
           <h3>📋 Detailed Rubric Assessment</h3>
@@ -778,6 +731,11 @@ const GradingTemplate = () => {
 
     const htmlContent = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Grade Report - ${gradingData.student.name}</title><style>body{font-family:Arial,sans-serif;max-width:800px;margin:20px auto;padding:20px;line-height:1.6}.header{background:#f8f9fa;padding:20px;border-radius:8px;margin-bottom:30px}.score-summary{background:#e8f5e8;border:2px solid #4caf50;border-radius:8px;padding:20px;margin:20px 0;text-align:center}.late-policy-section{margin:30px 0;background:#fff5f5;border:1px solid #f87171;border-radius:8px;padding:20px}.feedback-section{margin:20px 0;padding:15px;background:#f9f9f9;border-radius:8px}.attachments{margin:30px 0}.attachment-item{display:inline-block;text-align:center;margin:1rem;padding:1rem;background:#fff;border:1px solid #ddd;border-radius:8px;box-shadow:0 2px 4px rgba(0,0,0,.1);max-width:250px;vertical-align:top}.clickable-image{cursor:pointer;transition:all .3s ease;position:relative}.clickable-image:hover{transform:scale(1.05);box-shadow:0 4px 8px rgba(0,0,0,.2)}.video-links{margin:30px 0}.video-link-item{margin-bottom:1rem}.video-link-item a{color:#007bff;text-decoration:none}.video-link-item a:hover{text-decoration:underline}h1,h2,h3{color:#333}.image-modal{display:none;position:fixed;z-index:1000;left:0;top:0;width:100%;height:100%;background-color:rgba(0,0,0,.9);animation:fadeIn .3s ease}.image-modal.show{display:flex;align-items:center;justify-content:center}.modal-content{max-width:95%;max-height:95%;object-fit:contain;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,.5);animation:zoomIn .3s ease}.close-modal{position:absolute;top:20px;right:30px;color:#fff;font-size:40px;font-weight:700;cursor:pointer;z-index:1001;background:rgba(0,0,0,.5);border-radius:50%;width:50px;height:50px;display:flex;align-items:center;justify-content:center;line-height:1}.close-modal:hover{background:rgba(0,0,0,.8)}.modal-caption{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);color:#fff;background:rgba(0,0,0,.7);padding:10px 20px;border-radius:6px;text-align:center;max-width:80%}@keyframes fadeIn{from{opacity:0}to{opacity:1}}@keyframes zoomIn{from{transform:scale(.5);opacity:0}to{transform:scale(1);opacity:1}}@media print{.attachment-item,.video-link-item{break-inside:avoid}.image-modal{display:none!important}}</style></head><body><div class="header"><h1>📋 Grade Report</h1><p><strong>Student:</strong> ${gradingData.student.name} (${gradingData.student.id})</p><p><strong>Course:</strong> ${gradingData.course.code} - ${gradingData.course.name}</p><p><strong>Assignment:</strong> ${gradingData.assignment.name}</p><p><strong>Instructor:</strong> ${gradingData.course.instructor}</p><p><strong>Term:</strong> ${gradingData.course.term}</p></div><div class="score-summary"><h2>📊 Final Score</h2><div style="font-size:2rem;font-weight:700;color:#2e7d32;margin:15px 0">${totalScore.toFixed(1)} / ${maxPoints} (${percentage}%)</div><p style="margin:10px 0;color:#555">${loadedRubric ? `Rubric: ${loadedRubric.assignmentInfo.title}` : ""}${penaltyApplied ? ` | Late Policy: ${latePolicyLevels[gradingData.latePolicy.level].name}` : ""}</p></div>${penaltyApplied ? `<div class="late-policy-section"><h3 style="color:#dc2626">📅 Late Submission Policy Applied</h3><p><strong>Policy Status:</strong> ${latePolicyLevels[gradingData.latePolicy.level].name}</p><p>${latePolicyLevels[gradingData.latePolicy.level].description}</p><p><strong>Raw Score:</strong> ${Math.round(rawScore * 10) / 10}/${maxPoints} → <strong>Final Score:</strong> ${Math.round(totalScore * 10) / 10}/${maxPoints}</p></div>` : ""}${rubricTableHTML}${Object.entries(gradingData.feedback).filter(([e, t]) => t).map(([e, t]) => `<div class="feedback-section"><h3>${e.charAt(0).toUpperCase() + e.slice(1)} Feedback</h3><p>${t.replace(/\n/g, "<br>")}</p></div>`).join("")}${attachmentsHTML ? `<div class="attachments"><h3>📎 File Attachments</h3><div style="display: flex; flex-wrap: wrap; justify-content: flex-start;">${attachmentsHTML}</div></div>` : ""}${videoLinksHTML ? `<div class="video-links"><h3>🎥 Video Review Links</h3>${videoLinksHTML}</div>` : ""}<p style="margin-top:40px;text-align:center;color:#666;font-size:.9rem">Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}</p><div id="imageModal" class="image-modal"><span class="close-modal" onclick="closeImageModal()">&times;</span><img class="modal-content" id="modalImage"><div class="modal-caption" id="modalCaption"></div></div><script>const attachmentData=${JSON.stringify(gradingData.attachments)};function openImageModal(e,t){const n=document.getElementById("imageModal"),o=document.getElementById("modalImage"),a=document.getElementById("modalCaption");n.classList.add("show"),o.src=e,a.textContent=t,document.body.style.overflow="hidden"}function closeImageModal(){document.getElementById("imageModal").classList.remove("show"),document.body.style.overflow="auto"}document.addEventListener("DOMContentLoaded",function(){document.querySelectorAll(".clickable-image").forEach(e=>{e.addEventListener("click",function(){const e=parseInt(this.getAttribute("data-index")),t=attachmentData[e];t&&t.base64Data&&openImageModal(t.base64Data,t.name)})}),document.getElementById("imageModal").addEventListener("click",function(e){e.target===this&&closeImageModal()}),document.addEventListener("keydown",function(e){"Escape"===e.key&&closeImageModal()})})</script></body></html>`;
 
+    return htmlContent;
+  };
+
+  const exportToHTML = () => {
+    const htmlContent = generateStudentReportHTML();
     const htmlBlob = new Blob([htmlContent], { type: 'text/html' });
     const url = URL.createObjectURL(htmlBlob);
     const link = document.createElement('a');
@@ -788,10 +746,16 @@ const GradingTemplate = () => {
   };
 
   const exportToPDF = () => {
-    // This function's logic would also be updated to use `gradingData.rubricGrading` instead of a separate state variable.
-    // For brevity, the large PDF template string is omitted here, but the principle is the same.
-    alert("PDF export functionality would be fully implemented here.");
+    const html = generateStudentReportHTML();
+    const printWindow = window.open('', '_blank');
+    printWindow.document.open();
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
   };
+
+  // --- END: CODE FIX ---
 
   return (
     <div style={{ minHeight: '100vh', background: '#f9fafb', padding: '1.5rem' }}>
@@ -833,13 +797,14 @@ const GradingTemplate = () => {
                 Export HTML
               </button>
               <button
+                type="button"
                 onClick={exportToPDF}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.5rem',
-                  background: '#dc2626',
-                  color: 'white',
+                  backgroundColor: '#dc2626',
+                  color: '#ffffff',
                   padding: '0.5rem 1rem',
                   borderRadius: '0.5rem',
                   border: 'none',
@@ -850,6 +815,7 @@ const GradingTemplate = () => {
                 <FileText size={16} />
                 Export PDF
               </button>
+
             </div>
           </div>
         </div>
@@ -1335,7 +1301,7 @@ const GradingTemplate = () => {
                       transition: 'all 0.3s ease',
                       transform: gradingData.latePolicy.level === level ? 'translateY(-2px)' : 'none',
                       boxShadow: gradingData.latePolicy.level === level ? '0 8px 25px rgba(0, 0, 0, 0.15)' : '0 1px 3px rgba(0, 0, 0, 0.1)',
-                      background: gradingData.latePolicy.level === level ? `linear-gradient(135deg, ${policy.color}15 0%, ${policy.color}25 100%)` : 'white'
+                      backgroundColor: gradingData.latePolicy.level === level ? `linear-gradient(135deg, ${policy.color}15 0%, ${policy.color}25 100%)` : 'white'
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
@@ -1574,7 +1540,6 @@ const GradingTemplate = () => {
                 {/* Rubric Grading Interface */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                   {loadedRubric.criteria.map((criterion) => {
-                    // **FIX:** Read from the single source of truth: `gradingData.rubricGrading`
                     const currentGrading = gradingData.rubricGrading && gradingData.rubricGrading[criterion.id];
                     const showComments = showRubricComments[criterion.id];
 
