@@ -2,8 +2,9 @@
 import React from 'react';
 import { AssessmentProvider, useAssessment } from './components/SharedContext';
 import TabNavigation from './components/TabNavigation';
+import AIRubricPromptGenerator from './components/AIRubricPromptGenerator';
 import RubricCreator from './components/RubricCreator';
-import ClassListManager from './components/ClassListManager'; // ← Make sure this line exists
+import ClassListManager from './components/ClassListManager';
 import GradingTemplate from './components/GradingTemplate';
 import ExcelImportTest from './components/ExcelImportTest';
 import './index.css';
@@ -30,8 +31,9 @@ const AppContent = () => {
       <TabNavigation />
 
       <div className="tab-content">
+        {activeTab === 'ai-prompt-generator' && <AIRubricPromptGenerator />}
         {activeTab === 'rubric-creator' && <RubricCreator />}
-        {activeTab === 'class-manager' && <ClassListManager />} {/* ← Make sure this line exists */}
+        {activeTab === 'class-manager' && <ClassListManager />}
         {activeTab === 'grading-tool' && <GradingTemplate />}
         {activeTab === 'excel-import-test' && <ExcelImportTest />}
       </div>
