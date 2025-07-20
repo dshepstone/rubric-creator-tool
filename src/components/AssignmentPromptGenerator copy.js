@@ -206,9 +206,9 @@ const SimpleRichTextEditor = React.forwardRef(({ value, onChange, placeholder },
     };
 
     return (
-        <div className="simple-rich-text-editor border border-gray-300 rounded-lg overflow-hidden bg-white">
+        <div className="simple-rich-text-editor border border-gray-300 rounded-lg overflow-hidden">
             {/* Toolbar */}
-            <div className="bg-gray-100 border-b border-gray-300 p-2 flex gap-2 flex-wrap">
+            <div className="bg-gray-50 border-b border-gray-300 p-2 flex gap-2 flex-wrap">
                 <button
                     type="button"
                     onMouseDown={(e) => e.preventDefault()} // Prevent focus loss
@@ -298,7 +298,7 @@ const SimpleRichTextEditor = React.forwardRef(({ value, onChange, placeholder },
                 onInput={handleInput}
                 onPaste={handlePaste}
                 onKeyDown={handleKeyDown}
-                className="p-4 min-h-[120px] focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                className="p-4 min-h-[120px] focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 style={{ maxHeight: '300px', overflowY: 'auto' }}
                 suppressContentEditableWarning={true}
                 data-placeholder={placeholder}
@@ -606,227 +606,6 @@ ${formData.specialInstructions && formData.specialInstructions.trim() !== '' ? `
         setGeneratedHTML(assignmentHTML);
         setShowHTML(true);
         setShowPrompt(false);
-    };
-
-    const generateStudentHTML = () => {
-        // Generate CLO list HTML
-        const clos = formData.clos || [];
-        const closHTML = clos
-            .filter(clo => clo.text.trim() !== '')
-            .map(clo => `        <li><strong>${clo.type} ${clo.number}:</strong> ${clo.text}</li>`)
-            .join('\n');
-
-        // Generate due date text
-        const dueText = formData.dueWeek ?
-            `Week ${formData.dueWeek}${formData.dueDateCustom ? ` - ${formData.dueDateCustom}` : ''}` :
-            formData.dueDateCustom || 'See your Instructional Plan for exact due dates';
-
-        // Generate submission folder text
-        const submissionFolderText = `Assignment ${formData.submissionFolderNumber || formData.assignmentNumber || 'X'}`;
-
-        // Helper function to extract text content from HTML and format for display
-        const formatRichTextForStudentHTML = (htmlContent, fallbackText) => {
-            if (!htmlContent || htmlContent.trim() === '') {
-                return `<p>${fallbackText}</p>`;
-            }
-
-            // If it's already HTML content (contains HTML tags), use it as is
-            if (htmlContent.includes('<') && htmlContent.includes('>')) {
-                // Clean up the HTML content and ensure proper formatting
-                return htmlContent
-                    .replace(/<div>/g, '<p>')
-                    .replace(/<\/div>/g, '</p>')
-                    .replace(/<br\s*\/?>/g, '<br>')
-                    .trim();
-            } else {
-                // If it's plain text, wrap in paragraph tags
-                return `<p>${htmlContent}</p>`;
-            }
-        };
-
-        const studentHTML = `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="utf-8"/>
-    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-    <title>${formData.courseCode || 'Course'} - Assignment ${formData.assignmentNumber || 'X'}: ${formData.assignmentTitle || 'Assignment Title'}</title>
-    <style>
-        /* Internal CSS styling */
-        :root {
-            --primary-color: #2c3e50;
-            --secondary-color: #3498db;
-            --accent-color-a: #5D8CAE;
-            --accent-color-b: #65A69E;
-            --light-gray: #ecf0f1;
-            --dark-gray: #7f8c8d;
-            --white: #ffffff;
-            --red: #e74c3c;
-            --green: #27ae60;
-            --yellow: #f39c12;
-        }
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-
-        body {
-            background-color: var(--light-gray);
-            color: var(--primary-color);
-            line-height: 1.6;
-            padding: 20px;
-        }
-
-        .container {
-            max-width: 1000px;
-            margin: 0 auto;
-            background-color: var(--white);
-            padding: 30px;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-        }
-
-        header {
-            text-align: center;
-            margin-bottom: 30px;
-            padding-bottom: 20px;
-            border-bottom: 2px solid var(--secondary-color);
-        }
-
-        h1 {
-            color: var(--primary-color);
-            font-size: 2.2rem;
-            margin-bottom: 10px;
-        }
-
-        h2 {
-            color: var(--secondary-color);
-            font-size: 1.8rem;
-            margin: 25px 0 15px 0;
-            padding-bottom: 10px;
-            border-bottom: 1px solid var(--light-gray);
-        }
-
-        h3 {
-            color: var(--primary-color);
-            font-size: 1.4rem;
-            margin: 20px 0 10px 0;
-        }
-
-        p {
-            margin-bottom: 15px;
-        }
-
-        ul, ol {
-            margin-bottom: 20px;
-            padding-left: 25px;
-        }
-
-        li {
-            margin-bottom: 10px;
-        }
-
-        .important-box {
-            background-color: #fef3e8;
-            border-left: 4px solid var(--yellow);
-            padding: 15px;
-            margin-bottom: 20px;
-            border-radius: 4px;
-        }
-
-        .deadline-box {
-            background-color: #ffebee;
-            border-left: 4px solid var(--red);
-            padding: 15px;
-            margin-bottom: 20px;
-            border-radius: 4px;
-        }
-
-        .deliverables-box {
-            background-color: #e8f4fd;
-            border-left: 4px solid var(--secondary-color);
-            padding: 15px;
-            margin-bottom: 20px;
-            border-radius: 4px;
-        }
-
-        .instructor-box {
-            background-color: #edf7ed;
-            border-left: 4px solid var(--green);
-            padding: 15px;
-            margin-bottom: 20px;
-            border-radius: 4px;
-        }
-
-        footer {
-            text-align: center;
-            margin-top: 40px;
-            padding-top: 20px;
-            color: var(--dark-gray);
-            font-size: 0.9rem;
-            border-top: 1px solid var(--light-gray);
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <header>
-            <h1>Assignment ${formData.assignmentNumber || 'X'}: ${formData.assignmentTitle || 'Assignment Title'}</h1>
-            <p>Weight: ${formData.weightPercentage || 'X'}% of Final Grade</p>
-        </header>
-
-        <div class="deadline-box">
-            <h3>Due Date</h3>
-            <p><strong>${dueText}</strong></p>
-            <p>Submit to the ${submissionFolderText} dropbox on eConestoga</p>
-        </div>
-
-        <h2>Assignment Description</h2>
-        <p>${formData.assignmentDescription || 'Assignment description will be provided here.'}</p>
-
-        <h3>Rationale</h3>
-        <p>${formData.rationale || 'This assignment will evaluate the following Course Learning Outcomes:'}</p>
-        <ul>
-${closHTML || '            <li><strong>CLO1:</strong> Learning outcome description</li>\n            <li><strong>CLO2:</strong> Learning outcome description</li>\n            <li><strong>CLO3:</strong> Learning outcome description</li>\n            <li><strong>CLO4:</strong> Learning outcome description</li>'}
-        </ul>
-
-        <h2>Directions</h2>
-        ${formatRichTextForStudentHTML(formData.directions, 'Assignment directions will be provided here.')}
-
-        <h2>How Your Assignment Will be Graded</h2>
-        ${formatRichTextForStudentHTML(formData.gradingDetails, 'Grading information will be provided here.')}
-        <p>See your Program Handbook for the late policy.</p>
-
-        <h2>Tips for Success</h2>
-        ${formatRichTextForStudentHTML(formData.tipsForSuccess, 'Tips for success will be provided here.')}
-
-${formData.specialInstructions && formData.specialInstructions.trim() !== '' ? `        <h2>Additional Information</h2>
-        ${formatRichTextForStudentHTML(formData.specialInstructions, '')}
-` : ''}
-        <footer>
-            <p>${formData.courseCode || 'Course Code'} | ${new Date().getFullYear()}</p>
-            <p>Last Updated: ${new Date().toLocaleDateString()}</p>
-        </footer>
-    </div>
-</body>
-</html>`;
-
-        return studentHTML;
-    };
-
-    const exportStudentHTML = () => {
-        const studentHTML = generateStudentHTML();
-        const element = document.createElement('a');
-        const file = new Blob([studentHTML], { type: 'text/html' });
-        element.href = URL.createObjectURL(file);
-        const assignmentNum = formData.assignmentNumber || 'X';
-        const courseCode = formData.courseCode || 'Course';
-        element.download = `${courseCode}_Assignment_${assignmentNum}_${formData.assignmentTitle.replace(/\s+/g, '_').toLowerCase()}_Student.html`;
-        document.body.appendChild(element);
-        element.click();
-        document.body.removeChild(element);
     };
 
     const exportPrompt = () => {
@@ -1165,7 +944,7 @@ ${formData.specialInstructions && formData.specialInstructions.trim() !== '' ? `
                     </div>
 
                     {/* Action Buttons */}
-                    <div className="flex gap-4 pt-6 flex-wrap">
+                    <div className="flex gap-4 pt-6">
                         <button
                             onClick={generateAIPrompt}
                             disabled={!isFormValid}
@@ -1188,18 +967,6 @@ ${formData.specialInstructions && formData.specialInstructions.trim() !== '' ? `
                         >
                             <Code className="w-5 h-5" />
                             Generate D2L HTML
-                        </button>
-
-                        <button
-                            onClick={exportStudentHTML}
-                            disabled={!isFormValid}
-                            className={`flex items-center gap-2 px-6 py-3 rounded-lg font-medium ${isFormValid
-                                ? 'bg-purple-600 text-white hover:bg-purple-700'
-                                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                                }`}
-                        >
-                            <FileText className="w-5 h-5" />
-                            Export Student HTML
                         </button>
 
                         <button
