@@ -3,6 +3,7 @@ import React from 'react';
 import { AssessmentProvider, useAssessment } from './components/SharedContext';
 import TabNavigation from './components/TabNavigation';
 import AIRubricPromptGenerator from './components/AIRubricPromptGenerator';
+import AssignmentPromptGenerator from './components/AssignmentPromptGenerator'; // NEW IMPORT
 import RubricCreator from './components/RubricCreator';
 import ClassListManager from './components/ClassListManager';
 import GradingTemplate from './components/GradingTemplate';
@@ -32,6 +33,7 @@ const AppContent = () => {
 
       <div className="tab-content">
         {activeTab === 'ai-prompt-generator' && <AIRubricPromptGenerator />}
+        {activeTab === 'assignment-prompt-generator' && <AssignmentPromptGenerator />} {/* NEW TAB */}
         {activeTab === 'rubric-creator' && <RubricCreator />}
         {activeTab === 'class-manager' && <ClassListManager />}
         {activeTab === 'grading-tool' && <GradingTemplate />}

@@ -1,4 +1,4 @@
-// Updated SharedContext.js with Enhanced Draft/Final Grade Management + AI Prompt Generator
+// Updated SharedContext.js with Enhanced Draft/Final Grade Management + AI Prompt Generator + Assignment Prompt Generator
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 
 const AssessmentContext = createContext();
@@ -15,10 +15,13 @@ export const AssessmentProvider = ({ children }) => {
     // Shared rubric state
     const [sharedRubric, setSharedRubric] = useState(null);
     const [sharedCourseDetails, setSharedCourseDetails] = useState(null);
-    const [activeTab, setActiveTab] = useState('ai-prompt-generator'); // Updated to start with AI prompt generator
+    const [activeTab, setActiveTab] = useState('assignment-prompt-generator'); // Updated to start with assignment prompt generator
 
-    // NEW: AI Prompt Generator state
+    // AI Prompt Generator state (for rubrics)
     const [aiPromptFormData, setAIPromptFormData] = useState(null);
+
+    // NEW: Assignment Prompt Generator state
+    const [assignmentPromptFormData, setAssignmentPromptFormData] = useState(null);
 
     // Class list and student management
     const [classList, setClassList] = useState(null);
@@ -94,7 +97,7 @@ export const AssessmentProvider = ({ children }) => {
         modalEdit: { show: false, content: '', field: null, onSave: null }
     });
 
-    // NEW: AI Prompt Generator functions
+    // AI Prompt Generator functions (for rubrics)
     const initializeAIPromptFormData = useCallback(() => {
         setAIPromptFormData({
             assignmentType: '',
@@ -123,6 +126,43 @@ export const AssessmentProvider = ({ children }) => {
 
     const clearAIPromptFormData = useCallback(() => {
         setAIPromptFormData(null);
+    }, []);
+
+    // NEW: Assignment Prompt Generator functions
+    const initializeAssignmentPromptFormData = useCallback(() => {
+        setAssignmentPromptFormData({
+            assignmentTitle: '',
+            assignmentNumber: '',
+            weightPercentage: '',
+            courseCode: '',
+            programLevel: '',
+            subjectArea: '',
+            assignmentDescription: '',
+            rationale: 'This assignment will evaluate the following Course Learning Outcomes:',
+            clos: [
+                { id: 1, number: '1', text: '', type: 'CLO' },
+                { id: 2, number: '2', text: '', type: 'CLO' },
+                { id: 3, number: '3', text: '', type: 'CLO' },
+                { id: 4, number: '4', text: '', type: 'CLO' }
+            ],
+            directions: '',
+            gradingMethod: 'rubric',
+            gradingDetails: '',
+            dueDate: '',
+            submissionFolder: 'Assignment X',
+            specialInstructions: ''
+        });
+    }, []);
+
+    const updateAssignmentPromptFormData = useCallback((field, value) => {
+        setAssignmentPromptFormData(prev => ({
+            ...prev,
+            [field]: value
+        }));
+    }, []);
+
+    const clearAssignmentPromptFormData = useCallback(() => {
+        setAssignmentPromptFormData(null);
     }, []);
 
     // Form update functions
@@ -451,7 +491,7 @@ export const AssessmentProvider = ({ children }) => {
         });
     }, []);
 
-    // UPDATED: Export Session Function with AI Prompt Data
+    // UPDATED: Export Session Function with AI Prompt Data and Assignment Prompt Data
     const exportSession = useCallback(() => {
         const sessionData = {
             sharedRubric,
@@ -462,7 +502,8 @@ export const AssessmentProvider = ({ children }) => {
             currentStudent,
             gradingSession,
             sharedCourseDetails,
-            aiPromptFormData, // NEW: Include AI prompt data
+            aiPromptFormData, // AI Rubric prompt data
+            assignmentPromptFormData, // NEW: Assignment prompt data
         };
         const dataStr = JSON.stringify(sessionData, null, 2);
         const dataBlob = new Blob([dataStr], { type: 'application/json' });
@@ -475,9 +516,9 @@ export const AssessmentProvider = ({ children }) => {
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
-    }, [sharedRubric, classList, drafts, finalGrades, activeTab, currentStudent, gradingSession, sharedCourseDetails, aiPromptFormData]);
+    }, [sharedRubric, classList, drafts, finalGrades, activeTab, currentStudent, gradingSession, sharedCourseDetails, aiPromptFormData, assignmentPromptFormData]);
 
-    // UPDATED: Import Session Function with AI Prompt Data
+    // UPDATED: Import Session Function with AI Prompt Data and Assignment Prompt Data
     const importSession = useCallback((jsonContent) => {
         try {
             const sessionData = JSON.parse(jsonContent);
@@ -486,11 +527,12 @@ export const AssessmentProvider = ({ children }) => {
                 setClassList(sessionData.classList || null);
                 setDrafts(sessionData.drafts || {});
                 setFinalGrades(sessionData.finalGrades || {});
-                setActiveTab(sessionData.activeTab || 'ai-prompt-generator');
+                setActiveTab(sessionData.activeTab || 'assignment-prompt-generator');
                 setCurrentStudent(sessionData.currentStudent || null);
                 setGradingSession(sessionData.gradingSession || { active: false });
                 setSharedCourseDetails(sessionData.sharedCourseDetails || null);
-                setAIPromptFormData(sessionData.aiPromptFormData || null); // NEW: Restore AI prompt data
+                setAIPromptFormData(sessionData.aiPromptFormData || null); // AI Rubric prompt data
+                setAssignmentPromptFormData(sessionData.assignmentPromptFormData || null); // NEW: Assignment prompt data
                 alert('Session loaded successfully!');
             } else {
                 throw new Error('Invalid file format.');
@@ -548,8 +590,9 @@ export const AssessmentProvider = ({ children }) => {
         setSharedRubric(null);
         clearGradingFormData();
         clearRubricFormData();
-        clearAIPromptFormData(); // NEW: Clear AI prompt data
-    }, [clearGradingFormData, clearRubricFormData, clearAIPromptFormData]);
+        clearAIPromptFormData(); // Clear AI Rubric prompt data
+        clearAssignmentPromptFormData(); // NEW: Clear assignment prompt data
+    }, [clearGradingFormData, clearRubricFormData, clearAIPromptFormData, clearAssignmentPromptFormData]);
 
     const persistentFormData = gradingFormData;
     const updatePersistentFormData = setGradingFormData;
@@ -565,11 +608,17 @@ export const AssessmentProvider = ({ children }) => {
         activeTab,
         setActiveTab,
 
-        // NEW: AI Prompt Generator
+        // AI Prompt Generator (for rubrics)
         aiPromptFormData,
         updateAIPromptFormData,
         initializeAIPromptFormData,
         clearAIPromptFormData,
+
+        // NEW: Assignment Prompt Generator
+        assignmentPromptFormData,
+        updateAssignmentPromptFormData,
+        initializeAssignmentPromptFormData,
+        clearAssignmentPromptFormData,
 
         // Grading form data
         gradingData: gradingFormData,
