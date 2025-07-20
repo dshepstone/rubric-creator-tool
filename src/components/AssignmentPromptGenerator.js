@@ -1,6 +1,358 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Download, Sparkles, FileText, ArrowRight, Lightbulb, BookOpen, Code, Plus, Minus } from 'lucide-react';
 import { useAssessment } from './SharedContext';
+
+// Simple Rich Text Editor Component
+const SimpleRichTextEditor = React.forwardRef(({ value, onChange, placeholder }, ref) => {
+    const editorRef = useRef(null);
+    const [isEditorReady, setIsEditorReady] = useState(false);
+
+    useEffect(() => {
+        if (editorRef.current) {
+            setIsEditorReady(true);
+            // Set initial content
+            if (value && editorRef.current.innerHTML !== value) {
+                editorRef.current.innerHTML = value || '';
+            }
+        }
+    }, [value]);
+
+    const handlePaste = (e) => {
+        e.preventDefault();
+        const clipboard = e.clipboardData;
+        const htmlData = clipboard.getData('text/html');
+        const textData = clipboard.getData('text/plain');
+
+        let cleanContent;
+        if (htmlData) {
+            // Enhanced HTML sanitization - preserve more formatting including lists
+            cleanContent = sanitizeHtml(htmlData);
+        } else {
+            // Convert plain text to HTML, preserving line breaks
+            cleanContent = textData
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/\r\n|\r|\n/g, '<br>');
+        }
+
+        // Focus the editor first
+        editorRef.current.focus();
+
+        // Insert the content
+        if (document.queryCommandSupported('insertHTML')) {
+            document.execCommand('insertHTML', false, cleanContent);
+        } else {
+            // Fallback for browsers that don't support insertHTML
+            const selection = window.getSelection();
+            if (selection.rangeCount > 0) {
+                const range = selection.getRangeAt(0);
+                range.deleteContents();
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = cleanContent;
+                const fragment = document.createDocumentFragment();
+                while (tempDiv.firstChild) {
+                    fragment.appendChild(tempDiv.firstChild);
+                }
+                range.insertNode(fragment);
+            }
+        }
+
+        // Trigger onChange
+        if (onChange) {
+            onChange(editorRef.current.innerHTML);
+        }
+    };
+
+    const sanitizeHtml = (html) => {
+        let cleanedHtml = html
+            // Remove all HTML comments (<!-- … -->), including Word's conditional comments
+            .replace(/<!--[\s\S]*?-->/g, '')
+            // Remove style tags and their content
+            .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+            // Remove script tags and their content
+            .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+            // Remove XML declarations and Office-specific tags
+            .replace(/<\?xml[^>]*>/gi, '')
+            .replace(/<\/?o:p[^>]*>/gi, '')
+            .replace(/<\/?v:[^>]*>/gi, '')
+            .replace(/<\/?w:[^>]*>/gi, '');
+
+        // Create a temporary container
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = cleanedHtml;
+
+        // Remove all style attributes and Microsoft Office attributes
+        const removeAttributes = (element) => {
+            if (element.nodeType === Node.ELEMENT_NODE) {
+                const attributesToRemove = [];
+                for (let i = 0; i < element.attributes.length; i++) {
+                    const attr = element.attributes[i];
+                    if (attr.name.startsWith('mso-') ||
+                        attr.name === 'style' ||
+                        attr.name.startsWith('o:') ||
+                        attr.name.startsWith('v:') ||
+                        attr.name.startsWith('w:')) {
+                        attributesToRemove.push(attr.name);
+                    }
+                }
+                attributesToRemove.forEach(attrName => {
+                    element.removeAttribute(attrName);
+                });
+
+                // Recursively clean child elements
+                for (let child of element.children) {
+                    removeAttributes(child);
+                }
+            }
+        };
+
+        removeAttributes(tempDiv);
+
+        // Clean and rebuild DOM structure
+        const cleanNode = (node) => {
+            if (node.nodeType === Node.TEXT_NODE) {
+                return node.textContent.trim() ? document.createTextNode(node.textContent) : null;
+            } else if (node.nodeType === Node.ELEMENT_NODE) {
+                const tagName = node.tagName.toLowerCase();
+                const allowedTags = ['p', 'br', 'strong', 'b', 'em', 'i', 'u', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'div', 'span'];
+
+                if (allowedTags.includes(tagName)) {
+                    const newNode = document.createElement(tagName);
+
+                    // Copy allowed attributes (none for now, but could be expanded)
+
+                    // Process children
+                    for (const child of Array.from(node.childNodes)) {
+                        const cleanedChild = cleanNode(child);
+                        if (cleanedChild) {
+                            newNode.appendChild(cleanedChild);
+                        }
+                    }
+                    return newNode.childNodes.length > 0 || tagName === 'br' ? newNode : null;
+                } else {
+                    const fragment = document.createDocumentFragment();
+                    for (const child of Array.from(node.childNodes)) {
+                        const cleanedChild = cleanNode(child);
+                        if (cleanedChild) {
+                            fragment.appendChild(cleanedChild);
+                        }
+                    }
+                    return fragment.childNodes.length > 0 ? fragment : null;
+                }
+            }
+            return null;
+        };
+
+        const cleanedContainer = document.createElement('div');
+        for (const child of Array.from(tempDiv.childNodes)) {
+            const cleanedChild = cleanNode(child);
+            if (cleanedChild) {
+                cleanedContainer.appendChild(cleanedChild);
+            }
+        }
+
+        // Final cleanup
+        const finalHtml = cleanedContainer.innerHTML
+            .replace(/<p[^>]*>\s*<\/p>/g, '')
+            .replace(/\n\s*\n/g, '\n')
+            .replace(/(<\/[^>]+>)\s+(<[^>]+>)/g, '$1$2')
+            .trim();
+
+        return finalHtml;
+    };
+
+    const handleInput = () => {
+        if (onChange && editorRef.current) {
+            onChange(editorRef.current.innerHTML);
+        }
+    };
+
+    const formatText = (command, value = null) => {
+        if (editorRef.current) {
+            editorRef.current.focus();
+            setTimeout(() => {
+                try {
+                    document.execCommand(command, false, value);
+                    if (onChange && editorRef.current) {
+                        onChange(editorRef.current.innerHTML);
+                    }
+                } catch (error) {
+                    console.error(`Error executing command ${command}:`, error);
+                }
+            }, 10);
+        }
+    };
+
+    const handleKeyDown = (e) => {
+        if (e.ctrlKey || e.metaKey) {
+            switch (e.key) {
+                case 'b':
+                    e.preventDefault();
+                    formatText('bold');
+                    break;
+                case 'i':
+                    e.preventDefault();
+                    formatText('italic');
+                    break;
+                case 'u':
+                    e.preventDefault();
+                    formatText('underline');
+                    break;
+                default:
+                    break;
+            }
+        }
+    };
+
+    return (
+        <div className="simple-rich-text-editor border border-gray-300 rounded-lg overflow-hidden bg-white">
+            {/* Toolbar */}
+            <div className="bg-gray-100 border-b border-gray-300 p-2 flex gap-2 flex-wrap">
+                <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()} // Prevent focus loss
+                    onClick={() => formatText('bold')}
+                    className="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm font-bold transition-colors text-gray-800"
+                    title="Bold (Ctrl+B)"
+                >
+                    B
+                </button>
+                <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => formatText('italic')}
+                    className="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm italic transition-colors text-gray-800"
+                    title="Italic (Ctrl+I)"
+                >
+                    I
+                </button>
+                <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => formatText('underline')}
+                    className="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm underline transition-colors text-gray-800"
+                    title="Underline (Ctrl+U)"
+                >
+                    U
+                </button>
+                <div className="w-px bg-gray-300"></div>
+                <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => formatText('formatBlock', 'h3')}
+                    className="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm font-bold transition-colors text-gray-800"
+                    title="Heading 3"
+                >
+                    H3
+                </button>
+                <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => formatText('formatBlock', 'p')}
+                    className="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm transition-colors text-gray-800"
+                    title="Paragraph"
+                >
+                    P
+                </button>
+                <div className="w-px bg-gray-300"></div>
+                <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => formatText('insertUnorderedList')}
+                    className="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm transition-colors text-gray-800"
+                    title="Bullet List"
+                >
+                    • List
+                </button>
+                <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => formatText('insertOrderedList')}
+                    className="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm transition-colors text-gray-800"
+                    title="Numbered List"
+                >
+                    1. List
+                </button>
+                <div className="w-px bg-gray-300"></div>
+                <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                        if (editorRef.current) {
+                            editorRef.current.innerHTML = '';
+                            onChange('');
+                        }
+                    }}
+                    className="px-3 py-1 bg-red-50 border border-red-300 text-red-600 rounded hover:bg-red-100 text-sm transition-colors"
+                    title="Clear"
+                >
+                    Clear
+                </button>
+            </div>
+
+            {/* Editor */}
+            <div
+                ref={editorRef}
+                contentEditable
+                onInput={handleInput}
+                onPaste={handlePaste}
+                onKeyDown={handleKeyDown}
+                className="p-4 min-h-[120px] focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                style={{ maxHeight: '300px', overflowY: 'auto' }}
+                suppressContentEditableWarning={true}
+                data-placeholder={placeholder}
+            />
+
+            {/* CSS Styles for contentEditable */}
+            <style>{`
+                [contenteditable]:empty:before {
+                    content: attr(data-placeholder);
+                    color: #9ca3af;
+                    font-style: italic;
+                }
+                [contenteditable] strong, [contenteditable] b {
+                    font-weight: bold;
+                }
+                [contenteditable] em, [contenteditable] i {
+                    font-style: italic;
+                }
+                [contenteditable] u {
+                    text-decoration: underline;
+                }
+                [contenteditable] ul {
+                    list-style-type: disc;
+                    margin-left: 1.5em;
+                    margin-top: 0.5em;
+                    margin-bottom: 0.5em;
+                }
+                [contenteditable] ol {
+                    list-style-type: decimal;
+                    margin-left: 1.5em;
+                    margin-top: 0.5em;
+                    margin-bottom: 0.5em;
+                }
+                [contenteditable] li {
+                    margin-bottom: 0.25em;
+                }
+                [contenteditable] h3 {
+                    font-size: 1.25em;
+                    font-weight: bold;
+                    margin-top: 0.5em;
+                    margin-bottom: 0.5em;
+                }
+                [contenteditable] p {
+                    margin-bottom: 0.5em;
+                }
+                [contenteditable] p:last-child {
+                    margin-bottom: 0;
+                }
+            `}</style>
+        </div>
+    );
+});
+
+SimpleRichTextEditor.displayName = 'SimpleRichTextEditor';
 
 const AssignmentPromptGenerator = () => {
     const {
@@ -205,6 +557,26 @@ Generate complete, ready-to-paste HTML code for D2L content area that matches th
         // Generate submission folder text
         const submissionFolderText = `Assignment ${formData.submissionFolderNumber || formData.assignmentNumber || 'X'}`;
 
+        // Helper function to extract text content from HTML and format for display
+        const formatRichTextForHTML = (htmlContent, fallbackText) => {
+            if (!htmlContent || htmlContent.trim() === '') {
+                return fallbackText;
+            }
+
+            // If it's already HTML content (contains HTML tags), use it as is
+            if (htmlContent.includes('<') && htmlContent.includes('>')) {
+                // Clean up the HTML content and ensure proper formatting
+                return htmlContent
+                    .replace(/<div>/g, '<p>')
+                    .replace(/<\/div>/g, '</p>')
+                    .replace(/<br\s*\/?>/g, '<br>')
+                    .trim();
+            } else {
+                // If it's plain text, wrap in paragraph tags
+                return `<p>${htmlContent}</p>`;
+            }
+        };
+
         const assignmentHTML = `<div class="container-fluid">
 <div class="row justify-content-center">
 <div class="col-sm-12 col-md-10">
@@ -220,13 +592,13 @@ Generate complete, ready-to-paste HTML code for D2L content area that matches th
 ${closHTML || '    <li><strong>CLO1:</strong> [Learning outcome description]</li>\n    <li><strong>CLO2:</strong> [Learning outcome description]</li>\n    <li><strong>CLO3:</strong> [Learning outcome description]</li>\n    <li><strong>CLO4:</strong> [Learning outcome description]</li>'}
   </ul>
   <h2>Directions</h2>
-  <p>${formData.directions || '[Provide step-by-step instructions if applicable]'}</p>
+  ${formatRichTextForHTML(formData.directions, '<p>[Provide step-by-step instructions if applicable]</p>')}
   <h2>How Your Assignment Will be Graded</h2>
-  <p>${formData.gradingDetails || 'A rubric has been created and can be found attached to the submission folder. Your work will be evaluated on [specify criteria].'}</p>
+  ${formatRichTextForHTML(formData.gradingDetails, '<p>A rubric has been created and can be found attached to the submission folder. Your work will be evaluated on [specify criteria].</p>')}
   <p>See your Program Handbook for the late policy.</p>
   <h3>Tips for Success:</h3>
-  <p>${formData.tipsForSuccess || 'Tips for completing this assignment successfully will be provided here.'}</p>
-${formData.specialInstructions ? `  <p><strong>Additional Information:</strong> ${formData.specialInstructions}</p>` : ''}
+  ${formatRichTextForHTML(formData.tipsForSuccess, '<p>Tips for completing this assignment successfully will be provided here.</p>')}
+${formData.specialInstructions && formData.specialInstructions.trim() !== '' ? `  <h3>Additional Information:</h3>\n  ${formatRichTextForHTML(formData.specialInstructions, '')}` : ''}
 </div>
 </div>
 </div>`;
@@ -234,6 +606,227 @@ ${formData.specialInstructions ? `  <p><strong>Additional Information:</strong> 
         setGeneratedHTML(assignmentHTML);
         setShowHTML(true);
         setShowPrompt(false);
+    };
+
+    const generateStudentHTML = () => {
+        // Generate CLO list HTML
+        const clos = formData.clos || [];
+        const closHTML = clos
+            .filter(clo => clo.text.trim() !== '')
+            .map(clo => `        <li><strong>${clo.type} ${clo.number}:</strong> ${clo.text}</li>`)
+            .join('\n');
+
+        // Generate due date text
+        const dueText = formData.dueWeek ?
+            `Week ${formData.dueWeek}${formData.dueDateCustom ? ` - ${formData.dueDateCustom}` : ''}` :
+            formData.dueDateCustom || 'See your Instructional Plan for exact due dates';
+
+        // Generate submission folder text
+        const submissionFolderText = `Assignment ${formData.submissionFolderNumber || formData.assignmentNumber || 'X'}`;
+
+        // Helper function to extract text content from HTML and format for display
+        const formatRichTextForStudentHTML = (htmlContent, fallbackText) => {
+            if (!htmlContent || htmlContent.trim() === '') {
+                return `<p>${fallbackText}</p>`;
+            }
+
+            // If it's already HTML content (contains HTML tags), use it as is
+            if (htmlContent.includes('<') && htmlContent.includes('>')) {
+                // Clean up the HTML content and ensure proper formatting
+                return htmlContent
+                    .replace(/<div>/g, '<p>')
+                    .replace(/<\/div>/g, '</p>')
+                    .replace(/<br\s*\/?>/g, '<br>')
+                    .trim();
+            } else {
+                // If it's plain text, wrap in paragraph tags
+                return `<p>${htmlContent}</p>`;
+            }
+        };
+
+        const studentHTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>${formData.courseCode || 'Course'} - Assignment ${formData.assignmentNumber || 'X'}: ${formData.assignmentTitle || 'Assignment Title'}</title>
+    <style>
+        /* Internal CSS styling */
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --accent-color-a: #5D8CAE;
+            --accent-color-b: #65A69E;
+            --light-gray: #ecf0f1;
+            --dark-gray: #7f8c8d;
+            --white: #ffffff;
+            --red: #e74c3c;
+            --green: #27ae60;
+            --yellow: #f39c12;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: var(--light-gray);
+            color: var(--primary-color);
+            line-height: 1.6;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background-color: var(--white);
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid var(--secondary-color);
+        }
+
+        h1 {
+            color: var(--primary-color);
+            font-size: 2.2rem;
+            margin-bottom: 10px;
+        }
+
+        h2 {
+            color: var(--secondary-color);
+            font-size: 1.8rem;
+            margin: 25px 0 15px 0;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--light-gray);
+        }
+
+        h3 {
+            color: var(--primary-color);
+            font-size: 1.4rem;
+            margin: 20px 0 10px 0;
+        }
+
+        p {
+            margin-bottom: 15px;
+        }
+
+        ul, ol {
+            margin-bottom: 20px;
+            padding-left: 25px;
+        }
+
+        li {
+            margin-bottom: 10px;
+        }
+
+        .important-box {
+            background-color: #fef3e8;
+            border-left: 4px solid var(--yellow);
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+
+        .deadline-box {
+            background-color: #ffebee;
+            border-left: 4px solid var(--red);
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+
+        .deliverables-box {
+            background-color: #e8f4fd;
+            border-left: 4px solid var(--secondary-color);
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+
+        .instructor-box {
+            background-color: #edf7ed;
+            border-left: 4px solid var(--green);
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+
+        footer {
+            text-align: center;
+            margin-top: 40px;
+            padding-top: 20px;
+            color: var(--dark-gray);
+            font-size: 0.9rem;
+            border-top: 1px solid var(--light-gray);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Assignment ${formData.assignmentNumber || 'X'}: ${formData.assignmentTitle || 'Assignment Title'}</h1>
+            <p>Weight: ${formData.weightPercentage || 'X'}% of Final Grade</p>
+        </header>
+
+        <div class="deadline-box">
+            <h3>Due Date</h3>
+            <p><strong>${dueText}</strong></p>
+            <p>Submit to the ${submissionFolderText} dropbox on eConestoga</p>
+        </div>
+
+        <h2>Assignment Description</h2>
+        <p>${formData.assignmentDescription || 'Assignment description will be provided here.'}</p>
+
+        <h3>Rationale</h3>
+        <p>${formData.rationale || 'This assignment will evaluate the following Course Learning Outcomes:'}</p>
+        <ul>
+${closHTML || '            <li><strong>CLO1:</strong> Learning outcome description</li>\n            <li><strong>CLO2:</strong> Learning outcome description</li>\n            <li><strong>CLO3:</strong> Learning outcome description</li>\n            <li><strong>CLO4:</strong> Learning outcome description</li>'}
+        </ul>
+
+        <h2>Directions</h2>
+        ${formatRichTextForStudentHTML(formData.directions, 'Assignment directions will be provided here.')}
+
+        <h2>How Your Assignment Will be Graded</h2>
+        ${formatRichTextForStudentHTML(formData.gradingDetails, 'Grading information will be provided here.')}
+        <p>See your Program Handbook for the late policy.</p>
+
+        <h2>Tips for Success</h2>
+        ${formatRichTextForStudentHTML(formData.tipsForSuccess, 'Tips for success will be provided here.')}
+
+${formData.specialInstructions && formData.specialInstructions.trim() !== '' ? `        <h2>Additional Information</h2>
+        ${formatRichTextForStudentHTML(formData.specialInstructions, '')}
+` : ''}
+        <footer>
+            <p>${formData.courseCode || 'Course Code'} | ${new Date().getFullYear()}</p>
+            <p>Last Updated: ${new Date().toLocaleDateString()}</p>
+        </footer>
+    </div>
+</body>
+</html>`;
+
+        return studentHTML;
+    };
+
+    const exportStudentHTML = () => {
+        const studentHTML = generateStudentHTML();
+        const element = document.createElement('a');
+        const file = new Blob([studentHTML], { type: 'text/html' });
+        element.href = URL.createObjectURL(file);
+        const assignmentNum = formData.assignmentNumber || 'X';
+        const courseCode = formData.courseCode || 'Course';
+        element.download = `${courseCode}_Assignment_${assignmentNum}_${formData.assignmentTitle.replace(/\s+/g, '_').toLowerCase()}_Student.html`;
+        document.body.appendChild(element);
+        element.click();
+        document.body.removeChild(element);
     };
 
     const exportPrompt = () => {
@@ -529,33 +1122,30 @@ ${formData.specialInstructions ? `  <p><strong>Additional Information:</strong> 
                     {/* Assignment Instructions & Due Date */}
                     <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-6">
                         <h3 className="text-lg font-semibold text-indigo-800 mb-4">Assignment Instructions & Due Date</h3>
-                        <div className="space-y-4">
+                        <div className="space-y-6">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Directions</label>
-                                <textarea
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Directions</label>
+                                <SimpleRichTextEditor
                                     value={formData.directions || ''}
-                                    onChange={(e) => handleInputChange('directions', e.target.value)}
-                                    className="w-full p-3 border rounded-lg h-32"
+                                    onChange={(html) => handleInputChange('directions', html)}
                                     placeholder="Provide step-by-step instructions for completing the assignment..."
                                 />
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">How Your Assignment Will be Graded</label>
-                                <textarea
+                                <label className="block text-sm font-medium text-gray-700 mb-2">How Your Assignment Will be Graded</label>
+                                <SimpleRichTextEditor
                                     value={formData.gradingDetails || ''}
-                                    onChange={(e) => handleInputChange('gradingDetails', e.target.value)}
-                                    className="w-full p-3 border rounded-lg h-24"
+                                    onChange={(html) => handleInputChange('gradingDetails', html)}
                                     placeholder="Describe how the assignment will be graded..."
                                 />
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Tips for Success</label>
-                                <textarea
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Tips for Success</label>
+                                <SimpleRichTextEditor
                                     value={formData.tipsForSuccess || ''}
-                                    onChange={(e) => handleInputChange('tipsForSuccess', e.target.value)}
-                                    className="w-full p-3 border rounded-lg h-32"
+                                    onChange={(html) => handleInputChange('tipsForSuccess', html)}
                                     placeholder="Provide helpful tips and strategies for completing this assignment successfully..."
                                 />
                                 <p className="text-sm text-gray-600 mt-2">
@@ -564,11 +1154,10 @@ ${formData.specialInstructions ? `  <p><strong>Additional Information:</strong> 
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Additional Information</label>
-                                <textarea
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Additional Information</label>
+                                <SimpleRichTextEditor
                                     value={formData.specialInstructions || ''}
-                                    onChange={(e) => handleInputChange('specialInstructions', e.target.value)}
-                                    className="w-full p-3 border rounded-lg h-20"
+                                    onChange={(html) => handleInputChange('specialInstructions', html)}
                                     placeholder="Any additional notes or special requirements..."
                                 />
                             </div>
@@ -576,7 +1165,7 @@ ${formData.specialInstructions ? `  <p><strong>Additional Information:</strong> 
                     </div>
 
                     {/* Action Buttons */}
-                    <div className="flex gap-4 pt-6">
+                    <div className="flex gap-4 pt-6 flex-wrap">
                         <button
                             onClick={generateAIPrompt}
                             disabled={!isFormValid}
@@ -599,6 +1188,18 @@ ${formData.specialInstructions ? `  <p><strong>Additional Information:</strong> 
                         >
                             <Code className="w-5 h-5" />
                             Generate D2L HTML
+                        </button>
+
+                        <button
+                            onClick={exportStudentHTML}
+                            disabled={!isFormValid}
+                            className={`flex items-center gap-2 px-6 py-3 rounded-lg font-medium ${isFormValid
+                                ? 'bg-purple-600 text-white hover:bg-purple-700'
+                                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                }`}
+                        >
+                            <FileText className="w-5 h-5" />
+                            Export Student HTML
                         </button>
 
                         <button
