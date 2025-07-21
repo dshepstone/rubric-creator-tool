@@ -313,7 +313,41 @@ const GradingTemplate = () => {
   const [videoLinkInput, setVideoLinkInput] = useState('');
   const [videoTitle, setVideoTitle] = useState('');
 
-  // Auto-save to shared context whenever gradingData changes
+  // **FIXED: Enhanced shared data synchronization**
+  // Sync with sharedGradingData (updated by initializeGradingSession)
+  useEffect(() => {
+    if (!sharedGradingData) return;
+
+    console.log('🔄 Checking shared grading data for course info:', sharedGradingData.course);
+
+    // Only update course info if it's not empty and different from current
+    if (sharedGradingData.course &&
+      (sharedGradingData.course.code || sharedGradingData.course.name ||
+        sharedGradingData.course.instructor || sharedGradingData.course.term)) {
+
+      const needsSync =
+        sharedGradingData.course.code !== localGradingData.course.code ||
+        sharedGradingData.course.name !== localGradingData.course.name ||
+        sharedGradingData.course.instructor !== localGradingData.course.instructor ||
+        sharedGradingData.course.term !== localGradingData.course.term;
+
+      if (needsSync) {
+        console.log('✅ Syncing course data from shared context to local state');
+        setLocalGradingData(prev => ({
+          ...prev,
+          course: {
+            code: sharedGradingData.course.code || prev.course.code,
+            name: sharedGradingData.course.name || prev.course.name,
+            instructor: sharedGradingData.course.instructor || prev.course.instructor,
+            term: sharedGradingData.course.term || prev.course.term
+          }
+        }));
+      }
+    }
+  }, [sharedGradingData?.course?.code, sharedGradingData?.course?.name,
+  sharedGradingData?.course?.instructor, sharedGradingData?.course?.term]);
+
+  // Auto-save to shared context whenever gradingData changes (with debounce)
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       setSharedGradingData(gradingData);
@@ -2094,6 +2128,113 @@ Write the feedback now, making it sound personal and genuine while keeping it co
                 </div>
               </div>
             )}
+
+            {/* General Feedback Section */}
+            <div style={{ marginBottom: '2rem' }}>
+              <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '1rem', color: '#374151' }}>
+                📝 General Feedback
+              </h3>
+              <div style={{
+                background: 'linear-gradient(135deg, #fafaff 0%, #f3f4f6 100%)',
+                border: '1px solid #d1d5db',
+                borderRadius: '0.75rem',
+                padding: '1.5rem'
+              }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1.5rem' }}>
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: '500',
+                      color: '#374151',
+                      marginBottom: '0.5rem'
+                    }}>
+                      Overall Comments
+                    </label>
+                    <textarea
+                      value={gradingData.feedback.general}
+                      onChange={(e) => setGradingData(prevData => ({
+                        ...prevData,
+                        feedback: { ...prevData.feedback, general: e.target.value }
+                      }))}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '0.5rem',
+                        fontSize: '0.875rem',
+                        resize: 'none',
+                        minHeight: '100px'
+                      }}
+                      rows="4"
+                      placeholder="General comments about the assignment..."
+                    />
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <div>
+                      <label style={{
+                        display: 'block',
+                        fontSize: '0.875rem',
+                        fontWeight: '500',
+                        color: '#374151',
+                        marginBottom: '0.5rem'
+                      }}>
+                        Strengths
+                      </label>
+                      <textarea
+                        value={gradingData.feedback.strengths}
+                        onChange={(e) => setGradingData(prevData => ({
+                          ...prevData,
+                          feedback: { ...prevData.feedback, strengths: e.target.value }
+                        }))}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '0.5rem',
+                          fontSize: '0.875rem',
+                          resize: 'none',
+                          minHeight: '100px'
+                        }}
+                        rows="4"
+                        placeholder="What the student did well..."
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{
+                        display: 'block',
+                        fontSize: '0.875rem',
+                        fontWeight: '500',
+                        color: '#374151',
+                        marginBottom: '0.5rem'
+                      }}>
+                        Areas for Improvement
+                      </label>
+                      <textarea
+                        value={gradingData.feedback.improvements}
+                        onChange={(e) => setGradingData(prevData => ({
+                          ...prevData,
+                          feedback: { ...prevData.feedback, improvements: e.target.value }
+                        }))}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '0.5rem',
+                          fontSize: '0.875rem',
+                          resize: 'none',
+                          minHeight: '100px'
+                        }}
+                        rows="4"
+                        placeholder="Suggestions for improvement..."
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
 
             {/* File Attachments */}
             <div style={{ marginBottom: '2rem' }}>

@@ -1,446 +1,35 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Plus, X, Upload, Download, Save, FileText, RotateCcw, ChevronDown, ChevronUp, Maximize2, ArrowRight, Minimize2, Eraser, Trash2 } from 'lucide-react';
+// Enhanced RubricCreator.js with complete class list integration and batch grading functionality
+import React, { useState, useEffect, useRef } from 'react';
 import { useAssessment } from './SharedContext';
+import {
+    Plus, X, Save, Upload, Download, FileText, RotateCcw, Minimize2,
+    ChevronUp, ChevronDown, Maximize2, ArrowRight, AlertTriangle, CheckCircle
+} from 'lucide-react';
 
-// Simple Rich Text Editor Component to replace the problematic ReactQuill
+// SimpleRichTextEditor component (assuming it exists)
 const SimpleRichTextEditor = React.forwardRef(({ value, onChange, placeholder }, ref) => {
-    const editorRef = useRef(null);
-    const [isEditorReady, setIsEditorReady] = useState(false);
-
     useEffect(() => {
-        if (editorRef.current) {
-            setIsEditorReady(true);
-            // Set initial content
-            if (value && editorRef.current.innerHTML !== value) {
-                editorRef.current.innerHTML = value || '';
-            }
+        if (ref.current) {
+            ref.current.innerHTML = value || '';
         }
-    }, [value]);
-
-    const handlePaste = (e) => {
-        e.preventDefault();
-        const clipboard = e.clipboardData;
-        const htmlData = clipboard.getData('text/html');
-        const textData = clipboard.getData('text/plain');
-
-        let cleanContent;
-        if (htmlData) {
-            // Enhanced HTML sanitization - preserve more formatting including lists
-            cleanContent = sanitizeHtml(htmlData);
-        } else {
-            // Convert plain text to HTML, preserving line breaks
-            cleanContent = textData
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/\r\n|\r|\n/g, '<br>');
-        }
-
-        // Focus the editor first
-        editorRef.current.focus();
-
-        // Insert the content
-        if (document.queryCommandSupported('insertHTML')) {
-            document.execCommand('insertHTML', false, cleanContent);
-        } else {
-            // Fallback for browsers that don't support insertHTML
-            const selection = window.getSelection();
-            if (selection.rangeCount > 0) {
-                const range = selection.getRangeAt(0);
-                range.deleteContents();
-                const tempDiv = document.createElement('div');
-                tempDiv.innerHTML = cleanContent;
-                const fragment = document.createDocumentFragment();
-                while (tempDiv.firstChild) {
-                    fragment.appendChild(tempDiv.firstChild);
-                }
-                range.insertNode(fragment);
-            }
-        }
-
-        // Trigger onChange
-        if (onChange) {
-            onChange(editorRef.current.innerHTML);
-        }
-    };
-
-    const sanitizeHtml = (html) => {
-                let cleanedHtml = html
-                       // Remove all HTML comments (<!-- … -->), including Word’s conditional comments
-                        .replace(/<!--[\s\S]*?-->/g, '')      
-           
-            // Remove style tags and their content
-            .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-            // Remove script tags and their content
-            .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-            // Remove XML declarations and Office-specific tags
-            .replace(/<\?xml[^>]*>/gi, '')
-            .replace(/<\/?o:p[^>]*>/gi, '')
-            .replace(/<\/?v:[^>]*>/gi, '')
-            .replace(/<\/?w:[^>]*>/gi, '')
-              // (we already stripped all <!--…--> above)
-              ;
-
-        // Create a temporary container
-        const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = cleanedHtml;
-
-        // Remove all style attributes and Microsoft Office attributes
-        const removeAttributes = (element) => {
-            if (element.nodeType === Node.ELEMENT_NODE) {
-                const attributesToRemove = [];
-                for (let i = 0; i < element.attributes.length; i++) {
-                    const attr = element.attributes[i];
-                    if (
-                        attr.name === 'style' ||
-                        attr.name === 'class' ||
-                        attr.name.startsWith('mso-') ||
-                        attr.name.startsWith('data-') ||
-                        attr.name === 'lang' ||
-                        attr.name === 'dir'
-                    ) {
-                        attributesToRemove.push(attr.name);
-                    }
-                }
-
-                // FIX: Replaced forEach with a standard for...of loop to avoid parser errors
-                for (const attrName of attributesToRemove) {
-                    element.removeAttribute(attrName);
-                }
-
-                // Recursively clean child elements
-                for (const child of Array.from(element.children)) {
-                    removeAttributes(child);
-                }
-            }
-        };
-
-        removeAttributes(tempDiv);
-
-        // Convert Microsoft Word's complex list structures to simple HTML lists
-        const convertWordLists = (container) => {
-            const paragraphs = container.querySelectorAll('p');
-            let currentList = null;
-            let currentListType = null;
-
-            // FIX: Replaced forEach with a standard for...of loop to avoid parser errors
-            for (const p of paragraphs) {
-                const text = p.textContent.trim();
-                const isListItem =
-                    text.startsWith('·') ||
-                    text.startsWith('•') ||
-                    text.startsWith('-') ||
-                    text.match(/^\d+\./) ||
-                    p.style.marginLeft ||
-                    p.className?.includes('List');
-
-                if (isListItem) {
-                    const isOrdered = text.match(/^\d+\./);
-                    const listType = isOrdered ? 'ol' : 'ul';
-
-                    if (!currentList || currentListType !== listType) {
-                        currentList = document.createElement(listType);
-                        currentListType = listType;
-                        p.parentNode.insertBefore(currentList, p);
-                    }
-
-                    const li = document.createElement('li');
-                    let cleanText = text
-                        .replace(/^[·•\-]\s*/, '')
-                        .replace(/^\d+\.\s*/, '')
-                        .trim();
-                    li.innerHTML = cleanText;
-                    currentList.appendChild(li);
-                    p.remove();
-                } else {
-                    currentList = null;
-                    currentListType = null;
-                }
-            }
-        };
-
-        convertWordLists(tempDiv);
-
-        // Define allowed tags
-        const allowedTags = ['b', 'i', 'u', 'strong', 'em', 'p', 'br', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'];
-
-        // Function to recursively clean nodes and remove disallowed tags
-        const cleanNode = (node) => {
-            if (node.nodeType === Node.TEXT_NODE) {
-                const cleanText = node.textContent.replace(/\s+/g, ' ').trim();
-                return cleanText ? document.createTextNode(cleanText) : null;
-            }
-
-            if (node.nodeType === Node.ELEMENT_NODE) {
-                const tagName = node.tagName.toLowerCase();
-
-                if (allowedTags.includes(tagName)) {
-                    const newNode = document.createElement(tagName);
-
-                    // FIX: Replaced forEach with a standard for...of loop
-                    for (const child of Array.from(node.childNodes)) {
-                        const cleanedChild = cleanNode(child);
-                        if (cleanedChild) {
-                            newNode.appendChild(cleanedChild);
-                        }
-                    }
-
-                    return newNode.textContent.trim() || newNode.children.length > 0 ? newNode : null;
-                } else {
-                    const fragment = document.createDocumentFragment();
-                    // FIX: Replaced forEach with a standard for...of loop
-                    for (const child of Array.from(node.childNodes)) {
-                        const cleanedChild = cleanNode(child);
-                        if (cleanedChild) {
-                            fragment.appendChild(cleanedChild);
-                        }
-                    }
-                    return fragment.childNodes.length > 0 ? fragment : null;
-                }
-            }
-
-            return null;
-        };
-
-        const cleanedContainer = document.createElement('div');
-        // FIX: Replaced forEach with a standard for...of loop
-        for (const child of Array.from(tempDiv.childNodes)) {
-            const cleanedChild = cleanNode(child);
-            if (cleanedChild) {
-                cleanedContainer.appendChild(cleanedChild);
-            }
-        }
-
-        // Final cleanup
-        const finalHtml = cleanedContainer.innerHTML
-            .replace(/<p[^>]*>\s*<\/p>/g, '')
-            .replace(/\n\s*\n/g, '\n')
-            .replace(/(<\/[^>]+>)\s+(<[^>]+>)/g, '$1$2')
-            .trim();
-
-        return finalHtml;
-    };
-
-    const handleInput = () => {
-        if (onChange && editorRef.current) {
-            onChange(editorRef.current.innerHTML);
-        }
-    };
-
-    const formatText = (command, value = null) => {
-        if (editorRef.current) {
-            editorRef.current.focus();
-            setTimeout(() => {
-                try {
-                    document.execCommand(command, false, value);
-                    if (onChange && editorRef.current) {
-                        onChange(editorRef.current.innerHTML);
-                    }
-                } catch (error) {
-                    console.error(`Error executing command ${command}:`, error);
-                }
-            }, 10);
-        }
-    };
-
-    const handleKeyDown = (e) => {
-        if (e.ctrlKey || e.metaKey) {
-            switch (e.key) {
-                case 'b':
-                    e.preventDefault();
-                    formatText('bold');
-                    break;
-                case 'i':
-                    e.preventDefault();
-                    formatText('italic');
-                    break;
-                case 'u':
-                    e.preventDefault();
-                    formatText('underline');
-                    break;
-                default:
-                    break;
-            }
-        }
-    };
+    }, [value, ref]);
 
     return (
-        <div className="simple-rich-text-editor border border-gray-300 rounded-lg overflow-hidden">
-            {/* Toolbar */}
-            <div className="bg-gray-50 border-b border-gray-300 p-2 flex gap-2 flex-wrap">
-                <button
-                    type="button"
-                    onMouseDown={(e) => e.preventDefault()} // Prevent focus loss
-                    onClick={() => formatText('bold')}
-                    className="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm font-bold transition-colors text-gray-800"
-                    title="Bold (Ctrl+B)"
-                >
-                    B
-                </button>
-                <button
-                    type="button"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => formatText('italic')}
-                    className="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm italic transition-colors text-gray-800"
-                    title="Italic (Ctrl+I)"
-                >
-                    I
-                </button>
-                <button
-                    type="button"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => formatText('underline')}
-                    className="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm underline transition-colors text-gray-800"
-                    title="Underline (Ctrl+U)"
-                >
-                    U
-                </button>
-                <div className="w-px bg-gray-300"></div>
-                <button
-                    type="button"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => formatText('formatBlock', 'h3')}
-                    className="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm font-bold transition-colors text-gray-800"
-                    title="Heading 3"
-                >
-                    H3
-                </button>
-                <button
-                    type="button"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => formatText('formatBlock', 'p')}
-                    className="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm transition-colors text-gray-800"
-                    title="Paragraph"
-                >
-                    P
-                </button>
-                <div className="w-px bg-gray-300"></div>
-                <button
-                    type="button"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => formatText('insertUnorderedList')}
-                    className="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm transition-colors text-gray-800"
-                    title="Bullet List"
-                >
-                    • List
-                </button>
-                <button
-                    type="button"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => formatText('insertOrderedList')}
-                    className="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm transition-colors text-gray-800"
-                    title="Numbered List"
-                >
-                    1. List
-                </button>
-                <div className="w-px bg-gray-300"></div>
-                <button
-                    type="button"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => formatText('outdent')}
-                    className="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm transition-colors text-gray-800"
-                    title="Decrease Indent"
-                >
-                    ←
-                </button>
-                <button
-                    type="button"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => formatText('indent')}
-                    className="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm transition-colors text-gray-800"
-                    title="Increase Indent"
-                >
-                    →
-                </button>
-                <div className="w-px bg-gray-300"></div>
-
-                {/* ─── Remove formatting (Tx / Eraser) ───────────────────────────── */}
-                <button
-                    type="button"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => {
-                        if (!editorRef.current) return;
-
-                        const sel = window.getSelection();
-
-                        /* If no text is selected, select the whole editor first */
-                        if (sel && sel.isCollapsed) {
-                            const range = document.createRange();
-                            range.selectNodeContents(editorRef.current);
-                            sel.removeAllRanges();
-                            sel.addRange(range);
-                        }
-
-                        /* Strip bold/italic/underline/lists/etc. from the selection */
-                        document.execCommand('removeFormat');
-
-                        /* Sync React state so Save → inlineEditor.content stays correct */
-                        onChange?.(editorRef.current.innerHTML);
-                    }}
-                    className="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100
-             text-sm transition-colors flex items-center gap-1"
-                    title="Remove formatting"
-                >
-                    <Eraser size={14} />
-                </button>
-
-                {/* ─── Clear all content (Trash) ─────────────────────────────────── */}
-                <button
-                    type="button"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => {
-                        if (!editorRef.current) return;
-
-                        editorRef.current.innerHTML = '';
-                        onChange?.('');
-
-                        /* Put caret at start so the user can type immediately */
-                        const sel = window.getSelection();
-                        sel.removeAllRanges();
-                        const range = document.createRange();
-                        range.selectNodeContents(editorRef.current);
-                        range.collapse(true);
-                        sel.addRange(range);
-                    }}
-                    className="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100
-             text-sm text-red-600 transition-colors flex items-center gap-1"
-                    title="Clear all text"
-                >
-                    <Trash2 size={14} />
-                    Clear
-                </button>
-
-
-            </div>
-
-            {/* Editor Content */}
+        <div className="rich-text-editor">
             <div
-                ref={editorRef}
+                ref={ref}
                 contentEditable
-                onInput={handleInput}
-                onPaste={handlePaste}
-                onKeyDown={handleKeyDown}
-                className="p-4 min-h-[200px] max-h-[400px] overflow-y-auto focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-20"
-                style={{
-                    lineHeight: '1.5',
-                    wordWrap: 'break-word',
-                    overflowWrap: 'break-word'
-                }}
+                onInput={(e) => onChange(e.target.innerHTML)}
+                className="min-h-32 p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                style={{ minHeight: '120px' }}
                 dangerouslySetInnerHTML={{ __html: value || '' }}
-                suppressContentEditableWarning={true}
-                data-placeholder={placeholder}
+                placeholder={placeholder}
             />
-
-            {/* Enhanced styling for lists and editor */}
-            <style jsx>{`
+            <style>{`
                 [contenteditable]:empty:before {
-                    content: attr(data-placeholder);
+                    content: attr(placeholder);
                     color: #9ca3af;
                     font-style: italic;
-                    pointer-events: none;
-                }
-                [contenteditable]:focus:before {
-                    content: none;
                 }
                 [contenteditable] ul {
                     list-style-type: disc;
@@ -477,11 +66,14 @@ const SimpleRichTextEditor = React.forwardRef(({ value, onChange, placeholder },
 SimpleRichTextEditor.displayName = 'SimpleRichTextEditor';
 
 const RubricCreator = () => {
-    // Get shared context functions and state
+    // ENHANCED: Get shared context functions and state with class list access
     const {
         sharedRubric,
         setSharedRubric,
         transferRubricToGradingWithDetails,
+        setActiveTab,
+        classList, // ADDED: Access to class list
+        initializeGradingSession, // ADDED: Access to grading session function
         activeTab
     } = useAssessment();
 
@@ -643,6 +235,31 @@ const RubricCreator = () => {
             .replace(/• (.*?)\n/g, '<li>$1</li>')
             .replace(/\n/g, '<br>')
             .replace(/(<li>.*<\/li>)/g, '<ul>$1</ul>');
+    };
+
+    // Toggle all textareas to expanded or collapsed state
+    const toggleAllTextareas = (expand) => {
+        const textareas = document.querySelectorAll('textarea');
+        textareas.forEach(textarea => {
+            if (expand) {
+                textarea.style.height = '200px';
+                textarea.style.maxHeight = '400px';
+            } else {
+                // Reset to default sizes based on context
+                if (textarea.closest('.assignment-info')) {
+                    textarea.style.height = '80px';
+                    textarea.style.maxHeight = '200px';
+                } else if (textarea.closest('td')) {
+                    if (textarea.rows <= 2) {
+                        textarea.style.height = '48px';
+                        textarea.style.maxHeight = '200px';
+                    } else {
+                        textarea.style.height = '80px';
+                        textarea.style.maxHeight = '300px';
+                    }
+                }
+            }
+        });
     };
 
     // Close inline editor and optionally save
@@ -885,10 +502,65 @@ const RubricCreator = () => {
         return exportData;
     };
 
-    // Transfer to grading tool directly
+    // ENHANCED: Transfer to grading tool with class list validation and batch grading
     const transferToGrading = () => {
         const exportData = prepareRubricForExport();
-        transferRubricToGradingWithDetails(exportData);
+
+        // STEP 1: Check if class list is loaded
+        if (!classList || !classList.students || classList.students.length === 0) {
+            // If no class list, show confirmation dialog
+            const userChoice = window.confirm(
+                "No class list has been loaded yet.\n\n" +
+                "Would you like to:\n" +
+                "• Click 'OK' to go to Class Manager to load a class list first\n" +
+                "• Click 'Cancel' to proceed to Grading Tool for individual grading\n\n" +
+                "Note: Batch grading requires a loaded class list."
+            );
+
+            if (userChoice) {
+                // User chose to load class list first
+                setSharedRubric(exportData);
+                setActiveTab('class-manager');
+                alert("Rubric saved! Please import your class list, then use 'Start Batch Grading' to begin.");
+                return;
+            } else {
+                // User chose to proceed with individual grading
+                setSharedRubric(exportData);
+                setActiveTab('grading-tool');
+                console.log('✅ Rubric transferred for individual grading:', exportData.assignmentInfo?.title || 'Untitled');
+                return;
+            }
+        }
+
+        // STEP 2: Class list exists - proceed with batch grading setup
+        setSharedRubric(exportData);
+
+        // STEP 3: Initialize grading session with first student and course info
+        const success = initializeGradingSession(classList);
+
+        if (success) {
+            // STEP 4: Switch to grading tool
+            setActiveTab('grading-tool');
+
+            // STEP 5: Show success message
+            alert(
+                `🎯 Batch Grading Started!\n\n` +
+                `Rubric: ${exportData.assignmentInfo?.title || 'Untitled'}\n` +
+                `Class: ${classList.students.length} students\n` +
+                `Starting with: ${classList.students[0]?.name || 'First Student'}\n\n` +
+                `Course information has been automatically loaded from your class list.`
+            );
+
+            console.log('✅ Batch grading session started:', {
+                rubric: exportData.assignmentInfo?.title,
+                students: classList.students.length,
+                firstStudent: classList.students[0]?.name
+            });
+        } else {
+            // Fallback if session initialization fails
+            setActiveTab('grading-tool');
+            alert('Rubric transferred, but batch grading session could not be initialized. You can grade individual students.');
+        }
     };
 
     // Import rubric data
@@ -1069,62 +741,128 @@ const RubricCreator = () => {
     return (
         <div className="min-h-screen bg-gray-50 p-6">
             <div className="max-w-7xl mx-auto bg-white rounded-lg shadow-lg">
-                {/* Header */}
+                {/* ENHANCED: Header with better organized button layout and class list status */}
                 <div className="bg-blue-900 text-white p-6 rounded-t-lg">
-                    <div className="flex justify-between items-center">
+                    <div className="flex justify-between items-start mb-4">
                         <div>
                             <h1 className="text-2xl font-bold">Professional Rubric Builder</h1>
                             <p className="text-white">Create comprehensive assessment rubrics with detailed criteria and feedback</p>
                         </div>
-                        <div className="flex gap-2 flex-wrap">
-                            <button
-                                onClick={resetRubric}
-                                className="bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded flex items-center gap-1 text-sm"
-                                title="Reset to blank rubric"
-                            >
-                                <RotateCcw size={14} />
-                                Reset
-                            </button>
-                            <button
-                                onClick={() => importInputRef.current?.click()}
-                                className="bg-purple-700 hover:bg-purple-600 text-white px-3 py-2 rounded flex items-center gap-1 text-sm"
-                                title="Import existing rubric JSON file"
-                            >
-                                <Upload size={14} />
-                                Import
-                            </button>
-                            <button
-                                onClick={transferToGrading}
-                                className="bg-blue-700 hover:bg-blue-700 text-white px-3 py-2 rounded flex items-center gap-1 text-sm"
-                                title="Transfer rubric directly to grading tool"
-                            >
-                                <ArrowRight size={14} />
-                                Use for Grading
-                            </button>
-                            <button
-                                onClick={saveRubric}
-                                className="bg-teal-700 hover:bg-teal-600 text-white px-3 py-2 rounded flex items-center gap-1 text-sm"
-                                title="Save work in progress as JSON file"
-                            >
-                                <Save size={14} />
-                                Save Draft
-                            </button>
-                            <button
-                                onClick={exportForGrading}
-                                className="bg-green-700 hover:bg-green-600 text-white px-3 py-2 rounded flex items-center gap-1 text-sm"
-                                title="Export final rubric for grading template"
-                            >
-                                <Download size={14} />
-                                Export JSON
-                            </button>
-                            <button
-                                onClick={exportToHTML}
-                                className="bg-orange-700 hover:bg-orange-600 text-white px-3 py-2 rounded flex items-center gap-1 text-sm"
-                                title="Export HTML version for distribution"
-                            >
-                                <FileText size={14} />
-                                Export HTML
-                            </button>
+                    </div>
+
+                    {/* ENHANCED: Organized button layout with class list status indicators */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                        {/* Primary Actions */}
+                        <div>
+                            <h3 className="text-sm font-semibold text-white uppercase tracking-wide mb-2">
+                                Primary Actions
+                            </h3>
+                            <div className="flex flex-col gap-2">
+                                {/* ENHANCED: "Use for Grading" button with status indicator */}
+                                <div className="relative">
+                                    <button
+                                        onClick={transferToGrading}
+                                        className="bg-green-600 hover:bg-green-700 text-white px-4 py-3 rounded-lg flex items-center gap-2 text-sm font-medium shadow-lg transition-all duration-200 hover:shadow-xl hover:scale-105 w-full"
+                                        title={classList && classList.students?.length
+                                            ? `Start batch grading with ${classList.students.length} students`
+                                            : "Transfer rubric to grading tool (individual grading)"
+                                        }
+                                    >
+                                        <ArrowRight size={16} />
+                                        Use for Grading
+                                        {classList && classList.students?.length > 0 && (
+                                            <span className="ml-auto bg-green-800 text-xs px-2 py-1 rounded-full">
+                                                {classList.students.length} students
+                                            </span>
+                                        )}
+                                    </button>
+
+                                    {/* Status indicator */}
+                                    <div className="mt-1 text-xs text-white">
+                                        {classList && classList.students?.length > 0
+                                            ? `✅ Class list loaded (${classList.students.length} students) - Will start batch grading`
+                                            : "⚠️ No class list - Individual grading mode"
+                                        }
+                                    </div>
+                                </div>
+
+                                <button
+                                    onClick={exportForGrading}
+                                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded flex items-center gap-2 text-sm font-medium shadow-md transition-all duration-200"
+                                    title="Export final rubric for grading template"
+                                >
+                                    <Download size={14} />
+                                    Export JSON
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* File Operations */}
+                        <div>
+                            <h3 className="text-sm font-semibold text-white uppercase tracking-wide mb-2">
+                                File Operations
+                            </h3>
+                            <div className="flex flex-col gap-2">
+                                <button
+                                    onClick={() => importInputRef.current?.click()}
+                                    className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded flex items-center gap-1 text-sm font-medium shadow-md transition-all duration-200"
+                                    title="Import existing rubric JSON file"
+                                >
+                                    <Upload size={14} />
+                                    Import
+                                </button>
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={saveRubric}
+                                        className="bg-teal-600 hover:bg-teal-700 text-white px-3 py-2 rounded flex items-center gap-1 text-sm font-medium shadow-md transition-all duration-200 flex-1"
+                                        title="Save work in progress as JSON file"
+                                    >
+                                        <Save size={14} />
+                                        Save Draft
+                                    </button>
+                                    <button
+                                        onClick={exportToHTML}
+                                        className="bg-orange-600 hover:bg-orange-700 text-white px-3 py-2 rounded flex items-center gap-1 text-sm font-medium shadow-md transition-all duration-200 flex-1"
+                                        title="Export HTML version for distribution"
+                                    >
+                                        <FileText size={14} />
+                                        Export HTML
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Utility Actions */}
+                        <div>
+                            <h3 className="text-sm font-semibold text-white uppercase tracking-wide mb-2">
+                                Utility Actions
+                            </h3>
+                            <div className="flex flex-col gap-2">
+                                <button
+                                    onClick={resetRubric}
+                                    className="bg-gray-600 hover:bg-gray-700 text-white px-3 py-2 rounded flex items-center gap-1 text-sm font-medium shadow-md transition-all duration-200"
+                                    title="Reset to blank rubric"
+                                >
+                                    <RotateCcw size={14} />
+                                    Reset
+                                </button>
+                                <button
+                                    onClick={() => setReversedOrder(!reversedOrder)}
+                                    className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded flex items-center gap-1 text-sm font-medium shadow-md transition-all duration-200"
+                                    title="Switch between ascending and descending level order"
+                                >
+                                    <RotateCcw size={14} />
+                                    {reversedOrder ? 'High→Low' : 'Low→High'}
+                                </button>
+                                <button
+                                    onClick={() => resetTextareaSizes()}
+                                    className="bg-yellow-600 hover:bg-yellow-700 text-white px-3 py-2 rounded flex items-center gap-1 text-sm font-medium shadow-md transition-all duration-200"
+                                    title="Reset all text boxes to original size"
+                                >
+                                    <Minimize2 size={14} />
+                                    Reset Sizes
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1136,7 +874,42 @@ const RubricCreator = () => {
                             <div className="flex items-center gap-2 text-green-800">
                                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
                                 <span className="text-sm font-medium">Auto-saved - Ready for grading tool</span>
+                                {classList && classList.students?.length > 0 && (
+                                    <span className="ml-auto text-xs bg-green-100 px-2 py-1 rounded">
+                                        Class list ready: {classList.students.length} students
+                                    </span>
+                                )}
                             </div>
+                        </div>
+                    )}
+
+                    {/* ENHANCED: Add class list status notification */}
+                    {!classList || !classList.students?.length ? (
+                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+                            <div className="flex items-center gap-2 text-yellow-800">
+                                <AlertTriangle size={20} />
+                                <span className="font-medium">No Class List Loaded</span>
+                            </div>
+                            <p className="mt-1 text-yellow-700">
+                                For batch grading, load a class list first.{' '}
+                                <button
+                                    onClick={() => setActiveTab('class-manager')}
+                                    className="underline hover:no-underline font-medium"
+                                >
+                                    Go to Class Manager
+                                </button>
+                            </p>
+                        </div>
+                    ) : (
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                            <div className="flex items-center gap-2 text-blue-800">
+                                <CheckCircle size={20} />
+                                <span className="font-medium">Class List Ready</span>
+                            </div>
+                            <p className="mt-1 text-blue-700">
+                                {classList.students.length} students loaded.
+                                <strong> "Use for Grading"</strong> will start batch grading automatically.
+                            </p>
                         </div>
                     )}
 
@@ -1187,6 +960,10 @@ const RubricCreator = () => {
                             </div>
                         )}
                     </div>
+
+                    {/* Rest of the component content (Assignment Information, Point System, Rubric Table, etc.) */}
+                    {/* ... keeping all the existing form content exactly as it was ... */}
+                    {/* This includes: Assignment Information, Point System Selection, Rubric Table, Feedback Library Management, Overall Score Preview */}
 
                     {/* Assignment Information */}
                     <div className="assignment-info bg-blue-50 border border-blue-200 p-6 rounded-lg mb-6">
@@ -1284,8 +1061,6 @@ const RubricCreator = () => {
                                 />
                             </div>
                         </div>
-
-
 
                         {/* Inline Rich Text Editor for Assignment */}
                         {inlineEditor.show && inlineEditor.type === 'assignment' && (

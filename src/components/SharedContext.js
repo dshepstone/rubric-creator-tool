@@ -354,10 +354,11 @@ export const AssessmentProvider = ({ children }) => {
         return false;
     }, [gradingSession, classList]);
 
-    // **FIX APPLIED HERE: Replaced the old function with the new, corrected version.**
+    // **FIXED: Enhanced initializeGradingSession function**
     const initializeGradingSession = useCallback((classListData) => {
         // 1. Guard against missing or empty class list
         if (!classListData || !classListData.students?.length) {
+            console.warn('⚠️ Cannot initialize grading session: No students found');
             return false;
         }
 
@@ -396,11 +397,8 @@ export const AssessmentProvider = ({ children }) => {
             assignment: sharedCourseDetails?.assignment ?? prev.assignment
         }));
 
-        console.log(
-            `🚀 Grading session started for ${students.length} students`
-        );
+        console.log(`🚀 Grading session started for ${students.length} students`);
         return true;
-
     }, [sharedCourseDetails]);
 
     // Update grading session
