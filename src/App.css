@@ -1,10 +1,52 @@
+/* GradingPilot App Styles */
 .App {
-  text-align: center;
+  min-height: 100vh;
+  background-color: #f9fafb;
 }
 
+/* Header Styles */
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background-color: white;
+  border-bottom: 1px solid #e5e7eb;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+}
+
+/* Logo Styles */
+.app-header img {
+  height: 40px;
+  width: 40px;
+  object-fit: contain;
+  transition: transform 0.2s ease-in-out;
+}
+
+.app-header img:hover {
+  transform: scale(1.05);
+}
+
+/* App Title Styles */
+.app-header h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.app-header p {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin: 0;
+  line-height: 1;
+}
+
+/* Legacy App.css styles (keeping for compatibility) */
 .App-logo {
-  height: 40vmin;
+  height: 40px;
   pointer-events: none;
+  object-fit: contain;
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -32,7 +74,37 @@
   from {
     transform: rotate(0deg);
   }
+
   to {
     transform: rotate(360deg);
   }
+}
+
+/* Responsive Design */
+@media (max-width: 640px) {
+  .app-header h1 {
+    font-size: 1.25rem;
+  }
+
+  .app-header p {
+    font-size: 0.75rem;
+  }
+
+  .app-header img {
+    height: 32px;
+    width: 32px;
+  }
+}
+
+/* Tab Navigation Spacing */
+.tab-navigation {
+  background-color: white;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+/* Main Content Area */
+main {
+  flex: 1;
+  padding-top: 1.5rem;
+  padding-bottom: 1.5rem;
 }
