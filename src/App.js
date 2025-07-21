@@ -8,7 +8,7 @@ import RubricCreator from './components/RubricCreator';
 import ClassListManager from './components/ClassListManager';
 import GradingTemplate from './components/GradingTemplate';
 import ExcelImportTest from './components/ExcelImportTest';
-import HelpPage from './components/HelpPage'; // ADDED: Import the new HelpPage component
+import HelpPage from './components/HelpPage';
 import './index.css';
 
 // Scroll to Top Button Component
@@ -194,12 +194,24 @@ const AppContent = () => {
       <div className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Assessment Platform</h1>
-              <p className="text-gray-600">Professional rubric creation, class management, and grading tools</p>
+            <div className="flex items-center space-x-3">
+              {/* GradingPilot Logo */}
+              <img
+                src="/GradingPilot-Vector-Logo-v01.png"
+                alt="GradingPilot Logo"
+                className="h-20 w-20 object-contain"
+                onError={(e) => {
+                  // Fallback if image doesn't load
+                  e.target.style.display = 'none';
+                }}
+              />
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">GradingPilot</h1>
+                <p className="text-gray-600">Advanced grading and rubric creation tools for educators</p>
+              </div>
             </div>
             <div className="text-sm text-gray-500">
-              Comprehensive Educational Assessment Suite v2.0
+              GradingPilot Professional Suite v2.0
             </div>
           </div>
         </div>
@@ -214,7 +226,7 @@ const AppContent = () => {
         {activeTab === 'class-manager' && <ClassListManager />}
         {activeTab === 'grading-tool' && <GradingTemplate />}
         {activeTab === 'excel-import-test' && <ExcelImportTest />}
-        {activeTab === 'help' && <HelpPage />} {/* ADDED: Render HelpPage when help tab is active */}
+        {activeTab === 'help' && <HelpPage />}
       </div>
 
       {/* Scroll to Top Button - Available on all pages */}
