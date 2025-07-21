@@ -717,337 +717,57 @@ const ClassListManager = () => {
 
     // ──────────────────────────────
 
-    // Complete exportStudentGrade function for ClassListManager.js
-    // This should replace the incomplete function in the ClassListManager.js file
-
+    // ── New: Export a single student's grade as CSV ───────────────────────────────
     const exportStudentGrade = (studentId) => {
-        // 1. Make sure we have a classList and sharedRubric
-        if (!classList || !sharedRubric) {
-            alert('No class list or rubric available. Please ensure both are loaded.');
-            return;
-        }
+        // 1. Make sure we have a classList
+        if (!classList) return;
 
-        // 2. Find the student in the class list
+        // 2. Find the student record
         const student = classList.students.find(s => s.id === studentId);
-        if (!student) {
-            alert('Student not found in class list.');
-            return;
-        }
+        if (!student) return;
 
-        // 3. Load the student's grade data
-        const gradeStatus = getGradeStatus(studentId);
-        let gradeData = null;
+        // 3. Calculate their grade (score, percentage, etc.)
+        const gradeInfo = calculateStudentGrade(studentId);
 
-        if (gradeStatus === 'final') {
-            gradeData = loadFinalGradeData(studentId);
-        } else if (gradeStatus === 'draft') {
-            gradeData = loadDraft(studentId);
-        } else {
-            alert('No grade data found for this student. Please grade the student first.');
-            return;
-        }
+        // 4. Build a 2-row CSV: headers + this student's data
+        const rows = [
+            ['Student ID', 'Student Name', 'Email', 'Program', 'Status', 'Grade Type', 'Numeric Grade', 'Letter Grade', 'Percentage', 'Last Modified'],
+            ...classList.students.map((student, index) => {
+                const prog = classList.gradingProgress[index] || {};
+                const info = calculateStudentGrade(student.id);
+                const lm = prog.lastModified
+                    ? new Date(prog.lastModified).toLocaleDateString()
+                    : 'Never';
+                return [
+                    student.id,
+                    student.name,
+                    student.email,
+                    student.program || 'N/A',
+                    prog.status || 'pending',
+                    prog.gradeType || 'none',
+                    `${info.score}/${info.maxPossible}`,
+                    info.letterGrade || 'N/A',
+                    `${info.percentage}%`,
+                    lm
+                ];
+            })
+        ];
 
-        if (!gradeData) {
-            alert('Unable to load grade data for this student.');
-            return;
-        }
+        const quote = (cell) => `"${String(cell).trim().replace(/"/g, '""')}"`;
 
-        // 4. Late Policy Levels (same as in GradingTemplate.js)
-        const latePolicyLevels = {
-            none: {
-                name: 'On Time',
-                multiplier: 1.0,
-                description: 'Assignment submitted on or before due date and time - marked out of 100%',
-                color: '#16a34a'
-            },
-            within24: {
-                name: '1-24 Hours Late',
-                multiplier: 0.8,
-                description: 'Assignment received within 24 hours of due date - 20% reduction (marked out of 80%)',
-                color: '#ea580c'
-            },
-            after24: {
-                name: 'More than 24 Hours Late',
-                multiplier: 0.0,
-                description: 'Assignment received after 24 hours from due date - mark of zero (0)',
-                color: '#dc2626'
-            }
-        };
+        const csvContent = rows
+            .map(row => row.map(quote).join(','))
+            .join('\r\n');
 
-        // 5. Calculate scores (replicated from GradingTemplate.js)
-        const calculateTotalScore = () => {
-            if (!sharedRubric || !gradeData.rubricGrading) {
-                return { finalScore: 0, rawScore: 0, penaltyApplied: false };
-            }
 
-            let totalScore = 0;
-            const totalPossible = sharedRubric.assignmentInfo.totalPoints;
-
-            sharedRubric.criteria.forEach(criterion => {
-                const rubricGrading = gradeData.rubricGrading[criterion.id];
-                if (rubricGrading && rubricGrading.selectedLevel) {
-                    const level = sharedRubric.rubricLevels.find(l => l.level === rubricGrading.selectedLevel);
-                    if (level) {
-                        const points = criterion.maxPoints * level.multiplier;
-                        totalScore += points;
-                    }
-                }
-            });
-
-            const rawScore = totalScore;
-            let finalScore = totalScore;
-            let penaltyApplied = false;
-
-            // Apply late penalty if applicable
-            if (gradeData.latePolicy && gradeData.latePolicy.level !== 'none') {
-                const latePolicyLevel = latePolicyLevels[gradeData.latePolicy.level];
-                if (latePolicyLevel) {
-                    finalScore = totalScore * latePolicyLevel.multiplier;
-                    penaltyApplied = true;
-                }
-            }
-
-            return { finalScore, rawScore, penaltyApplied };
-        };
-
-        // 6. Generate HTML report (based on GradingTemplate.js generateStudentReportHTML)
-        const generateStudentReportHTML = () => {
-            const scoreCalculation = calculateTotalScore();
-            const totalScore = scoreCalculation.finalScore;
-            const rawScore = scoreCalculation.rawScore;
-            const maxPoints = sharedRubric.assignmentInfo.totalPoints;
-            const percentage = ((totalScore / (maxPoints || 1)) * 100).toFixed(1);
-            const penaltyApplied = scoreCalculation.penaltyApplied;
-
-            // Generate attachments HTML
-            const attachmentsHTML = gradeData.attachments?.map((att, index) => {
-                if (att.base64Data) {
-                    return `<div class="attachment-item"><img src="${att.base64Data}" alt="${att.name}" class="clickable-image" data-index="${index}" style="max-width: 200px; max-height: 200px; object-fit: contain; display: block; margin-bottom: 0.5rem; border: 1px solid #ddd; border-radius: 4px;" /><div style="font-size: 0.875rem; font-weight: 500; word-break: break-word;">${att.name}</div><div style="font-size: 0.75rem; color: #666;">${(att.size / 1024).toFixed(1)} KB</div><div style="font-size: 0.75rem; color: #007bff; margin-top: 4px;">Click to enlarge</div></div>`;
-                } else {
-                    return `<div class="attachment-item"><div style="width: 40px; height: 40px; background: #f3f4f6; border-radius: 4px; display: flex; align-items: center; justify-content: center; margin: 0 auto 0.5rem auto;">📄</div><div style="font-size: 0.875rem; font-weight: 500; word-break: break-word;">${att.name}</div><div style="font-size: 0.75rem; color: #666;">${(att.size / 1024).toFixed(1)} KB</div></div>`;
-                }
-            }).join('') || '';
-
-            // Generate video links HTML
-            const videoLinksHTML = gradeData.videoLinks?.map(link =>
-                `<div class="video-link-item" style="background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 8px; padding: 1rem; margin-bottom: 1rem;"><div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;"><span style="font-size: 1.25rem;">🎥</span><strong style="color: #495057;">${link.title}</strong></div><a href="${link.url}" target="_blank" rel="noopener noreferrer" style="color: #007bff; text-decoration: none; word-break: break-all;">${link.url}</a></div>`
-            ).join('') || '';
-
-            // Generate rubric table HTML
-            const rubricTableHTML = sharedRubric ? `
-            <div style="margin: 30px 0;">
-                <h3>📊 Detailed Rubric Assessment</h3>
-                <table style="width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.9rem;">
-                    <thead>
-                        <tr style="background: #f8f9fa;">
-                            <th style="border: 1px solid #ddd; padding: 12px; text-align: left;">Criterion</th>
-                            <th style="border: 1px solid #ddd; padding: 12px; text-align: center; width: 120px;">Level Achieved</th>
-                            <th style="border: 1px solid #ddd; padding: 12px; text-align: center; width: 80px;">Points</th>
-                            <th style="border: 1px solid #ddd; padding: 12px; text-align: left;">Details & Comments</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${sharedRubric.criteria.map(criterion => {
-                const rubricGrading = gradeData.rubricGrading?.[criterion.id];
-                const selectedLevel = rubricGrading?.selectedLevel;
-                const level = selectedLevel ? sharedRubric.rubricLevels.find(l => l.level === selectedLevel) : null;
-                const points = level ? Math.round(criterion.maxPoints * level.multiplier * 10) / 10 : 0;
-                const levelDescription = level && criterion.levels?.[selectedLevel]?.description ? criterion.levels[selectedLevel].description : '';
-                const additionalComments = rubricGrading?.customComments || '';
-
-                return `<tr>
-                                <td style="border: 1px solid #ddd; padding: 12px; vertical-align: top;">
-                                    <strong>${criterion.name}</strong><br>
-                                    <small style="color: #666;">${criterion.description || ''}</small><br>
-                                    <small style="color: #888;">Max Points: ${criterion.maxPoints}</small>
-                                </td>
-                                <td style="border: 1px solid #ddd; padding: 8px; text-align: center; vertical-align: top;">
-                                    <span style="display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: bold; background: ${level?.color || '#f0f0f0'}; color: white;">
-                                        ${level?.name || 'Not Assessed'}
-                                    </span>
-                                </td>
-                                <td style="border: 1px solid #ddd; padding: 8px; text-align: center; font-weight: bold; font-size: 1.1em; color: #2c3e50;">${points}</td>
-                                <td style="border: 1px solid #ddd; padding: 8px; vertical-align: top;">
-                                    ${levelDescription ? `<div style="margin-bottom: 10px; padding: 8px; background: #f8f9fa; border-left: 4px solid ${level.color}; border-radius: 4px;"><strong style="color: ${level.color};">Level Description:</strong><br><span style="font-size: 0.85em; line-height: 1.4;">${levelDescription}</span></div>` : ''}
-                                    ${additionalComments ? `<div style="margin-top: 8px; padding: 8px; background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px;"><strong style="color: #856404;">Additional Comments:</strong><br><span style="font-size: 0.85em; line-height: 1.4; white-space: pre-wrap;">${additionalComments}</span></div>` : ''}
-                                    ${(!levelDescription && !additionalComments) ? '<em style="color: #999;">No assessment provided</em>' : ''}
-                                </td>
-                            </tr>`;
-            }).join('')}
-                    </tbody>
-                </table>
-                <div style="background: #e8f5e8; border: 1px solid #4caf50; border-radius: 8px; padding: 15px; margin-top: 20px;">
-                    <h4 style="color: #2e7d32; margin-bottom: 10px;">📊 Rubric Score Summary</h4>
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
-                        <div><strong>Total Score:</strong> ${Math.round(totalScore * 10) / 10} / ${maxPoints}<br><strong>Percentage:</strong> ${percentage}%</div>
-                        <div><strong>Grade Status:</strong><span style="color: ${percentage >= sharedRubric.assignmentInfo.passingThreshold ? '#4caf50' : '#f44336'}; font-weight: bold;">${percentage >= sharedRubric.assignmentInfo.passingThreshold ? '✓ PASSING' : '✗ NEEDS IMPROVEMENT'}</span></div>
-                        ${penaltyApplied ? `<div style="color: #ff9800;"><strong>Late Penalty Applied:</strong><br>Raw Score: ${Math.round(rawScore * 10) / 10}</div>` : ''}
-                    </div>
-                </div>
-            </div>` : '';
-
-            // Complete HTML document
-            const htmlContent = `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Grade Report - ${student.name}</title>
-    <style>
-        body { font-family: Arial, sans-serif; max-width: 800px; margin: 20px auto; padding: 20px; line-height: 1.6; }
-        .header { background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 30px; }
-        .score-summary { background: #e8f5e8; border: 2px solid #4caf50; border-radius: 8px; padding: 20px; margin: 20px 0; text-align: center; }
-        .late-policy-section { margin: 30px 0; background: #fff5f5; border: 1px solid #f87171; border-radius: 8px; padding: 20px; }
-        .feedback-section { margin: 20px 0; padding: 15px; background: #f9f9f9; border-radius: 8px; }
-        .attachments { margin: 30px 0; }
-        .attachment-item { display: inline-block; text-align: center; margin: 1rem; padding: 1rem; background: #fff; border: 1px solid #ddd; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,.1); max-width: 250px; vertical-align: top; }
-        .clickable-image { cursor: pointer; transition: all .3s ease; position: relative; }
-        .clickable-image:hover { transform: scale(1.05); box-shadow: 0 4px 8px rgba(0,0,0,.2); }
-        .video-links { margin: 30px 0; }
-        .video-link-item { margin-bottom: 1rem; }
-        .video-link-item a { color: #007bff; text-decoration: none; }
-        .video-link-item a:hover { text-decoration: underline; }
-        h1, h2, h3 { color: #333; }
-        .image-modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,.9); animation: fadeIn .3s ease; }
-        .image-modal.show { display: flex; align-items: center; justify-content: center; }
-        .modal-content { max-width: 95%; max-height: 95%; object-fit: contain; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,.5); animation: zoomIn .3s ease; }
-        .close-modal { position: absolute; top: 20px; right: 30px; color: #fff; font-size: 40px; font-weight: 700; cursor: pointer; z-index: 1001; background: rgba(0,0,0,.5); border-radius: 50%; width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; line-height: 1; }
-        .close-modal:hover { background: rgba(0,0,0,.8); }
-        .modal-caption { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); color: #fff; background: rgba(0,0,0,.7); padding: 10px 20px; border-radius: 6px; text-align: center; max-width: 80%; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes zoomIn { from { transform: scale(.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-        @media print { .attachment-item, .video-link-item { break-inside: avoid; } .image-modal { display: none!important; } }
-    </style>
-</head>
-<body>
-    <div class="header">
-        <h1>📋 Grade Report</h1>
-        <p><strong>Student:</strong> ${student.name} (${student.id})</p>
-        <p><strong>Course:</strong> ${gradeData.course?.code || classList.courseMetadata?.courseCode || ''} - ${gradeData.course?.name || classList.courseMetadata?.courseName || ''}</p>
-        <p><strong>Assignment:</strong> ${gradeData.assignment?.name || sharedRubric.assignmentInfo?.title || ''}</p>
-        <p><strong>Instructor:</strong> ${gradeData.course?.instructor || classList.courseMetadata?.instructor || ''}</p>
-        <p><strong>Term:</strong> ${gradeData.course?.term || classList.courseMetadata?.term || ''}</p>
-    </div>
-
-    <div class="score-summary">
-        <h2>📊 Final Score</h2>
-        <div style="font-size: 2rem; font-weight: 700; color: #2e7d32; margin: 15px 0;">
-            ${totalScore.toFixed(1)} / ${maxPoints} (${percentage}%)
-        </div>
-        <p style="margin: 10px 0; color: #555;">
-            ${sharedRubric ? `Rubric: ${sharedRubric.assignmentInfo.title}` : ""}
-            ${penaltyApplied ? ` | Late Policy: ${latePolicyLevels[gradeData.latePolicy.level].name}` : ""}
-        </p>
-    </div>
-
-    ${penaltyApplied ? `
-        <div class="late-policy-section">
-            <h3 style="color: #dc2626;">📅 Late Submission Policy Applied</h3>
-            <p><strong>Policy Status:</strong> ${latePolicyLevels[gradeData.latePolicy.level].name}</p>
-            <p>${latePolicyLevels[gradeData.latePolicy.level].description}</p>
-            <p><strong>Raw Score:</strong> ${Math.round(rawScore * 10) / 10}/${maxPoints} → <strong>Final Score:</strong> ${Math.round(totalScore * 10) / 10}/${maxPoints}</p>
-        </div>
-    ` : ""}
-
-    ${rubricTableHTML}
-
-    ${Object.entries(gradeData.feedback || {}).filter(([key, text]) => text).map(([key, text]) => `
-        <div class="feedback-section">
-            <h3>${key.charAt(0).toUpperCase() + key.slice(1)} Feedback</h3>
-            <p>${text.replace(/\n/g, "<br>")}</p>
-        </div>
-    `).join("")}
-
-    ${attachmentsHTML ? `
-        <div class="attachments">
-            <h3>📎 File Attachments</h3>
-            <div style="display: flex; flex-wrap: wrap; justify-content: flex-start;">
-                ${attachmentsHTML}
-            </div>
-        </div>
-    ` : ""}
-
-    ${videoLinksHTML ? `
-        <div class="video-links">
-            <h3>🎥 Video Review Links</h3>
-            ${videoLinksHTML}
-        </div>
-    ` : ""}
-
-    <p style="margin-top: 40px; text-align: center; color: #666; font-size: .9rem;">
-        Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}
-    </p>
-
-    <div id="imageModal" class="image-modal">
-        <span class="close-modal" onclick="closeImageModal()">&times;</span>
-        <img class="modal-content" id="modalImage">
-        <div class="modal-caption" id="modalCaption"></div>
-    </div>
-
-    <script>
-        const attachmentData = ${JSON.stringify(gradeData.attachments || [])};
-        
-        function openImageModal(src, caption) {
-            const modal = document.getElementById("imageModal");
-            const modalImg = document.getElementById("modalImage");
-            const modalCaption = document.getElementById("modalCaption");
-            modal.classList.add("show");
-            modalImg.src = src;
-            modalCaption.textContent = caption;
-            document.body.style.overflow = "hidden";
-        }
-        
-        function closeImageModal() {
-            document.getElementById("imageModal").classList.remove("show");
-            document.body.style.overflow = "auto";
-        }
-        
-        document.addEventListener("DOMContentLoaded", function() {
-            document.querySelectorAll(".clickable-image").forEach(img => {
-                img.addEventListener("click", function() {
-                    const index = parseInt(this.getAttribute("data-index"));
-                    const attachment = attachmentData[index];
-                    if (attachment && attachment.base64Data) {
-                        openImageModal(attachment.base64Data, attachment.name);
-                    }
-                });
-            });
-            
-            document.getElementById("imageModal").addEventListener("click", function(e) {
-                if (e.target === this) {
-                    closeImageModal();
-                }
-            });
-            
-            document.addEventListener("keydown", function(e) {
-                if (e.key === "Escape") {
-                    closeImageModal();
-                }
-            });
-        });
-    </script>
-</body>
-</html>`;
-
-            return htmlContent;
-        };
-
-        // 7. Generate and export the HTML file
-        try {
-            const htmlContent = generateStudentReportHTML();
-            const htmlBlob = new Blob([htmlContent], { type: 'text/html' });
-            const url = URL.createObjectURL(htmlBlob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `grade_report_${student.name.replace(/[^a-zA-Z0-9]/g, '_')}_${sharedRubric.assignmentInfo?.title?.replace(/[^a-zA-Z0-9]/g, '_') || 'assignment'}.html`;
-            link.click();
-            URL.revokeObjectURL(url);
-
-            console.log(`✅ Individual grade report exported for student: ${student.name}`);
-        } catch (error) {
-            console.error('Error generating individual grade report:', error);
-            alert('Error generating grade report. Please check the console for details.');
-        }
+        // 5. Trigger download
+        const blob = new Blob([csvContent], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${classList.courseMetadata?.courseCode || 'grade'}_${student.id}.csv`;
+        link.click();
+        URL.revokeObjectURL(url);
     };
     // ────────────────────────────
 
