@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Download, Sparkles, FileText, ArrowRight, Lightbulb, BookOpen, Code, Plus, Minus } from 'lucide-react';
+import { Download, Sparkles, FileText, ArrowRight, Lightbulb, BookOpen, Code, Plus, Minus, Upload, Save } from 'lucide-react';
 import { useAssessment } from './SharedContext';
 
 // Simple Rich Text Editor Component
@@ -373,6 +373,9 @@ const AssignmentPromptGenerator = () => {
     const [generatedHTML, setGeneratedHTML] = useState('');
     const [showHTML, setShowHTML] = useState(false);
 
+    // ADD: File input ref for loading JSON
+    const fileInputRef = useRef(null);
+
     const handleInputChange = (field, value) => {
         updateAssignmentPromptFormData(field, value);
 
@@ -380,6 +383,80 @@ const AssignmentPromptGenerator = () => {
         if (field === 'assignmentNumber' && value) {
             updateAssignmentPromptFormData('submissionFolderNumber', value);
         }
+    };
+
+    // ADD: Save assignment data as JSON
+    const saveAssignmentJSON = () => {
+        if (!assignmentPromptFormData) {
+            alert('No assignment data to save');
+            return;
+        }
+
+        const dataToSave = {
+            ...assignmentPromptFormData,
+            savedDate: new Date().toISOString(),
+            version: '1.0'
+        };
+
+        const dataStr = JSON.stringify(dataToSave, null, 2);
+        const dataBlob = new Blob([dataStr], { type: 'application/json' });
+        const url = URL.createObjectURL(dataBlob);
+        const link = document.createElement('a');
+        link.href = url;
+
+        // Generate filename based on assignment title and number
+        const assignmentTitle = assignmentPromptFormData.assignmentTitle || 'Assignment';
+        const assignmentNumber = assignmentPromptFormData.assignmentNumber || 'X';
+        const courseCode = assignmentPromptFormData.courseCode || 'Course';
+        const filename = `${courseCode}_Assignment_${assignmentNumber}_${assignmentTitle.replace(/\s+/g, '_')}.json`;
+
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+
+        alert('Assignment saved successfully!');
+    };
+
+    // ADD: Load assignment data from JSON
+    const loadAssignmentJSON = () => {
+        fileInputRef.current?.click();
+    };
+
+    // ADD: Handle file input change
+    const handleFileLoad = (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const jsonData = JSON.parse(e.target.result);
+
+                // Validate the JSON structure
+                if (typeof jsonData !== 'object' || !jsonData.assignmentTitle) {
+                    throw new Error('Invalid assignment file format');
+                }
+
+                // Remove metadata fields before loading
+                const { savedDate, version, ...assignmentData } = jsonData;
+
+                // Load the data into the form
+                Object.entries(assignmentData).forEach(([field, value]) => {
+                    updateAssignmentPromptFormData(field, value);
+                });
+
+                alert(`Assignment loaded successfully!${savedDate ? `\nSaved: ${new Date(savedDate).toLocaleDateString()}` : ''}`);
+            } catch (error) {
+                console.error('Error loading assignment:', error);
+                alert('Error loading assignment file. Please ensure it\'s a valid assignment JSON file.');
+            }
+        };
+        reader.readAsText(file);
+
+        // Reset the input to allow loading the same file again
+        event.target.value = '';
     };
 
     // CLO management functions
@@ -874,6 +951,11 @@ ${formData.specialInstructions && formData.specialInstructions.trim() !== '' ? `
         formData.assignmentDescription?.trim() &&
         (formData.clos || []).some(clo => clo.text?.trim());
 
+    // Check if there's data to save
+    const hasDataToSave = formData.assignmentTitle?.trim() ||
+        formData.assignmentDescription?.trim() ||
+        (formData.clos || []).some(clo => clo.text?.trim());
+
     if (!formData) {
         return <div>Loading...</div>;
     }
@@ -881,15 +963,51 @@ ${formData.specialInstructions && formData.specialInstructions.trim() !== '' ? `
     return (
         <div className="min-h-screen bg-gray-50 p-6">
             <div className="max-w-6xl mx-auto">
-                {/* Header */}
+                {/* UPDATED Header with Save/Load buttons */}
                 <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-                    <div className="flex items-center gap-3 mb-4">
-                        <FileText className="w-8 h-8 text-orange-600" />
-                        <div>
-                            <h1 className="text-2xl font-bold text-gray-900">Assignment Prompt Generator</h1>
-                            <p className="text-gray-600">Create AI prompts and D2L HTML for assignment pages</p>
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                            <FileText className="w-8 h-8 text-orange-600" />
+                            <div>
+                                <h1 className="text-2xl font-bold text-gray-900">Assignment Prompt Generator</h1>
+                                <p className="text-gray-600">Create AI prompts and D2L HTML for assignment pages</p>
+                            </div>
+                        </div>
+
+                        {/* ADD: Save/Load buttons */}
+                        <div className="flex items-center gap-3">
+                            <button
+                                onClick={saveAssignmentJSON}
+                                disabled={!hasDataToSave}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all duration-200 ${hasDataToSave
+                                        ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm'
+                                        : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                    }`}
+                                title="Save current assignment as JSON file"
+                            >
+                                <Save className="w-4 h-4" />
+                                Save JSON
+                            </button>
+
+                            <button
+                                onClick={loadAssignmentJSON}
+                                className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-700 transition-all duration-200 shadow-sm"
+                                title="Load assignment from JSON file"
+                            >
+                                <Upload className="w-4 h-4" />
+                                Load JSON
+                            </button>
                         </div>
                     </div>
+
+                    {/* ADD: Hidden file input */}
+                    <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept=".json"
+                        onChange={handleFileLoad}
+                        className="hidden"
+                    />
 
                     <div className="bg-gradient-to-r from-orange-50 to-green-50 rounded-lg p-6 border border-orange-200">
                         <div className="flex items-start gap-4">
@@ -917,13 +1035,15 @@ ${formData.specialInstructions && formData.specialInstructions.trim() !== '' ? `
                                     </div>
                                 </div>
                                 <p className="text-sm text-gray-600">
-                                    The AI prompt helps ChatGPT create assignment pages, while the D2L HTML output can be pasted directly into D2L's content editor. All form data is auto-saved when switching tabs.
+                                    The AI prompt helps ChatGPT create assignment pages, while the D2L HTML output can be pasted directly into D2L's content editor.
+                                    <strong> Save your work as JSON files to easily resume later!</strong>
                                 </p>
                             </div>
                         </div>
                     </div>
                 </div>
 
+                {/* Rest of the existing form content remains exactly the same... */}
                 {/* Assignment Information Form */}
                 <div className="space-y-6">
                     {/* Basic Assignment Info */}

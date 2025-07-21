@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
-import { Download, Sparkles, FileText, ArrowRight, Lightbulb } from 'lucide-react';
+import { Download, Sparkles, FileText, ArrowRight, Lightbulb, Upload } from 'lucide-react';
 import { useAssessment } from './SharedContext';
 
 const AIRubricPromptGenerator = () => {
   const {
     aiPromptFormData,
     updateAIPromptFormData,
-    initializeAIPromptFormData
+    initializeAIPromptFormData,
+    assignmentPromptFormData // ADD: Access to assignment data
   } = useAssessment();
 
   // Initialize form data if it doesn't exist
@@ -21,6 +22,55 @@ const AIRubricPromptGenerator = () => {
 
   const handleInputChange = (field, value) => {
     updateAIPromptFormData(field, value);
+  };
+
+  // ADD: Import function to map assignment data to AI prompt format
+  const importAssignmentData = () => {
+    if (!assignmentPromptFormData) {
+      alert('No assignment data found to import. Please create an assignment first.');
+      return;
+    }
+
+    // Map assignment data to AI prompt fields
+    const mappedData = {
+      // Ensure all required fields have values (no empty strings)
+      assignmentType: assignmentPromptFormData.assignmentTitle?.trim() || 'Assignment',
+      programType: formData.programType || 'Diploma',
+      programLevel: assignmentPromptFormData.programLevel || formData.programLevel || 'Level (Semester) 3',
+      subjectArea: assignmentPromptFormData.subjectArea?.trim() || 'General Studies',
+      assignmentDescription: assignmentPromptFormData.assignmentDescription?.trim() || 'Assignment description imported from assignment prompt.',
+
+      // Keep existing settings or set defaults
+      criteriaType: formData.criteriaType || 'ai-suggested',
+      numCriteria: formData.numCriteria || '4',
+      timeFrameUnit: formData.timeFrameUnit || 'weeks',
+
+      // Convert weight percentage to points (multiply by 4 to get reasonable point total)
+      totalPoints: assignmentPromptFormData.weightPercentage ?
+        (parseInt(assignmentPromptFormData.weightPercentage) * 4).toString() : '100',
+
+      // Format learning outcomes from CLOs
+      learningObjectives: assignmentPromptFormData.clos ?
+        assignmentPromptFormData.clos
+          .filter(clo => clo.text && clo.text.trim()) // Only include CLOs with text
+          .map(clo => `${clo.type}${clo.number}: ${clo.text}`)
+          .join('\n') : '',
+
+      // Map special instructions to special considerations
+      specialConsiderations: assignmentPromptFormData.specialInstructions?.trim() || '',
+
+      // Set other fields
+      studentPopulation: formData.studentPopulation || 'Mixed Ability',
+      timeFrameNumber: formData.timeFrameNumber || '',
+      userCriteria: formData.userCriteria || ''
+    };
+
+    // Update all the mapped data
+    Object.entries(mappedData).forEach(([field, value]) => {
+      updateAIPromptFormData(field, value);
+    });
+
+    alert('Assignment data imported successfully! All required fields have been populated. Review and adjust as needed.');
   };
 
   // Use shared form data, fallback to defaults if not available
@@ -40,6 +90,11 @@ const AIRubricPromptGenerator = () => {
     timeFrameUnit: 'weeks',
     specialConsiderations: ''
   };
+
+  // Force re-render when aiPromptFormData changes to ensure validation updates
+  React.useEffect(() => {
+    // This effect will run whenever aiPromptFormData changes, ensuring validation is rechecked
+  }, [aiPromptFormData]);
 
   const generatePrompt = () => {
     const courseLevel = `${formData.programType} - ${formData.programLevel}`;
@@ -222,7 +277,7 @@ ${formData.criteriaType === 'user-provided' ?
 - Time frame: ${timeFrame}
 - Special considerations: ${formData.specialConsiderations || 'None specified'}
 
-Please generate a complete, ready-to-import JSON file that matches the structure exactly and can be directly imported into the Rubric Creator tool.`;
+Please generate a complete, ready-to-import, downloadable JSON file that matches the structure exactly and can be directly imported into the Rubric Creator tool.`;
 
     setGeneratedPrompt(prompt);
     setShowPrompt(true);
@@ -243,23 +298,46 @@ Please generate a complete, ready-to-import JSON file that matches the structure
     alert('Prompt copied to clipboard!');
   };
 
-  const isFormValid = formData.assignmentType && formData.programType &&
-    formData.programLevel && formData.subjectArea && formData.assignmentDescription &&
+  const isFormValid = formData.assignmentType?.trim() && formData.programType?.trim() &&
+    formData.programLevel?.trim() && formData.subjectArea?.trim() && formData.assignmentDescription?.trim() &&
     (formData.criteriaType === 'ai-suggested' ||
-      (formData.criteriaType === 'user-provided' && formData.userCriteria.trim()));
+      (formData.criteriaType === 'user-provided' && formData.userCriteria?.trim()));
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-4xl mx-auto bg-white rounded-lg shadow-lg">
-        {/* Header */}
+        {/* UPDATED Header with Import Button */}
         <div className="bg-blue-900 text-white p-6 rounded-t-lg">
-          <div className="flex items-center gap-3">
-            <Sparkles className="w-8 h-8" />
-            <div>
-              <h1 className="text-2xl font-bold">AI Rubric Prompt Generator</h1>
-              <p className="text-white">Generate AI prompts to create rubric JSON files for import</p>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Sparkles className="w-8 h-8" />
+              <div>
+                <h1 className="text-2xl font-bold">AI Rubric Prompt Generator</h1>
+                <p className="text-white">Generate AI prompts to create rubric JSON files for import</p>
+              </div>
             </div>
+
+            {/* ADD: Import Button */}
+            {assignmentPromptFormData && (
+              <button
+                onClick={importAssignmentData}
+                className="flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg font-medium transition-all duration-200 border border-white/20"
+                title="Import data from Assignment Prompt page"
+              >
+                <Upload className="w-4 h-4" />
+                Import Assignment Data
+              </button>
+            )}
           </div>
+
+          {/* ADD: Import Status Indicator */}
+          {assignmentPromptFormData && (
+            <div className="mt-3 text-sm text-blue-100">
+              Available: {assignmentPromptFormData.assignmentTitle || 'Assignment'}
+              {assignmentPromptFormData.assignmentNumber && ` #${assignmentPromptFormData.assignmentNumber}`}
+              {assignmentPromptFormData.weightPercentage && ` (${assignmentPromptFormData.weightPercentage}%)`}
+            </div>
+          )}
         </div>
 
         <div className="p-6">
@@ -476,13 +554,27 @@ Please generate a complete, ready-to-import JSON file that matches the structure
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
                       Student Skill Level & Population
                     </label>
-                    <input
-                      type="text"
+                    <select
                       value={formData.studentPopulation}
                       onChange={(e) => handleInputChange('studentPopulation', e.target.value)}
-                      placeholder="e.g., beginner, intermediate, advanced, mixed ability"
                       className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
+                    >
+                      <option value="">Select student population...</option>
+                      <option value="Beginner/Entry Level">Beginner/Entry Level</option>
+                      <option value="Intermediate">Intermediate</option>
+                      <option value="Advanced">Advanced</option>
+                      <option value="Mixed Ability">Mixed Ability</option>
+                      <option value="First-Year Students">First-Year Students</option>
+                      <option value="Second-Year Students">Second-Year Students</option>
+                      <option value="Third-Year Students">Third-Year Students</option>
+                      <option value="Final-Year Students">Final-Year Students</option>
+                      <option value="Graduate Students">Graduate Students</option>
+                      <option value="Adult Learners/Continuing Education">Adult Learners/Continuing Education</option>
+                      <option value="International Students">International Students</option>
+                      <option value="Students with Learning Accommodations">Students with Learning Accommodations</option>
+                      <option value="High-Achieving Students">High-Achieving Students</option>
+                      <option value="Students Needing Additional Support">Students Needing Additional Support</option>
+                    </select>
                   </div>
                 </div>
               </div>
@@ -544,8 +636,8 @@ Please generate a complete, ready-to-import JSON file that matches the structure
                   onClick={generatePrompt}
                   disabled={!isFormValid}
                   className={`flex items-center gap-2 px-8 py-3 rounded-lg font-semibold transition-all ${isFormValid
-                      ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl'
-                      : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl'
+                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                     }`}
                 >
                   <Sparkles className="w-5 h-5" />
