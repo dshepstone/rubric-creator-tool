@@ -24,7 +24,7 @@ const AIRubricPromptGenerator = () => {
     updateAIPromptFormData(field, value);
   };
 
-  // ADD: Import function to map assignment data to AI prompt format
+  // UPDATED: Import function to preserve weight percentage
   const importAssignmentData = () => {
     if (!assignmentPromptFormData) {
       alert('No assignment data found to import. Please create an assignment first.');
@@ -36,7 +36,7 @@ const AIRubricPromptGenerator = () => {
       // Ensure all required fields have values (no empty strings)
       assignmentType: assignmentPromptFormData.assignmentTitle?.trim() || 'Assignment',
       programType: formData.programType || 'Diploma',
-      programLevel: assignmentPromptFormData.programLevel || formData.programLevel || 'Level (Semester) 3',
+      programLevel: assignmentPromptFormData.programLevel || formData.programLevel || 'Semester 3',
       subjectArea: assignmentPromptFormData.subjectArea?.trim() || 'General Studies',
       assignmentDescription: assignmentPromptFormData.assignmentDescription?.trim() || 'Assignment description imported from assignment prompt.',
 
@@ -45,7 +45,10 @@ const AIRubricPromptGenerator = () => {
       numCriteria: formData.numCriteria || '4',
       timeFrameUnit: formData.timeFrameUnit || 'weeks',
 
-      // Convert weight percentage to points (multiply by 4 to get reasonable point total)
+      // UPDATED: Preserve weight percentage instead of converting to points
+      weightPercentage: assignmentPromptFormData.weightPercentage || '',
+
+      // Still calculate points for the prompt, but keep weight separate
       totalPoints: assignmentPromptFormData.weightPercentage ?
         (parseInt(assignmentPromptFormData.weightPercentage) * 4).toString() : '100',
 
@@ -70,7 +73,7 @@ const AIRubricPromptGenerator = () => {
       updateAIPromptFormData(field, value);
     });
 
-    alert('Assignment data imported successfully! All required fields have been populated. Review and adjust as needed.');
+    alert('Assignment data imported successfully! Weight percentage and all required fields have been populated. Review and adjust as needed.');
   };
 
   // Use shared form data, fallback to defaults if not available
@@ -81,6 +84,7 @@ const AIRubricPromptGenerator = () => {
     subjectArea: '',
     assignmentDescription: '',
     totalPoints: '100',
+    weightPercentage: '', // NEW: Add weight percentage field
     numCriteria: '4',
     criteriaType: 'ai-suggested',
     userCriteria: '',
@@ -117,6 +121,7 @@ const AIRubricPromptGenerator = () => {
 
 **Specific Requirements:**
 - Total Points: ${formData.totalPoints} points
+- Weight: ${formData.weightPercentage || 'TBD'}% of Final Grade
 - Number of Criteria: ${criteriaCount} main criteria
 - Assessment Levels: Use this 7-level system:
   1. Incomplete (0x multiplier)
@@ -135,7 +140,7 @@ Please provide the output as a complete JSON file matching this exact structure:
   "assignmentInfo": {
     "title": "${formData.assignmentType}",
     "description": "${formData.assignmentDescription}",
-    "weight": 30,
+    "weight": ${formData.weightPercentage || 25},
     "totalPoints": ${formData.totalPoints},
     "passingThreshold": 65,
     "dueDate": "2025-04-15",
@@ -176,90 +181,85 @@ Please provide the output as a complete JSON file matching this exact structure:
       "name": "Proficient",
       "multiplier": 0.85,
       "color": "#2980b9",
-      "description": "Solid work that exceeds basic requirements"
+      "description": "Demonstrates solid understanding and competent execution"
     },
     {
       "level": "accomplished",
       "name": "Accomplished",
       "multiplier": 0.95,
       "color": "#16a085",
-      "description": "High-quality work demonstrating advanced skills"
+      "description": "High-quality work showing strong mastery"
     },
     {
       "level": "exceptional",
       "name": "Exceptional",
       "multiplier": 1.0,
       "color": "#8e44ad",
-      "description": "Outstanding work suitable for professional portfolio"
+      "description": "Outstanding work exceeding expectations"
     }
   ],
   "criteria": [
-    // Generate ${criteriaCount} criteria objects here, each with this EXACT structure:
     {
-      "id": "descriptive_id_here", // Use descriptive IDs like "animation_principles", "technical_execution"
-      "name": "Criterion Name Here",
-      "description": "What this criterion measures",
-      "maxPoints": 20, // Distribute ${formData.totalPoints} points across ${criteriaCount} criteria
-      "feedbackLibrary": {
-        "strengths": [
-          "Strength comment 1",
-          "Strength comment 2",
-          // ... 8-12 total strength comments
-        ],
-        "improvements": [
-          "Improvement suggestion 1", 
-          "Improvement suggestion 2",
-          // ... 8-12 total improvement comments
-        ],
-        "general": [
-          "General comment 1",
-          "General comment 2", 
-          // ... 8-10 total general comments
-        ]
-      },
+      "id": "criterion_example",
+      "name": "Example Criterion",
+      "description": "Brief description of what this criterion assesses",
+      "maxPoints": 25,
+      "weight": 25,
       "levels": {
         "incomplete": {
           "pointRange": "0",
-          "description": "Description for incomplete level"
+          "description": "Detailed description for incomplete level"
         },
         "unacceptable": {
-          "pointRange": "X-Y",
-          "description": "Description for unacceptable level"
+          "pointRange": "1-10",
+          "description": "Detailed description for unacceptable level"
         },
         "developing": {
-          "pointRange": "X-Y",
-          "description": "Description for developing level"
+          "pointRange": "11-15",
+          "description": "Detailed description for developing level"
         },
         "acceptable": {
-          "pointRange": "X-Y",
-          "description": "Description for acceptable level"
+          "pointRange": "16-18",
+          "description": "Detailed description for acceptable level"
         },
         "proficient": {
-          "pointRange": "X-Y",
-          "description": "Description for proficient level"
+          "pointRange": "19-21",
+          "description": "Detailed description for proficient level"
         },
         "accomplished": {
-          "pointRange": "X-Y",
-          "description": "Description for accomplished level"
+          "pointRange": "22-23",
+          "description": "Detailed description for accomplished level"
         },
         "exceptional": {
-          "pointRange": "X",
-          "description": "Description for exceptional level (full points)"
+          "pointRange": "24-25",
+          "description": "Detailed description for exceptional level"
         }
+      },
+      "feedbackLibrary": {
+        "strengths": [
+          "Positive feedback example 1",
+          "Positive feedback example 2",
+          "Positive feedback example 3"
+        ],
+        "improvements": [
+          "Improvement suggestion 1",
+          "Improvement suggestion 2",
+          "Improvement suggestion 3"
+        ],
+        "general": [
+          "General feedback 1",
+          "General feedback 2",
+          "General feedback 3"
+        ]
       }
     }
-    // Repeat this structure for each criterion
-  ]
+  ],
+  "pointingSystem": "multiplier",
+  "reversedOrder": false
 }
 \`\`\`
 
-For each criterion, provide:
-- Criterion name and appropriate point weight (distribute ${formData.totalPoints} points across ${criteriaCount} criteria)
-- Brief description of what it measures
-- Detailed performance descriptions for each of the 7 levels as objects with "pointRange" and "description"
-- Feedback library with 8-12 "strengths" comments, 8-12 "improvements" comments, and 8-10 "general" comments
-
-${formData.criteriaType === 'user-provided' ?
+${formData.criteriaType === 'user-provided' && formData.userCriteria ?
         `**NOTE:** The user has provided specific criteria. Ensure all listed criteria are included and refined with professional descriptions appropriate for ${formData.subjectArea} assessment.` :
         `**NOTE:** Generate appropriate criteria based on best practices for ${formData.assignmentType} assessment in ${formData.subjectArea}.`}
 
@@ -342,171 +342,155 @@ Please generate a complete, ready-to-import, downloadable JSON file that matches
 
         <div className="p-6">
           {!showPrompt ? (
-            <div>
-              {/* Workflow Guide */}
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-                <div className="flex items-start gap-3">
-                  <Lightbulb className="w-5 h-5 text-blue-600 mt-0.5" />
-                  <div>
-                    <h3 className="font-semibold text-blue-900 mb-2">How This Works</h3>
-                    <div className="flex items-center gap-2 text-sm text-blue-800 mb-2">
-                      <span className="bg-blue-200 rounded-full w-6 h-6 flex items-center justify-center font-bold">1</span>
-                      <span>Fill out assignment info & choose criteria method</span>
-                      <ArrowRight className="w-4 h-4" />
-                      <span className="bg-blue-200 rounded-full w-6 h-6 flex items-center justify-center font-bold">2</span>
-                      <span>Generate AI prompt</span>
-                      <ArrowRight className="w-4 h-4" />
-                      <span className="bg-blue-200 rounded-full w-6 h-6 flex items-center justify-center font-bold">3</span>
-                      <span>Copy to AI tool</span>
-                      <ArrowRight className="w-4 h-4" />
-                      <span className="bg-blue-200 rounded-full w-6 h-6 flex items-center justify-center font-bold">4</span>
-                      <span>Import JSON to Rubric Creator</span>
-                    </div>
-                    <p className="text-xs text-blue-700">
-                      💾 <strong>Note:</strong> Your form data is automatically saved and will persist when switching between tabs.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Form */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Left Column */}
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Assignment Type *
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.assignmentType}
-                      onChange={(e) => handleInputChange('assignmentType', e.target.value)}
-                      placeholder="e.g., Research Paper, Digital Portfolio, Laboratory Report"
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Program Type *
-                    </label>
-                    <select
-                      value={formData.programType}
-                      onChange={(e) => handleInputChange('programType', e.target.value)}
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="">Select program type...</option>
-                      <option value="Degree">Degree</option>
-                      <option value="Diploma">Diploma</option>
-                      <option value="Graduate Certificate">Graduate Certificate</option>
-                      <option value="Certificate">Certificate</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Program Level *
-                    </label>
-                    <select
-                      value={formData.programLevel}
-                      onChange={(e) => handleInputChange('programLevel', e.target.value)}
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="">Select program level...</option>
-                      <option value="Level (Semester) 1">Level (Semester) 1</option>
-                      <option value="Level (Semester) 2">Level (Semester) 2</option>
-                      <option value="Level (Semester) 3">Level (Semester) 3</option>
-                      <option value="Level (Semester) 4">Level (Semester) 4</option>
-                      <option value="Level (Semester) 5">Level (Semester) 5</option>
-                      <option value="Level (Semester) 6">Level (Semester) 6</option>
-                      <option value="Level (Semester) 7">Level (Semester) 7</option>
-                      <option value="Level (Semester) 8">Level (Semester) 8</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Subject Area *
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.subjectArea}
-                      onChange={(e) => handleInputChange('subjectArea', e.target.value)}
-                      placeholder="e.g., English Literature, Computer Science, Biology"
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
+            <>
+              <div className="space-y-6">
+                {/* Form */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Left Column */}
+                  <div className="space-y-4">
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        Total Points
+                        Assignment Type *
                       </label>
                       <input
-                        type="number"
-                        value={formData.totalPoints}
-                        onChange={(e) => handleInputChange('totalPoints', e.target.value)}
+                        type="text"
+                        value={formData.assignmentType}
+                        onChange={(e) => handleInputChange('assignmentType', e.target.value)}
+                        placeholder="e.g., Research Paper, Digital Portfolio, Laboratory Report"
                         className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
+
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        Number of Criteria (Optional)
+                        Program Type *
+                      </label>
+                      <select
+                        value={formData.programType}
+                        onChange={(e) => handleInputChange('programType', e.target.value)}
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Select program type...</option>
+                        <option value="Degree">Degree</option>
+                        <option value="Diploma">Diploma</option>
+                        <option value="Graduate Certificate">Graduate Certificate</option>
+                        <option value="Certificate">Certificate</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Program Level *
+                      </label>
+                      <select
+                        value={formData.programLevel}
+                        onChange={(e) => handleInputChange('programLevel', e.target.value)}
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Select program level...</option>
+                        <option value="Semester 1">Semester 1</option>
+                        <option value="Semester 2">Semester 2</option>
+                        <option value="Semester 3">Semester 3</option>
+                        <option value="Semester 4">Semester 4</option>
+                        <option value="Semester 5">Semester 5</option>
+                        <option value="Semester 6">Semester 6</option>
+                        <option value="Semester 7">Semester 7</option>
+                        <option value="Semester 8">Semester 8</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Subject Area *
                       </label>
                       <input
-                        type="number"
-                        min="1"
-                        value={formData.numCriteria}
-                        onChange={(e) => handleInputChange('numCriteria', e.target.value)}
-                        placeholder="e.g., 4 or 5 criteria"
+                        type="text"
+                        value={formData.subjectArea}
+                        onChange={(e) => handleInputChange('subjectArea', e.target.value)}
+                        placeholder="e.g., English Literature, Computer Science, Biology"
                         className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
-                  </div>
 
-                  {/* Criteria Selection */}
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-3">
-                      Criteria Generation Method
-                    </label>
-                    <div className="space-y-3">
-                      <div className="flex items-center">
-                        <input
-                          type="radio"
-                          id="ai-suggested"
-                          name="criteriaType"
-                          value="ai-suggested"
-                          checked={formData.criteriaType === 'ai-suggested'}
-                          onChange={(e) => handleInputChange('criteriaType', e.target.value)}
-                          className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500"
-                        />
-                        <label htmlFor="ai-suggested" className="ml-2 text-sm text-gray-700">
-                          <strong>AI Suggested Criteria</strong> - Let AI suggest appropriate criteria for this subject area
+                    {/* NEW: Weight Percentage Field */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          Weight (% of Final Grade)
                         </label>
+                        <input
+                          type="number"
+                          value={formData.weightPercentage}
+                          onChange={(e) => handleInputChange('weightPercentage', e.target.value)}
+                          placeholder="25"
+                          min="0"
+                          max="100"
+                          className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <p className="text-xs text-gray-600 mt-1">
+                          💡 Assignment weight for final grade calculation
+                        </p>
                       </div>
-                      <div className="flex items-start">
-                        <input
-                          type="radio"
-                          id="user-provided"
-                          name="criteriaType"
-                          value="user-provided"
-                          checked={formData.criteriaType === 'user-provided'}
-                          onChange={(e) => handleInputChange('criteriaType', e.target.value)}
-                          className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 mt-1"
-                        />
-                        <label htmlFor="user-provided" className="ml-2 text-sm text-gray-700">
-                          <strong>User Listed Criteria</strong> - Provide your own specific criteria list
+
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          Total Points
                         </label>
+                        <input
+                          type="number"
+                          value={formData.totalPoints}
+                          onChange={(e) => handleInputChange('totalPoints', e.target.value)}
+                          className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <p className="text-xs text-gray-600 mt-1">
+                          💡 Total points for this assignment
+                        </p>
                       </div>
                     </div>
 
-                    {/* User Criteria Text Area */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          Number of Criteria (Optional)
+                        </label>
+                        <input
+                          type="number"
+                          value={formData.numCriteria}
+                          onChange={(e) => handleInputChange('numCriteria', e.target.value)}
+                          placeholder="4"
+                          min="1"
+                          max="20"
+                          className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <p className="text-xs text-gray-600 mt-1">
+                          💡 Choose 1-20 criteria (typically 3-6 for most assignments)
+                        </p>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          Criteria Generation Method
+                        </label>
+                        <select
+                          value={formData.criteriaType}
+                          onChange={(e) => handleInputChange('criteriaType', e.target.value)}
+                          className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="ai-suggested">AI Suggested</option>
+                          <option value="user-provided">I'll Provide Criteria</option>
+                        </select>
+                      </div>
+                    </div>
+
                     {formData.criteriaType === 'user-provided' && (
-                      <div className="mt-3">
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          Your Criteria (one per line) *
+                        </label>
                         <textarea
                           value={formData.userCriteria}
                           onChange={(e) => handleInputChange('userCriteria', e.target.value)}
-                          placeholder="List your criteria, one per line or separated by commas. For example:
+                          placeholder="For example:
 • Technical Execution & Craft
 • Creative Problem Solving
 • Research & Process Documentation
@@ -520,182 +504,166 @@ Please generate a complete, ready-to-import, downloadable JSON file that matches
                       </div>
                     )}
                   </div>
+
+                  {/* Right Column */}
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Assignment Description *
+                      </label>
+                      <textarea
+                        value={formData.assignmentDescription}
+                        onChange={(e) => handleInputChange('assignmentDescription', e.target.value)}
+                        placeholder="Brief description of what students need to create/submit..."
+                        rows="4"
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Learning Objectives
+                      </label>
+                      <textarea
+                        value={formData.learningObjectives}
+                        onChange={(e) => handleInputChange('learningObjectives', e.target.value)}
+                        placeholder="List 2-3 key learning goals..."
+                        rows="3"
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Student Skill Level & Population
+                      </label>
+                      <select
+                        value={formData.studentPopulation}
+                        onChange={(e) => handleInputChange('studentPopulation', e.target.value)}
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Select student population...</option>
+                        <option value="Beginner/Entry Level">Beginner/Entry Level</option>
+                        <option value="Intermediate">Intermediate</option>
+                        <option value="Advanced">Advanced</option>
+                        <option value="Mixed Ability">Mixed Ability</option>
+                        <option value="First-Year Students">First-Year Students</option>
+                        <option value="Second-Year Students">Second-Year Students</option>
+                        <option value="Third-Year Students">Third-Year Students</option>
+                        <option value="Final-Year Students">Final-Year Students</option>
+                        <option value="Graduate Students">Graduate Students</option>
+                        <option value="Adult Learners/Continuing Education">Adult Learners/Continuing Education</option>
+                        <option value="International Students">International Students</option>
+                        <option value="Students with Learning Accommodations">Students with Learning Accommodations</option>
+                        <option value="High-Achieving Students">High-Achieving Students</option>
+                        <option value="Students Needing Additional Support">Students Needing Additional Support</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Assignment Duration (Optional)
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          type="number"
+                          min="1"
+                          value={formData.timeFrameNumber}
+                          onChange={(e) => handleInputChange('timeFrameNumber', e.target.value)}
+                          placeholder="e.g., 2"
+                          className="flex-1 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <select
+                          value={formData.timeFrameUnit}
+                          onChange={(e) => handleInputChange('timeFrameUnit', e.target.value)}
+                          className="w-24 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="days">days</option>
+                          <option value="weeks">weeks</option>
+                          <option value="months">months</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Special Considerations
+                      </label>
+                      <textarea
+                        value={formData.specialConsiderations}
+                        onChange={(e) => handleInputChange('specialConsiderations', e.target.value)}
+                        placeholder="Any accessibility needs, technology requirements, or other considerations..."
+                        rows="3"
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
                 </div>
 
-                {/* Right Column */}
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Assignment Description *
-                    </label>
-                    <textarea
-                      value={formData.assignmentDescription}
-                      onChange={(e) => handleInputChange('assignmentDescription', e.target.value)}
-                      placeholder="Brief description of what students need to create/submit..."
-                      rows="4"
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Learning Objectives
-                    </label>
-                    <textarea
-                      value={formData.learningObjectives}
-                      onChange={(e) => handleInputChange('learningObjectives', e.target.value)}
-                      placeholder="List 2-3 key learning goals..."
-                      rows="3"
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Student Skill Level & Population
-                    </label>
-                    <select
-                      value={formData.studentPopulation}
-                      onChange={(e) => handleInputChange('studentPopulation', e.target.value)}
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="">Select student population...</option>
-                      <option value="Beginner/Entry Level">Beginner/Entry Level</option>
-                      <option value="Intermediate">Intermediate</option>
-                      <option value="Advanced">Advanced</option>
-                      <option value="Mixed Ability">Mixed Ability</option>
-                      <option value="First-Year Students">First-Year Students</option>
-                      <option value="Second-Year Students">Second-Year Students</option>
-                      <option value="Third-Year Students">Third-Year Students</option>
-                      <option value="Final-Year Students">Final-Year Students</option>
-                      <option value="Graduate Students">Graduate Students</option>
-                      <option value="Adult Learners/Continuing Education">Adult Learners/Continuing Education</option>
-                      <option value="International Students">International Students</option>
-                      <option value="Students with Learning Accommodations">Students with Learning Accommodations</option>
-                      <option value="High-Achieving Students">High-Achieving Students</option>
-                      <option value="Students Needing Additional Support">Students Needing Additional Support</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              {/* Optional Fields */}
-              <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Assignment Duration (Optional)
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="number"
-                      min="1"
-                      value={formData.timeFrameNumber}
-                      onChange={(e) => handleInputChange('timeFrameNumber', e.target.value)}
-                      placeholder="e.g., 2"
-                      className="flex-1 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                    <select
-                      value={formData.timeFrameUnit}
-                      onChange={(e) => handleInputChange('timeFrameUnit', e.target.value)}
-                      className="w-24 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="days">days</option>
-                      <option value="weeks">weeks</option>
-                      <option value="months">months</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Special Considerations
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.specialConsiderations}
-                    onChange={(e) => handleInputChange('specialConsiderations', e.target.value)}
-                    placeholder="Accessibility, technology, or other requirements"
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-
-              {/* Generate Button */}
-              <div className="mt-8 flex justify-center gap-4">
-                <button
-                  onClick={() => {
-                    initializeAIPromptFormData();
-                    setShowPrompt(false);
-                  }}
-                  className="flex items-center gap-2 px-6 py-3 bg-gray-500 hover:bg-gray-600 text-white rounded-lg font-semibold transition-all shadow-lg hover:shadow-xl"
-                >
-                  Clear Form
-                </button>
-
-                <button
-                  onClick={generatePrompt}
-                  disabled={!isFormValid}
-                  className={`flex items-center gap-2 px-8 py-3 rounded-lg font-semibold transition-all ${isFormValid
-                    ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl'
-                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                    }`}
-                >
-                  <Sparkles className="w-5 h-5" />
-                  Generate AI Prompt
-                </button>
-              </div>
-
-              {/* Auto-save indicator */}
-              <div className="mt-4 text-center">
-                <p className="text-xs text-gray-500">
-                  💾 Form data is automatically saved as you type
-                </p>
-              </div>
-            </div>
-          ) : (
-            <div>
-              {/* Generated Prompt Display */}
-              <div className="mb-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-xl font-semibold text-gray-800">Generated AI Prompt</h2>
+                {/* Generate Button */}
+                <div className="flex justify-center pt-4">
                   <button
-                    onClick={() => setShowPrompt(false)}
-                    className="text-gray-600 hover:text-gray-800 underline"
+                    onClick={generatePrompt}
+                    disabled={!isFormValid}
+                    className={`px-8 py-4 rounded-lg font-semibold text-lg flex items-center gap-3 transition-all ${isFormValid
+                        ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl transform hover:-translate-y-1'
+                        : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      }`}
                   >
-                    ← Back to Form
+                    <Sparkles className="w-6 h-6" />
+                    Generate AI Prompt
+                    <ArrowRight className="w-6 h-6" />
                   </button>
                 </div>
 
-                <div className="bg-gray-100 border rounded-lg p-4 max-h-96 overflow-y-auto">
-                  <pre className="whitespace-pre-wrap text-sm text-gray-800 font-mono">
-                    {generatedPrompt}
-                  </pre>
-                </div>
+                {!isFormValid && (
+                  <div className="text-center">
+                    <p className="text-sm text-red-600">
+                      Please fill in all required fields (*) to generate the prompt
+                    </p>
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            <div className="space-y-6">
+              {/* Generated Prompt Display */}
+              <div className="bg-gray-800 text-green-400 p-4 rounded-lg font-mono text-sm max-h-96 overflow-y-auto">
+                <pre className="whitespace-pre-wrap">{generatedPrompt}</pre>
               </div>
 
               {/* Action Buttons */}
               <div className="flex gap-4 justify-center">
                 <button
                   onClick={copyToClipboard}
-                  className="flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-all shadow-lg hover:shadow-xl"
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
                 >
-                  <FileText className="w-5 h-5" />
+                  <FileText className="w-4 h-4" />
                   Copy to Clipboard
                 </button>
-
                 <button
                   onClick={exportPrompt}
-                  className="flex items-center gap-2 px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-all shadow-lg hover:shadow-xl"
+                  className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2"
                 >
-                  <Download className="w-5 h-5" />
-                  Export as Text File
+                  <Download className="w-4 h-4" />
+                  Download as File
+                </button>
+                <button
+                  onClick={() => setShowPrompt(false)}
+                  className="px-6 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 flex items-center gap-2"
+                >
+                  <ArrowRight className="w-4 h-4 rotate-180" />
+                  Go back to Rubric Generator
                 </button>
               </div>
 
-              {/* Next Steps */}
-              <div className="mt-8 bg-green-50 border border-green-200 rounded-lg p-4">
-                <h3 className="font-semibold text-green-900 mb-2">Next Steps:</h3>
-                <ol className="text-sm text-green-800 space-y-1">
+              {/* Instructions */}
+              <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
+                <h4 className="font-semibold text-blue-800 mb-2 flex items-center gap-2">
+                  <Lightbulb className="w-4 h-4" />
+                  Next Steps
+                </h4>
+                <ol className="text-blue-700 space-y-1 text-sm">
                   <li>1. Copy the prompt above</li>
                   <li>2. Paste it into your preferred AI tool (ChatGPT, Claude, etc.)</li>
                   <li>3. The AI will generate a complete JSON file</li>

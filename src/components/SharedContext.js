@@ -17,7 +17,7 @@ export const AssessmentProvider = ({ children }) => {
     const [sharedCourseDetails, setSharedCourseDetails] = useState(null);
     const [activeTab, setActiveTab] = useState('assignment-prompt-generator'); // Updated to start with assignment prompt generator
 
-    // AI Prompt Generator state (for rubrics)
+    // AI Prompt Generator state (for rubrics) - UPDATED with weight percentage
     const [aiPromptFormData, setAIPromptFormData] = useState(null);
 
     // NEW: Assignment Prompt Generator state
@@ -97,7 +97,7 @@ export const AssessmentProvider = ({ children }) => {
         modalEdit: { show: false, content: '', field: null, onSave: null }
     });
 
-    // AI Prompt Generator functions (for rubrics)
+    // AI Prompt Generator functions (for rubrics) - UPDATED with weight percentage
     const initializeAIPromptFormData = useCallback(() => {
         setAIPromptFormData({
             assignmentType: '',
@@ -106,6 +106,7 @@ export const AssessmentProvider = ({ children }) => {
             subjectArea: '',
             assignmentDescription: '',
             totalPoints: '100',
+            weightPercentage: '', // NEW: Add weight percentage field
             numCriteria: '4',
             criteriaType: 'ai-suggested',
             userCriteria: '',
@@ -489,6 +490,49 @@ export const AssessmentProvider = ({ children }) => {
         });
     }, []);
 
+    // Finalize a draft grade
+    const finalizeGrade = useCallback((studentId) => {
+        const draftData = drafts[studentId];
+        if (draftData) {
+            saveFinalGrade(studentId, draftData);
+            console.log('🎯 Finalized draft for student:', studentId);
+        }
+    }, [drafts, saveFinalGrade]);
+
+    // Unlock a final grade (convert back to draft)
+    const unlockGrade = useCallback((studentId) => {
+        const finalData = finalGrades[studentId];
+        if (finalData) {
+            // Move from final back to draft
+            setDrafts(prev => ({ ...prev, [studentId]: finalData }));
+            setFinalGrades(prev => {
+                const updated = { ...prev };
+                delete updated[studentId];
+                return updated;
+            });
+
+            // Update class list progress
+            if (classList) {
+                const studentIndex = classList.students.findIndex(s => s.id === studentId);
+                if (studentIndex >= 0) {
+                    const updatedProgress = [...classList.gradingProgress];
+                    updatedProgress[studentIndex] = {
+                        ...updatedProgress[studentIndex],
+                        status: 'completed_draft',
+                        lastModified: new Date().toISOString(),
+                        gradeType: 'draft'
+                    };
+                    setClassList(prev => ({
+                        ...prev,
+                        gradingProgress: updatedProgress
+                    }));
+                }
+            }
+
+            console.log('🔓 Unlocked final grade for student:', studentId);
+        }
+    }, [finalGrades, setDrafts, setFinalGrades, classList, setClassList]);
+
     // UPDATED: Export Session Function with AI Prompt Data and Assignment Prompt Data
     const exportSession = useCallback(() => {
         const sessionData = {
@@ -541,49 +585,6 @@ export const AssessmentProvider = ({ children }) => {
         }
     }, []);
 
-    // Finalize a draft grade
-    const finalizeGrade = useCallback((studentId) => {
-        const draftData = drafts[studentId];
-        if (draftData) {
-            saveFinalGrade(studentId, draftData);
-            console.log('🎯 Finalized draft for student:', studentId);
-        }
-    }, [drafts, saveFinalGrade]);
-
-    // Unlock a final grade (convert back to draft)
-    const unlockGrade = useCallback((studentId) => {
-        const finalData = finalGrades[studentId];
-        if (finalData) {
-            // Move from final back to draft
-            setDrafts(prev => ({ ...prev, [studentId]: finalData }));
-            setFinalGrades(prev => {
-                const updated = { ...prev };
-                delete updated[studentId];
-                return updated;
-            });
-
-            // Update class list progress
-            if (classList) {
-                const studentIndex = classList.students.findIndex(s => s.id === studentId);
-                if (studentIndex >= 0) {
-                    const updatedProgress = [...classList.gradingProgress];
-                    updatedProgress[studentIndex] = {
-                        ...updatedProgress[studentIndex],
-                        status: 'completed_draft',
-                        lastModified: new Date().toISOString(),
-                        gradeType: 'draft'
-                    };
-                    setClassList(prev => ({
-                        ...prev,
-                        gradingProgress: updatedProgress
-                    }));
-                }
-            }
-
-            console.log('🔓 Unlocked final grade for student:', studentId);
-        }
-    }, [finalGrades, setDrafts, setFinalGrades, classList, setClassList]);
-
     const clearAllData = useCallback(() => {
         setSharedRubric(null);
         clearGradingFormData();
@@ -621,6 +622,11 @@ export const AssessmentProvider = ({ children }) => {
         // Grading form data
         gradingData: gradingFormData,
         setGradingData: setGradingFormData,
+        clearGradingFormData,
+        persistentFormData,
+        updatePersistentFormData,
+
+        // Form update functions
         updateStudentInfo,
         updateCourseInfo,
         updateAssignmentInfo,
@@ -665,17 +671,12 @@ export const AssessmentProvider = ({ children }) => {
         transferRubricToGrading,
         transferRubricToGradingWithDetails,
         clearSharedRubric,
-        clearGradingFormData,
         clearRubricFormData,
         clearAllData,
 
         // Session management
         exportSession,
-        importSession,
-
-        // Legacy compatibility
-        persistentFormData,
-        updatePersistentFormData
+        importSession
     };
 
     return (
@@ -684,3 +685,5 @@ export const AssessmentProvider = ({ children }) => {
         </AssessmentContext.Provider>
     );
 };
+
+export default AssessmentProvider;
