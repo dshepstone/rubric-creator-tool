@@ -8,6 +8,7 @@ import RubricCreator from './components/RubricCreator';
 import ClassListManager from './components/ClassListManager';
 import GradingTemplate from './components/GradingTemplate';
 import ExcelImportTest from './components/ExcelImportTest';
+import HelpPage from './components/HelpPage'; // ADDED: Import the new HelpPage component
 import './index.css';
 
 // Scroll to Top Button Component
@@ -213,6 +214,7 @@ const AppContent = () => {
         {activeTab === 'class-manager' && <ClassListManager />}
         {activeTab === 'grading-tool' && <GradingTemplate />}
         {activeTab === 'excel-import-test' && <ExcelImportTest />}
+        {activeTab === 'help' && <HelpPage />} {/* ADDED: Render HelpPage when help tab is active */}
       </div>
 
       {/* Scroll to Top Button - Available on all pages */}

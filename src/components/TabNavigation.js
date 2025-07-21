@@ -2,7 +2,7 @@ import React, { useRef } from 'react';
 import { useAssessment } from './SharedContext';
 import {
     FileText, GraduationCap, Users, ArrowRight, Database,
-    PlayCircle, Clock, CheckCircle, AlertTriangle, Save, Upload, Sparkles, BookOpen // ADDED BookOpen
+    PlayCircle, Clock, CheckCircle, AlertTriangle, Save, Upload, Sparkles, BookOpen, HelpCircle // ADDED HelpCircle
 } from 'lucide-react';
 
 const TabNavigation = () => {
@@ -63,15 +63,22 @@ const TabNavigation = () => {
             name: 'Grading Tool',
             icon: GraduationCap,
             description: 'Grade assignments using rubrics'
+        },
+        {
+            id: 'help',
+            name: 'Help',
+            icon: HelpCircle,
+            description: 'User guide and feature documentation'
         }
     ];
 
     const activeStyles = {
         'ai-prompt-generator': 'active-ai-prompt border-blue-500 text-blue-700',
-        'assignment-prompt-generator': 'active-assignment-prompt border-orange-500 text-orange-700', // NEW STYLE
+        'assignment-prompt-generator': 'active-assignment-prompt border-orange-500 text-orange-700',
         'rubric-creator': 'active-rubric border-purple-500 text-purple-700',
         'class-manager': 'active-class border-indigo-500 text-indigo-700',
         'grading-tool': 'active-grading border-green-500 text-green-700',
+        'help': 'active-help border-gray-500 text-gray-700', // NEW STYLE
     };
 
     // Check if there's data that indicates active work
@@ -112,40 +119,38 @@ const TabNavigation = () => {
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id)}
                                 className={`${isActive
-                                    ? `${activeStyles[tab.id]} border-b-2 bg-white`
-                                    : 'text-gray-500 hover:text-gray-700 border-b-2 border-transparent hover:border-gray-300'
-                                    } flex flex-col items-center px-4 py-3 text-sm font-medium transition-all duration-200 min-w-max`}
+                                    ? `border-b-2 ${activeStyles[tab.id]} bg-white shadow-sm`
+                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 bg-transparent'
+                                    } whitespace-nowrap py-4 px-3 border-b-2 font-medium text-sm transition-all duration-200 flex items-start gap-2 min-w-fit`}
+                                aria-current={isActive ? 'page' : undefined}
+                                title={tab.description}
                             >
-                                <Icon size={18} className="mb-1" />
-                                <span className="hidden sm:block">{tab.name}</span>
-                                <span className="text-xs text-gray-400 hidden lg:block max-w-32 text-center">
-                                    {tab.description}
-                                </span>
+                                <Icon size={16} className="flex-shrink-0 mt-0.5" />
+                                <div className="flex flex-col items-start text-left">
+                                    <span className="font-medium">{tab.name}</span>
 
-                                {/* Status indicators */}
-                                <div className="flex flex-wrap gap-1 mt-1 justify-center">
                                     {/* AI Prompt Generator indicators */}
                                     {tab.id === 'ai-prompt-generator' && (
-                                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 whitespace-nowrap">
-                                            <Sparkles size={10} className="mr-1 flex-shrink-0" />
-                                            Rubric AI
-                                        </span>
-                                    )}
-
-                                    {/* Assignment Prompt Generator indicators */}
-                                    {tab.id === 'assignment-prompt-generator' && (
-                                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 whitespace-nowrap">
-                                            <BookOpen size={10} className="mr-1 flex-shrink-0" />
-                                            Assignment AI
-                                        </span>
+                                        <div className="flex flex-col gap-1">
+                                            {hasRubricData && (
+                                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 whitespace-nowrap">
+                                                    <Sparkles size={10} className="mr-1 flex-shrink-0" />
+                                                    AI Ready
+                                                </span>
+                                            )}
+                                        </div>
                                     )}
 
                                     {/* Rubric Creator indicators */}
-                                    {tab.id === 'rubric-creator' && hasRubricData && (
-                                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 whitespace-nowrap">
-                                            <Database size={10} className="mr-1 flex-shrink-0" />
-                                            Rubric Ready
-                                        </span>
+                                    {tab.id === 'rubric-creator' && (
+                                        <div className="flex flex-col gap-1">
+                                            {hasRubricData && (
+                                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 whitespace-nowrap">
+                                                    <Database size={10} className="mr-1 flex-shrink-0" />
+                                                    Rubric Ready
+                                                </span>
+                                            )}
+                                        </div>
                                     )}
 
                                     {/* Class Manager indicators */}
@@ -195,6 +200,14 @@ const TabNavigation = () => {
                                             )}
                                         </div>
                                     )}
+
+                                    {/* Help tab indicator */}
+                                    {tab.id === 'help' && (
+                                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 whitespace-nowrap">
+                                            <HelpCircle size={10} className="mr-1 flex-shrink-0" />
+                                            User Guide
+                                        </span>
+                                    )}
                                 </div>
                             </button>
                         );
@@ -205,67 +218,66 @@ const TabNavigation = () => {
                 <div className="border-t border-gray-100 bg-gray-50">
                     <div className="flex items-center justify-between px-6 py-2">
                         <div className="flex items-center gap-4">
-                            <input
-                                ref={importSessionInputRef}
-                                type="file"
-                                accept=".json"
-                                onChange={handleSessionImport}
-                                className="hidden"
-                            />
-                            <button
-                                onClick={() => importSessionInputRef.current?.click()}
-                                className="flex items-center gap-2 text-gray-700 hover:text-gray-800 text-sm font-medium bg-white px-3 py-1.5 rounded-lg border border-gray-200 hover:border-gray-300 transition-all duration-200 shadow-sm hover:shadow"
-                            >
-                                <Upload size={14} />
-                                Import Session
-                            </button>
-                            <button
-                                onClick={exportSession}
-                                className="flex items-center gap-2 text-gray-700 hover:text-gray-800 text-sm font-medium bg-white px-3 py-1.5 rounded-lg border border-gray-200 hover:border-gray-300 transition-all duration-200 shadow-sm hover:shadow"
-                            >
-                                <Save size={14} />
-                                Save Session
-                            </button>
-                            <div className="w-px h-6 bg-gray-300"></div>
-
-                            {/* Workflow indicators and quick actions */}
-                            {!hasRubricData && activeTab !== 'rubric-creator' && activeTab !== 'ai-prompt-generator' && activeTab !== 'assignment-prompt-generator' && (
-                                <div className="flex items-center gap-2 text-yellow-700 bg-yellow-50 px-3 py-1.5 rounded-lg border border-yellow-200">
-                                    <AlertTriangle size={14} />
-                                    <span className="text-sm">Create rubric first</span>
-                                </div>
-                            )}
-
-                            {hasRubricData && !hasClassListData && activeTab !== 'class-manager' && (
+                            {/* Session Management Controls */}
+                            <div className="flex items-center gap-2">
                                 <button
-                                    onClick={() => setActiveTab('class-manager')}
-                                    className="flex items-center gap-2 text-indigo-700 hover:text-indigo-800 text-sm font-medium bg-white px-3 py-1.5 rounded-lg border border-indigo-200 hover:border-indigo-300 transition-all duration-200 shadow-sm hover:shadow"
+                                    onClick={exportSession}
+                                    className="flex items-center gap-1 text-gray-600 hover:text-gray-800 text-xs font-medium"
+                                    title="Export Current Session"
                                 >
-                                    <Users size={14} />
-                                    Import Class List
+                                    <Save size={12} />
+                                    Export
+                                </button>
+
+                                <input
+                                    ref={importSessionInputRef}
+                                    type="file"
+                                    accept=".json"
+                                    onChange={handleSessionImport}
+                                    style={{ display: 'none' }}
+                                />
+                                <button
+                                    onClick={() => importSessionInputRef.current?.click()}
+                                    className="flex items-center gap-1 text-gray-600 hover:text-gray-800 text-xs font-medium"
+                                    title="Import Session"
+                                >
+                                    <Upload size={12} />
+                                    Import
+                                </button>
+                            </div>
+
+                            {/* Help shortcut */}
+                            {activeTab !== 'help' && (
+                                <button
+                                    onClick={() => setActiveTab('help')}
+                                    className="flex items-center gap-1 text-blue-600 hover:text-blue-800 text-xs font-medium"
+                                    title="Need help? View user guide"
+                                >
+                                    <HelpCircle size={12} />
+                                    Need Help?
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Smart workflow navigation buttons */}
+                        <div className="flex items-center gap-2">
+                            {activeTab === 'ai-prompt-generator' && hasRubricData && (
+                                <button
+                                    onClick={() => setActiveTab('rubric-creator')}
+                                    className="flex items-center gap-2 text-purple-700 hover:text-purple-800 text-sm font-medium bg-white px-3 py-1.5 rounded-lg border border-purple-200 hover:border-purple-300 transition-all duration-200 shadow-sm hover:shadow"
+                                >
+                                    <FileText size={14} />
+                                    Edit Rubric
                                 </button>
                             )}
 
-                            {hasRubricData && hasClassListData && !hasActiveSession && activeTab !== 'class-manager' && (
+                            {activeTab === 'rubric-creator' && hasRubricData && hasClassListData && (
                                 <button
-                                    onClick={() => {
-                                        initializeGradingSession(classList);
-                                        setActiveTab('grading-tool');
-                                    }}
+                                    onClick={() => setActiveTab('grading-tool')}
                                     className="flex items-center gap-2 text-green-700 hover:text-green-800 text-sm font-medium bg-white px-3 py-1.5 rounded-lg border border-green-200 hover:border-green-300 transition-all duration-200 shadow-sm hover:shadow"
                                 >
                                     <GraduationCap size={14} />
                                     Start Grading
-                                </button>
-                            )}
-
-                            {!hasClassListData && activeTab !== 'class-manager' && activeTab !== 'rubric-creator' && activeTab !== 'ai-prompt-generator' && activeTab !== 'assignment-prompt-generator' && (
-                                <button
-                                    onClick={() => setActiveTab('class-manager')}
-                                    className="flex items-center gap-2 text-indigo-700 hover:text-indigo-800 text-sm font-medium bg-white px-3 py-1.5 rounded-lg border border-indigo-200 hover:border-indigo-300 transition-all duration-200 shadow-sm hover:shadow"
-                                >
-                                    <Users size={14} />
-                                    Import Class
                                 </button>
                             )}
 
