@@ -337,6 +337,9 @@ export const AssessmentProvider = ({ children }) => {
         }
 
         if (draft) {
+            if (!draft.latePolicy) {
+                draft = { ...draft, latePolicy: { level: 'none', penaltyApplied: false } };
+            }
             setGradingFormData(draft);
             console.log('✅ Draft loaded for student:', studentId);
             return true;
@@ -385,6 +388,9 @@ export const AssessmentProvider = ({ children }) => {
             }
         }
 
+        if (finalGrade && !finalGrade.latePolicy) {
+            finalGrade = { ...finalGrade, latePolicy: { level: 'none', penaltyApplied: false } };
+        }
         return finalGrade || null;
     }, [finalGrades]);
 
