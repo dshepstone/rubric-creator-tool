@@ -6,7 +6,8 @@ import {
     AlertCircle, CheckCircle, Info, Lightbulb, Settings,
     Database, PlayCircle, Save, RefreshCw, Eye, Edit3,
     Star, Clock, Target, Award, BarChart3, FileSpreadsheet,
-    ArrowRight, Zap, Shield, HelpCircle
+    ArrowRight, Zap, Shield, HelpCircle, Lock, Cloud,
+    Timer, AlertTriangle, UserCheck, FileJson, Globe
 } from 'lucide-react';
 
 const HelpPage = () => {
@@ -22,121 +23,165 @@ const HelpPage = () => {
         }));
     };
 
-    // Help content sections
+    // Navigation to specific tabs
+    const navigateToTab = (tabId) => {
+        setActiveTab(tabId);
+    };
+
+    // Help content sections for GradingPilot v2.0
     const helpSections = [
         {
             id: 'overview',
-            title: 'Platform Overview',
+            title: 'GradingPilot Professional Suite v2.0',
             icon: HelpCircle,
-            color: 'gray',
+            color: 'blue',
             content: {
-                description: 'Complete educational assessment platform with AI-powered tools',
+                description: 'Advanced educational assessment platform with AI-powered tools, privacy-first design, and cloud integration',
                 features: [
-                    'Generate assignment prompts and HTML pages',
-                    'Create AI prompts for rubric generation',
-                    'Build professional rubrics with 7-level assessment system',
-                    'Import and manage class lists from Excel files',
-                    'Grade assignments with integrated rubric system',
-                    'Export session data and results'
+                    '🚀 AI-powered assignment and rubric generation',
+                    '📊 Professional 7-level rubric creation system',
+                    '👥 Excel-based class management with privacy protection',
+                    '🔒 Privacy-first architecture with session-based storage',
+                    '☁️ Cloud deployment with automatic scaling',
+                    '⚡ Real-time grading with policy management',
+                    '📱 Responsive design with enhanced accessibility',
+                    '🔄 TanStack Query integration for optimal performance'
                 ],
-                quickStart: [
-                    'Start with Assignment Prompt Generator to create your assignment',
-                    'Use AI Rubric Prompt Generator to get AI assistance with rubric creation',
-                    'Build your detailed rubric in Rubric Creator',
-                    'Import your class list in Class Manager',
-                    'Begin grading in Grading Tool'
+                newFeatures: [
+                    'Grading Policy Manager - Dynamic policy configuration',
+                    'Privacy-first data handling - No permanent student storage',
+                    'Session-based temporary storage with auto-cleanup',
+                    'Enhanced Excel import with validation',
+                    'Cloud deployment capabilities',
+                    'Real-time policy previews and calculations'
                 ]
             }
         },
         {
-            id: 'assignment-prompt',
-            title: 'Assignment Prompt Generator',
-            icon: BookOpen,
-            color: 'orange',
-            tabId: 'assignment-prompt-generator',
+            id: 'privacy',
+            title: 'Privacy & Data Protection',
+            icon: Shield,
+            color: 'green',
             content: {
-                description: 'Generate AI prompts and complete HTML assignment pages',
+                description: 'GradingPilot v2.0 prioritizes student privacy with advanced data protection features',
                 features: [
-                    'Create detailed assignment descriptions',
-                    'Generate AI prompts for assignment creation',
-                    'Export HTML pages for student distribution',
-                    'Include learning objectives and requirements',
-                    'Specify assessment criteria and deliverables'
+                    '🔒 No permanent student data storage',
+                    '⏱️ Session-based temporary storage (1-hour default)',
+                    '🗑️ Auto-delete on logout and session expiry',
+                    '📥 JSON export for personal data ownership',
+                    '🧹 Automatic cleanup of expired sessions',
+                    '🚫 No tracking or analytics on student data',
+                    '✅ GDPR and privacy compliance ready'
                 ],
-                howTo: [
-                    'Enter assignment title and basic information',
-                    'Add detailed assignment description',
-                    'List learning objectives (2-3 key goals)',
-                    'Specify special requirements or constraints',
-                    'Generate AI prompt or export HTML page',
-                    'Use the HTML output in your LMS or website'
-                ],
-                tips: [
-                    'Be specific about deliverables and expectations',
-                    'Include clear success criteria',
-                    'Consider student skill level when writing requirements',
-                    'Test the HTML output before distributing to students'
+                details: [
+                    {
+                        title: 'Session Management',
+                        description: 'All student data is stored temporarily in sessions that automatically expire',
+                        features: [
+                            'Configurable session timeout (default: 1 hour)',
+                            'Automatic cleanup on browser close',
+                            'Manual session clearing on logout',
+                            'Session data export before expiry'
+                        ]
+                    },
+                    {
+                        title: 'Data Export',
+                        description: 'Users can export their grading data as JSON files for personal storage',
+                        features: [
+                            'Complete grading session export',
+                            'Class roster export (anonymized)',
+                            'Rubric and policy export',
+                            'Timestamps and metadata included'
+                        ]
+                    }
                 ]
             }
         },
         {
-            id: 'ai-rubric-prompt',
+            id: 'ai-prompt-generator',
             title: 'AI Rubric Prompt Generator',
             icon: Sparkles,
-            color: 'blue',
+            color: 'purple',
             tabId: 'ai-prompt-generator',
             content: {
-                description: 'Generate optimized prompts for AI to create detailed rubrics',
+                description: 'Create comprehensive AI prompts for automated rubric generation using ChatGPT, Claude, or other AI systems',
                 features: [
-                    'Smart prompt generation for AI rubric creation',
-                    'Customizable assessment levels and criteria',
-                    'Integration with popular AI platforms',
-                    'Export ready-to-use prompts',
-                    'Professional rubric structure templates'
+                    'Smart prompt generation based on assignment details',
+                    'Integration with Assignment Prompt Generator data',
+                    'Customizable criteria types (AI-suggested or user-defined)',
+                    'Professional rubric structure templates',
+                    'Learning objectives integration from CLOs',
+                    'Weight percentage calculations',
+                    'Copy-paste ready prompts for AI systems'
                 ],
-                howTo: [
-                    'Enter assignment title and description',
-                    'Specify the number of assessment levels (typically 4-7)',
-                    'Choose criteria generation method (AI suggestions or custom)',
-                    'Add learning objectives and special requirements',
-                    'Generate the AI prompt',
-                    'Copy and paste into your preferred AI tool (ChatGPT, Claude, etc.)',
-                    'Import the AI-generated JSON into Rubric Creator'
+                workflow: [
+                    'Import data from Assignment Prompt Generator or enter manually',
+                    'Select assignment type and academic level',
+                    'Choose criteria generation method (AI or custom)',
+                    'Specify learning objectives and special considerations',
+                    'Generate comprehensive AI prompt',
+                    'Copy prompt to your preferred AI system',
+                    'Import generated rubric back into Rubric Creator'
                 ],
                 tips: [
-                    'Be specific about your assessment goals',
-                    'Include context about student level and course',
-                    'Review AI-generated rubrics carefully before use',
-                    'Test the rubric with sample work before full implementation'
+                    'Use specific assignment descriptions for better AI results',
+                    'Include clear learning objectives for focused criteria',
+                    'Specify student population for appropriate language level',
+                    'Test with different AI systems for varied approaches'
+                ]
+            }
+        },
+        {
+            id: 'assignment-prompt-generator',
+            title: 'Assignment Prompt Generator',
+            icon: FileText,
+            color: 'blue',
+            tabId: 'assignment-prompt-generator',
+            content: {
+                description: 'Generate complete assignment prompts and HTML pages with professional formatting',
+                features: [
+                    'Comprehensive assignment prompt creation',
+                    'Course Learning Outcomes (CLO) integration',
+                    'Due date and submission requirement management',
+                    'Academic integrity and late policy integration',
+                    'Professional HTML page generation',
+                    'Citation style and submission format specification',
+                    'Weight percentage and total points calculation'
+                ],
+                components: [
+                    'Course and assignment metadata',
+                    'Detailed assignment descriptions',
+                    'Course Learning Outcomes (CLOs) with mapping',
+                    'Evaluation criteria and rubric references',
+                    'Submission requirements and formatting',
+                    'Academic integrity statements',
+                    'Late submission policies'
+                ],
+                outputs: [
+                    'Professional HTML assignment page',
+                    'Printable PDF-ready format',
+                    'Data export for AI Rubric Generator',
+                    'JSON backup for future editing'
                 ]
             }
         },
         {
             id: 'rubric-creator',
-            title: 'Rubric Creator',
-            icon: FileText,
-            color: 'purple',
+            title: 'Professional Rubric Creator',
+            icon: Target,
+            color: 'orange',
             tabId: 'rubric-creator',
             content: {
-                description: 'Professional rubric creation tool with 7-level assessment system',
+                description: 'Create professional rubrics with the industry-standard 7-level assessment system',
                 features: [
-                    '7-level performance scale (Incomplete → Exceptional)',
-                    'Dynamic criterion management with custom point values',
-                    'Rich text editing for detailed level descriptions',
-                    'Feedback library system for efficient grading',
-                    'Automatic point calculation with multiplier system',
-                    'Export options: JSON for grading, HTML for students',
-                    'Professional formatting and layout'
-                ],
-                howTo: [
-                    'Enter assignment information (title, weight, passing threshold)',
-                    'Add assessment criteria using the "Add Criterion" button',
-                    'Set point values and weights for each criterion',
-                    'Define performance level descriptions for each criterion',
-                    'Build feedback libraries with pre-written comments',
-                    'Preview the rubric layout and point calculations',
-                    'Export as JSON for grading or HTML for student distribution',
-                    'Use "Use for Grading" button to transfer to Grading Tool'
+                    'Professional 7-level performance scale',
+                    'Custom criteria with detailed descriptions',
+                    'Rich text editing with formatting options',
+                    'Real-time point calculation and weighting',
+                    'Feedback library integration',
+                    'Multiple export formats (JSON, HTML)',
+                    'Direct transfer to Grading Tool',
+                    'Preview mode with student view'
                 ],
                 levels: [
                     'Incomplete (0%) - No submission or unusable',
@@ -147,184 +192,273 @@ const HelpPage = () => {
                     'Accomplished (92%) - Strong professional quality',
                     'Exceptional (100%) - Outstanding professional quality'
                 ],
+                workflow: [
+                    'Import assignment data or start from scratch',
+                    'Define assessment criteria and weights',
+                    'Write detailed performance level descriptions',
+                    'Build reusable feedback libraries',
+                    'Preview rubric in student-facing format',
+                    'Export for distribution or transfer to grading',
+                    'Use for batch grading with Class Manager'
+                ],
                 tips: [
-                    'Start with 3-5 key criteria, add more as needed',
-                    'Write clear, observable descriptions for each level',
-                    'Use consistent language across criteria',
-                    'Build comprehensive feedback libraries to save time during grading',
-                    'Test your rubric with sample student work',
-                    'Consider the total points and weighting carefully'
+                    'Start with 3-5 key criteria, expand as needed',
+                    'Write observable, measurable descriptions',
+                    'Use consistent language across all levels',
+                    'Test rubric with sample student work',
+                    'Build comprehensive feedback libraries'
                 ]
             }
         },
         {
             id: 'class-manager',
-            title: 'Class Manager',
+            title: 'Enhanced Class Manager',
             icon: Users,
             color: 'indigo',
             tabId: 'class-manager',
             content: {
-                description: 'Import and manage class rosters with Excel integration',
+                description: 'Import and manage class rosters with Excel integration, privacy protection, and grading policy management',
                 features: [
-                    'Excel file import with automatic validation',
-                    'Support for .xlsx and .xls formats',
-                    'Course metadata extraction (name, instructor, term)',
-                    'Student roster management with ID and email support',
-                    'Batch operations and progress tracking',
-                    'Integration with grading workflow',
-                    'Export capabilities for grade books'
+                    'Excel file import with intelligent validation',
+                    'Automatic course metadata extraction',
+                    'Privacy-compliant student data handling',
+                    'Integration with Grading Policy Manager',
+                    'Real-time grade calculations with policy preview',
+                    'Batch grading session initialization',
+                    'Export capabilities (JSON, anonymized)',
+                    'Session-based temporary storage'
                 ],
-                howTo: [
-                    'Prepare Excel file with student information',
-                    'Use the "Import Excel File" button to upload',
-                    'Review imported data for accuracy',
-                    'Verify course information (automatically extracted)',
-                    'Check student roster completeness',
-                    'Use "Start Batch Grading" to begin assessment',
-                    'Monitor progress through grading indicators'
+                excelRequirements: [
+                    'First Name column (required)',
+                    'Last Name column (required)',
+                    'Student ID or Email (recommended)',
+                    'Course metadata in designated cells',
+                    'Program type specification for policy selection',
+                    'Supported formats: .xlsx, .xls'
                 ],
-                excelFormat: [
-                    'Required columns: Student Name, Student ID',
-                    'Optional columns: Email, Course Name, Instructor, Term',
-                    'First row should contain headers',
-                    'Course information can be in metadata or separate columns',
-                    'File formats: .xlsx or .xls',
-                    'Maximum recommended: 500 students per file'
+                privacyFeatures: [
+                    'Temporary storage only - no permanent database',
+                    'Auto-cleanup after session expiry',
+                    'Manual data clearing on logout',
+                    'Export options for instructor records',
+                    'Anonymization tools for sharing'
                 ],
-                excelExample: {
-                    description: 'Example Excel file structure with sample data',
-                    headers: ['Student Name', 'Student ID', 'Email', 'Course Name', 'Instructor', 'Term'],
-                    sampleRows: [
-                        ['John Smith', 'JS001', 'john.smith@email.com', 'Web Design Fundamentals', 'Prof. Anderson', 'Fall 2024'],
-                        ['Sarah Johnson', 'SJ002', 'sarah.johnson@email.com', 'Web Design Fundamentals', 'Prof. Anderson', 'Fall 2024'],
-                        ['Michael Chen', 'MC003', 'michael.chen@email.com', 'Web Design Fundamentals', 'Prof. Anderson', 'Fall 2024'],
-                        ['Emily Rodriguez', 'ER004', 'emily.rodriguez@email.com', 'Web Design Fundamentals', 'Prof. Anderson', 'Fall 2024'],
-                        ['David Kim', 'DK005', 'david.kim@email.com', 'Web Design Fundamentals', 'Prof. Anderson', 'Fall 2024']
-                    ],
-                    notes: [
-                        'Each student should have a unique Student ID',
-                        'Email addresses should be valid and unique',
-                        'Course information can be the same for all students in a class',
-                        'Headers are case-sensitive and should match exactly',
-                        'Empty cells are allowed but may cause validation warnings'
-                    ]
-                },
-                preparationChecklist: [
-                    'Verify all student names are spelled correctly and consistently formatted',
-                    'Confirm student IDs follow your institution\'s standard format',
-                    'Check that email addresses are current and properly formatted',
-                    'Ensure course name, instructor, and term information is consistent',
-                    'Remove any test data, duplicate entries, or placeholder rows',
-                    'Save the file in Excel format (.xlsx or .xls)',
-                    'Test the import with a small subset before processing the full class'
+                workflow: [
+                    'Import Excel file with class roster',
+                    'Validate and review imported data',
+                    'Select appropriate grading policy',
+                    'Preview grade calculations',
+                    'Initialize batch grading session',
+                    'Export data before session expires'
+                ]
+            }
+        },
+        {
+            id: 'policy-manager',
+            title: 'Grading Policy Manager (NEW)',
+            icon: Settings,
+            color: 'emerald',
+            tabId: 'policy-manager',
+            content: {
+                description: 'Dynamic grading policy management with institutional standards and custom configurations',
+                features: [
+                    'Pre-loaded institutional policies (Conestoga, etc.)',
+                    'Custom program type configurations',
+                    'Dynamic grade scale management',
+                    'Real-time policy preview and testing',
+                    'Import/export policy configurations',
+                    'Version control and audit trails',
+                    'Multi-institutional support',
+                    'Cloud synchronization capabilities'
                 ],
-                tips: [
-                    'Keep Excel files simple and clean - avoid merged cells or complex formatting',
-                    'Ensure student IDs are unique and consistent across all records',
-                    'Include course information for better organization and automatic metadata',
-                    'Test with a small sample (3-5 students) before importing large classes',
-                    'Save files in .xlsx format for best compatibility',
-                    'Double-check email addresses for validity before import',
-                    'Use consistent naming conventions for courses and instructors',
-                    'Remove any empty rows or columns that might cause parsing errors',
-                    'Backup your original files before making any modifications',
-                    'Consider creating a template file for future class imports'
+                defaultPolicies: [
+                    'Conestoga College - Degree Programs',
+                    'Conestoga College - Diploma Programs',
+                    'Conestoga College - Certificate Programs',
+                    'Custom University Standards',
+                    'K-12 Educational Standards'
+                ],
+                capabilities: [
+                    'Create custom grading scales',
+                    'Define program-specific policies',
+                    'Set passing grade thresholds',
+                    'Configure special grading rules',
+                    'Manage effective date ranges',
+                    'Export policies for institutional use'
+                ],
+                integration: [
+                    'Seamless integration with Class Manager',
+                    'Real-time grade calculations',
+                    'Policy preview in class roster',
+                    'Automatic policy selection by program type',
+                    'Override capabilities for special cases'
                 ]
             }
         },
         {
             id: 'grading-tool',
-            title: 'Grading Tool',
+            title: 'Advanced Grading Tool',
             icon: GraduationCap,
-            color: 'green',
+            color: 'red',
             tabId: 'grading-tool',
             content: {
-                description: 'Comprehensive grading interface with rubric integration',
+                description: 'Comprehensive grading interface with rubric integration, batch processing, and session management',
                 features: [
-                    'Level-based assessment using imported rubrics',
-                    'Automatic point calculation and grade conversion',
-                    'Rich feedback system with pre-built comments',
-                    'Student navigation with progress tracking',
-                    'Draft saving and session management',
-                    'Attachment and video link support',
-                    'Late policy handling and penalty calculation',
-                    'Export options for LMS integration'
+                    'Integrated rubric-based grading',
+                    'Batch grading with class roster navigation',
+                    'Rich feedback composition with libraries',
+                    'Draft and final grade management',
+                    'Real-time calculation with policy integration',
+                    'Session persistence with auto-save',
+                    'Export capabilities (individual and batch)',
+                    'Late policy integration and overrides'
                 ],
-                howTo: [
-                    'Ensure rubric is loaded (from Rubric Creator)',
-                    'Import class list (from Class Manager)',
-                    'Start grading session or continue existing session',
-                    'Navigate between students using the student selector',
-                    'Assess each criterion by selecting performance levels',
-                    'Add personalized feedback using the comment system',
-                    'Apply late policies if necessary',
-                    'Save drafts frequently during grading',
-                    'Finalize and export grades when complete'
+                gradingFlow: [
+                    'Load rubric from Rubric Creator',
+                    'Import class roster from Class Manager',
+                    'Start batch grading session',
+                    'Grade each student with rubric criteria',
+                    'Add personalized feedback and comments',
+                    'Review and finalize grades',
+                    'Export results and clear session'
                 ],
-                gradingWorkflow: [
-                    'Review student submission and assignment requirements',
-                    'Assess each criterion against the rubric levels',
-                    'Select appropriate performance level for each criterion',
-                    'Add specific feedback using the feedback library',
-                    'Review total score and grade calculation',
-                    'Save progress and move to next student',
-                    'Export final grades for gradebook entry'
+                sessionFeatures: [
+                    'Auto-save draft grades every 30 seconds',
+                    'Resume interrupted grading sessions',
+                    'Export session data before expiry',
+                    'Navigate between students seamlessly',
+                    'Track grading progress'
                 ],
-                tips: [
-                    'Grade in batches for consistency',
-                    'Use feedback libraries to maintain consistent comments',
-                    'Take breaks during long grading sessions',
-                    'Double-check calculations and final grades',
-                    'Keep backup copies of grading sessions',
-                    'Provide constructive, specific feedback'
+                exportOptions: [
+                    'Individual grade reports (PDF)',
+                    'Class grade summary (Excel)',
+                    'Feedback compilation',
+                    'Session data backup (JSON)'
                 ]
             }
         },
         {
-            id: 'workflows',
-            title: 'Common Workflows',
+            id: 'excel-import',
+            title: 'Excel Import & Testing',
+            icon: FileSpreadsheet,
+            color: 'green',
+            tabId: 'excel-import-test',
+            content: {
+                description: 'Advanced Excel import functionality with validation, testing, and error handling',
+                features: [
+                    'Intelligent file format detection',
+                    'Comprehensive data validation',
+                    'Error reporting and suggestions',
+                    'Course metadata extraction',
+                    'Student data normalization',
+                    'Privacy-compliant processing',
+                    'Test mode for validation',
+                    'Batch processing capabilities'
+                ],
+                supportedFormats: [
+                    '.xlsx (Excel 2007+)',
+                    '.xls (Excel 97-2003)',
+                    'CSV files with proper encoding',
+                    'Tab-delimited text files'
+                ],
+                validationChecks: [
+                    'Required column presence',
+                    'Data type validation',
+                    'Duplicate student detection',
+                    'Course metadata verification',
+                    'Program type compatibility',
+                    'Grading policy alignment'
+                ],
+                troubleshooting: [
+                    'Clear error messages with line numbers',
+                    'Suggestions for data correction',
+                    'Sample file templates',
+                    'Step-by-step resolution guides'
+                ]
+            }
+        },
+        {
+            id: 'cloud-deployment',
+            title: 'Cloud Integration',
+            icon: Cloud,
+            color: 'sky',
+            content: {
+                description: 'Professional cloud deployment with privacy-first architecture and minimal maintenance',
+                features: [
+                    'Docker-based containerization',
+                    'Automatic SSL certificate management',
+                    'Load balancing and auto-scaling',
+                    'Redis session management',
+                    'PostgreSQL policy storage',
+                    'Nginx reverse proxy configuration',
+                    'Automated backup and recovery',
+                    'Health monitoring and alerts'
+                ],
+                privacyArchitecture: [
+                    'No permanent student data storage',
+                    'Session-only data persistence',
+                    'Automatic session cleanup',
+                    'Data export before deletion',
+                    'GDPR compliance ready',
+                    'Audit trail for policy changes'
+                ],
+                deployment: [
+                    'One-command setup scripts',
+                    'Copy-paste configuration files',
+                    'Automated dependency installation',
+                    'SSL certificate auto-renewal',
+                    'Domain configuration support',
+                    'Environment-specific configs'
+                ],
+                maintenance: [
+                    'Monthly security updates (15 minutes)',
+                    'Automatic session cleanup',
+                    'Container health monitoring',
+                    'Log rotation and management',
+                    'Performance optimization'
+                ]
+            }
+        },
+        {
+            id: 'workflow',
+            title: 'Recommended Workflows',
             icon: ArrowRight,
             color: 'teal',
             content: {
-                description: 'Step-by-step guides for common platform workflows',
+                description: 'Optimized workflows for different use cases and scenarios',
                 workflows: [
                     {
-                        title: 'Complete Assessment Setup',
+                        title: 'Complete Assignment Creation',
                         steps: [
-                            'Create assignment prompt → Assignment Prompt Generator',
-                            'Generate AI rubric prompt → AI Rubric Prompt Generator',
-                            'Build detailed rubric → Rubric Creator',
-                            'Import class roster → Class Manager',
-                            'Begin grading → Grading Tool'
+                            '1. Use Assignment Prompt Generator to create detailed assignment',
+                            '2. Export assignment data to AI Rubric Prompt Generator',
+                            '3. Generate AI prompt and create rubric with ChatGPT/Claude',
+                            '4. Import rubric into Rubric Creator for refinement',
+                            '5. Export HTML assignment page for student distribution',
+                            '6. Save rubric for grading when assignments are submitted'
                         ]
                     },
                     {
-                        title: 'Quick Rubric Creation',
+                        title: 'Class Setup and Grading',
                         steps: [
-                            'Go directly to Rubric Creator',
-                            'Enter assignment information',
-                            'Add 3-5 key criteria',
-                            'Define performance levels',
-                            'Export for immediate use'
+                            '1. Configure grading policies in Policy Manager',
+                            '2. Import class roster via Excel in Class Manager',
+                            '3. Preview grade calculations with selected policy',
+                            '4. Load saved rubric in Grading Tool',
+                            '5. Start batch grading session',
+                            '6. Grade all students and export results',
+                            '7. Clear session data to maintain privacy'
                         ]
                     },
                     {
-                        title: 'Batch Grading Session',
+                        title: 'Privacy-Compliant Operation',
                         steps: [
-                            'Prepare rubric in Rubric Creator',
-                            'Import class list in Class Manager',
-                            'Use "Use for Grading" button for automatic setup',
-                            'Grade students systematically',
-                            'Export results for gradebook'
-                        ]
-                    },
-                    {
-                        title: 'Session Management',
-                        steps: [
-                            'Export current session regularly (Save button)',
-                            'Import previous sessions to continue work',
-                            'Use draft system for work-in-progress',
-                            'Backup important rubrics and class data'
+                            '1. Import student data into temporary session',
+                            '2. Complete all grading within session timeout',
+                            '3. Export grading results as JSON before expiry',
+                            '4. Manually clear session or allow auto-cleanup',
+                            '5. Store exported data in secure local storage',
+                            '6. Re-import data if additional grading needed'
                         ]
                     }
                 ]
@@ -332,46 +466,60 @@ const HelpPage = () => {
         },
         {
             id: 'troubleshooting',
-            title: 'Troubleshooting',
+            title: 'Troubleshooting & Support',
             icon: AlertCircle,
             color: 'red',
             content: {
-                description: 'Common issues and solutions',
-                problems: [
+                description: 'Common issues and solutions for GradingPilot v2.0',
+                commonIssues: [
                     {
-                        issue: 'Excel import not working',
+                        issue: 'Excel import fails with validation errors',
                         solutions: [
                             'Check file format (.xlsx or .xls only)',
-                            'Ensure first row contains headers',
-                            'Verify required columns are present',
-                            'Try with a smaller sample file first'
+                            'Ensure first row contains proper headers',
+                            'Verify required columns: First Name, Last Name',
+                            'Remove any merged cells or complex formatting',
+                            'Try with Excel Import Test tool first'
                         ]
                     },
                     {
-                        issue: 'Rubric not transferring to grading',
+                        issue: 'Grading session expires unexpectedly',
+                        solutions: [
+                            'Export session data regularly during grading',
+                            'Increase session timeout in settings (if available)',
+                            'Use batch export before session expiry warning',
+                            'Consider grading in smaller batches',
+                            'Check browser auto-refresh settings'
+                        ]
+                    },
+                    {
+                        issue: 'Rubric not transferring to grading tool',
                         solutions: [
                             'Complete all required rubric fields',
-                            'Save rubric before transferring',
-                            'Check that criteria have been defined',
-                            'Verify assignment information is complete'
+                            'Save rubric explicitly before transferring',
+                            'Check that all criteria have descriptions',
+                            'Verify assignment information is complete',
+                            'Try exporting and re-importing rubric'
                         ]
                     },
                     {
-                        issue: 'Lost grading progress',
+                        issue: 'Grade calculations seem incorrect',
                         solutions: [
-                            'Use Export Session regularly to backup work',
-                            'Check draft system for saved progress',
-                            'Import last saved session',
-                            'Enable browser local storage'
+                            'Verify grading policy is correctly selected',
+                            'Check criterion weights sum to 100%',
+                            'Review performance level multipliers',
+                            'Test calculations with known values',
+                            'Use Policy Manager preview feature'
                         ]
                     },
                     {
-                        issue: 'Calculations seem incorrect',
+                        issue: 'Cloud deployment connection issues',
                         solutions: [
-                            'Verify criterion weights add up correctly',
-                            'Check performance level multipliers',
-                            'Review total points settings',
-                            'Test with known values'
+                            'Check server status and health endpoints',
+                            'Verify SSL certificate validity',
+                            'Test with direct IP if domain fails',
+                            'Check firewall and port configurations',
+                            'Review Docker container logs'
                         ]
                     }
                 ]
@@ -379,91 +527,49 @@ const HelpPage = () => {
         },
         {
             id: 'advanced',
-            title: 'Advanced Features',
-            icon: Settings,
-            color: 'indigo',
+            title: 'Advanced Features & Tips',
+            icon: Zap,
+            color: 'yellow',
             content: {
-                description: 'Advanced functionality and customization options',
+                description: 'Power user features and optimization tips',
                 features: [
                     {
-                        title: 'Custom Feedback Libraries',
-                        description: 'Create reusable comment banks for efficient grading',
-                        details: [
-                            'Build criterion-specific feedback collections',
-                            'Organize comments by strengths, improvements, and general',
-                            'Use rich text formatting for professional appearance',
-                            'Share feedback libraries between rubrics'
-                        ]
-                    },
-                    {
-                        title: 'Session Management',
-                        description: 'Advanced session handling for complex workflows',
-                        details: [
-                            'Export complete application state',
-                            'Import sessions across devices',
-                            'Maintain multiple active projects',
-                            'Backup and restore capabilities'
+                        title: 'Keyboard Shortcuts',
+                        shortcuts: [
+                            'Ctrl/Cmd + S: Save current work',
+                            'Ctrl/Cmd + E: Export current data',
+                            'Tab: Navigate between form fields',
+                            'Escape: Close modal dialogs',
+                            'Ctrl/Cmd + Enter: Submit forms'
                         ]
                     },
                     {
                         title: 'Batch Operations',
-                        description: 'Efficient handling of large classes',
-                        details: [
-                            'Process multiple students simultaneously',
-                            'Apply consistent grading standards',
-                            'Export bulk results for LMS integration',
-                            'Progress tracking and resumption'
-                        ]
-                    }
-                ]
-            }
-        },
-        {
-            id: 'best-practices',
-            title: 'Best Practices',
-            icon: Star,
-            color: 'yellow',
-            content: {
-                description: 'Professional tips for effective assessment',
-                practices: [
-                    {
-                        category: 'Rubric Design',
-                        tips: [
-                            'Use clear, observable criteria',
-                            'Align with learning objectives',
-                            'Provide specific examples for each level',
-                            'Test with sample student work',
-                            'Keep language consistent across criteria'
+                        operations: [
+                            'Bulk student import with validation',
+                            'Mass rubric application to multiple assignments',
+                            'Batch grade export for multiple classes',
+                            'Policy deployment across institutions'
                         ]
                     },
                     {
-                        category: 'Grading Efficiency',
+                        title: 'Integration Tips',
                         tips: [
-                            'Grade all students on one criterion before moving to the next',
-                            'Use feedback libraries for consistent comments',
-                            'Take regular breaks during long sessions',
-                            'Save progress frequently',
-                            'Double-check final calculations'
+                            'Use JSON exports for LMS integration',
+                            'Set up recurring backup schedules',
+                            'Configure institutional branding',
+                            'Customize grading policies per department',
+                            'Implement automated policy updates'
                         ]
                     },
                     {
-                        category: 'Student Communication',
-                        tips: [
-                            'Share rubrics before assignment is due',
-                            'Provide clear, constructive feedback',
-                            'Focus on specific improvements',
-                            'Highlight strengths as well as areas for growth',
-                            'Be consistent in expectations across all students'
-                        ]
-                    },
-                    {
-                        category: 'Data Management',
-                        tips: [
-                            'Export sessions regularly for backup',
-                            'Keep organized file naming conventions',
-                            'Maintain secure storage of student data',
-                            'Document rubric changes and versions',
-                            'Archive completed sessions appropriately'
+                        title: 'Performance Optimization',
+                        optimizations: [
+                            'Use smaller class batches for large rosters',
+                            'Pre-load rubrics before grading sessions',
+                            'Clear browser cache if experiencing slowdowns',
+                            'Export data regularly to prevent loss',
+                            'Use Chrome/Firefox for best performance'
                         ]
                     }
                 ]
@@ -477,298 +583,381 @@ const HelpPage = () => {
 
         const query = searchQuery.toLowerCase();
         return helpSections.filter(section => {
-            // Search in title
-            if (section.title.toLowerCase().includes(query)) return true;
+            const titleMatch = section.title.toLowerCase().includes(query);
+            const descriptionMatch = section.content.description?.toLowerCase().includes(query);
+            const featuresMatch = section.content.features?.some(feature =>
+                feature.toString().toLowerCase().includes(query)
+            );
 
-            // Search in content
-            const content = JSON.stringify(section.content).toLowerCase();
-            return content.includes(query);
+            return titleMatch || descriptionMatch || featuresMatch;
         });
     }, [searchQuery]);
 
-    // Helper components
-    const FeatureList = ({ items, icon: ItemIcon = CheckCircle }) => (
-        <ul className="space-y-2">
-            {items.map((item, index) => (
-                <li key={index} className="flex items-start gap-2">
-                    <ItemIcon size={16} className="text-green-600 mt-0.5 flex-shrink-0" />
-                    <span className="text-gray-700">{item}</span>
-                </li>
-            ))}
-        </ul>
-    );
-
-    const StepsList = ({ steps, numbered = true }) => (
-        <ol className={`space-y-2 ${numbered ? 'list-decimal list-inside' : ''}`}>
-            {steps.map((step, index) => (
-                <li key={index} className="flex items-start gap-2">
-                    {numbered && <span className="font-medium text-blue-600 min-w-[1.5rem]">{index + 1}.</span>}
-                    <span className="text-gray-700">{step}</span>
-                </li>
-            ))}
-        </ol>
-    );
-
-    const SectionHeader = ({ section, isExpanded, onToggle }) => (
-        <button
-            onClick={onToggle}
-            className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 rounded-lg border transition-colors"
-        >
-            <div className="flex items-center gap-3">
-                <section.icon size={24} className={`text-${section.color}-600`} />
-                <div className="text-left">
-                    <h3 className="text-lg font-semibold text-gray-900">{section.title}</h3>
-                    <p className="text-sm text-gray-600">{section.content.description}</p>
-                </div>
-            </div>
-            <div className="flex items-center gap-2">
-                {section.tabId && (
-                    <button
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            setActiveTab(section.tabId);
-                        }}
-                        className="px-3 py-1 bg-blue-100 text-blue-700 rounded-md text-sm font-medium hover:bg-blue-200 transition-colors"
-                        title={`Go to ${section.title}`}
-                    >
-                        <ExternalLink size={14} className="inline mr-1" />
-                        Open
-                    </button>
-                )}
-                {isExpanded ? (
-                    <ChevronDown size={20} className="text-gray-600" />
-                ) : (
-                    <ChevronRight size={20} className="text-gray-600" />
-                )}
-            </div>
-        </button>
-    );
+    // Color classes for different sections
+    const getColorClasses = (color) => {
+        const colors = {
+            blue: 'border-blue-200 bg-blue-50 text-blue-800',
+            purple: 'border-purple-200 bg-purple-50 text-purple-800',
+            orange: 'border-orange-200 bg-orange-50 text-orange-800',
+            indigo: 'border-indigo-200 bg-indigo-50 text-indigo-800',
+            red: 'border-red-200 bg-red-50 text-red-800',
+            green: 'border-green-200 bg-green-50 text-green-800',
+            emerald: 'border-emerald-200 bg-emerald-50 text-emerald-800',
+            sky: 'border-sky-200 bg-sky-50 text-sky-800',
+            teal: 'border-teal-200 bg-teal-50 text-teal-800',
+            yellow: 'border-yellow-200 bg-yellow-50 text-yellow-800',
+            gray: 'border-gray-200 bg-gray-50 text-gray-800'
+        };
+        return colors[color] || colors.gray;
+    };
 
     return (
-        <div className="help-page min-h-screen bg-gray-50">
-            <div className="max-w-6xl mx-auto px-6 py-8">
-                {/* Header */}
-                <div className="mb-8">
-                    <h1 className="text-3xl font-bold text-gray-900 mb-2">User Guide & Help</h1>
-                    <p className="text-gray-600 text-lg">
-                        Complete documentation for the Assessment Platform
-                    </p>
-                </div>
-
-                {/* Search Bar */}
-                <div className="mb-8">
-                    <div className="relative max-w-lg">
-                        <Search size={20} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                        <input
-                            type="text"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            placeholder="Search help topics, features, or functions..."
-                            className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white shadow-sm"
-                        />
+        <div className="max-w-6xl mx-auto p-6 bg-white">
+            {/* Header */}
+            <div className="mb-8 text-center">
+                <div className="flex items-center justify-center mb-4">
+                    <GraduationCap className="h-12 w-12 text-blue-600 mr-3" />
+                    <div>
+                        <h1 className="text-4xl font-bold text-gray-900">GradingPilot Help Center</h1>
+                        <p className="text-lg text-gray-600 mt-2">Professional Suite v2.0 - Complete User Guide</p>
                     </div>
-                    {searchQuery && (
-                        <p className="mt-2 text-sm text-gray-600">
-                            {filteredSections.length} result{filteredSections.length !== 1 ? 's' : ''} found
-                        </p>
-                    )}
                 </div>
 
-                {/* Help Sections */}
-                <div className="space-y-6">
-                    {filteredSections.map((section) => {
-                        const isExpanded = expandedSections[section.id];
+                {/* Version Badge */}
+                <div className="inline-flex items-center px-4 py-2 rounded-full bg-blue-100 text-blue-800 text-sm font-medium mb-6">
+                    <Star className="h-4 w-4 mr-2" />
+                    Latest Version: Professional Suite v2.0 with Privacy-First Architecture
+                </div>
+            </div>
 
-                        return (
-                            <div key={section.id} className="bg-white rounded-lg shadow-sm border">
-                                <SectionHeader
-                                    section={section}
-                                    isExpanded={isExpanded}
-                                    onToggle={() => toggleSection(section.id)}
-                                />
+            {/* Search Bar */}
+            <div className="mb-8">
+                <div className="relative max-w-2xl mx-auto">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                    <input
+                        type="text"
+                        placeholder="Search help topics, features, or troubleshooting..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg"
+                    />
+                </div>
+            </div>
 
-                                {isExpanded && (
-                                    <div className="p-6 border-t border-gray-100">
-                                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                                            {/* Features */}
-                                            {section.content.features && (
-                                                <div>
-                                                    <h4 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                                                        <Star size={18} className="text-yellow-500" />
-                                                        Key Features
-                                                    </h4>
-                                                    <FeatureList items={section.content.features} />
-                                                </div>
-                                            )}
+            {/* Quick Navigation */}
+            <div className="mb-8 p-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+                <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
+                    <Lightbulb className="h-5 w-5 mr-2 text-blue-600" />
+                    Quick Start Guide
+                </h2>
+                <div className="grid md:grid-cols-3 gap-4">
+                    <button
+                        onClick={() => navigateToTab('assignment-prompt-generator')}
+                        className="p-4 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow text-left border border-blue-200"
+                    >
+                        <FileText className="h-6 w-6 text-blue-600 mb-2" />
+                        <h3 className="font-medium text-gray-900">1. Create Assignment</h3>
+                        <p className="text-sm text-gray-600">Start with assignment prompt generation</p>
+                    </button>
+                    <button
+                        onClick={() => navigateToTab('rubric-creator')}
+                        className="p-4 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow text-left border border-orange-200"
+                    >
+                        <Target className="h-6 w-6 text-orange-600 mb-2" />
+                        <h3 className="font-medium text-gray-900">2. Build Rubric</h3>
+                        <p className="text-sm text-gray-600">Create professional assessment rubrics</p>
+                    </button>
+                    <button
+                        onClick={() => navigateToTab('class-manager')}
+                        className="p-4 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow text-left border border-indigo-200"
+                    >
+                        <Users className="h-6 w-6 text-indigo-600 mb-2" />
+                        <h3 className="font-medium text-gray-900">3. Grade Students</h3>
+                        <p className="text-sm text-gray-600">Import classes and start grading</p>
+                    </button>
+                </div>
+            </div>
 
-                                            {/* How To */}
-                                            {section.content.howTo && (
-                                                <div>
-                                                    <h4 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                                                        <Target size={18} className="text-blue-500" />
-                                                        How to Use
-                                                    </h4>
-                                                    <StepsList steps={section.content.howTo} />
-                                                </div>
-                                            )}
+            {/* Help Sections */}
+            <div className="space-y-6">
+                {filteredSections.map((section) => {
+                    const isExpanded = expandedSections[section.id];
+                    const IconComponent = section.icon;
 
-                                            {/* Quick Start */}
-                                            {section.content.quickStart && (
-                                                <div>
-                                                    <h4 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                                                        <Zap size={18} className="text-green-500" />
-                                                        Quick Start
-                                                    </h4>
-                                                    <StepsList steps={section.content.quickStart} />
-                                                </div>
-                                            )}
-
-                                            {/* Tips */}
-                                            {section.content.tips && (
-                                                <div>
-                                                    <h4 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                                                        <Lightbulb size={18} className="text-yellow-500" />
-                                                        Pro Tips
-                                                    </h4>
-                                                    <FeatureList items={section.content.tips} icon={Info} />
-                                                </div>
-                                            )}
-
-                                            {/* Assessment Levels */}
-                                            {section.content.levels && (
-                                                <div className="lg:col-span-2">
-                                                    <h4 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                                                        <Award size={18} className="text-purple-500" />
-                                                        Assessment Levels
-                                                    </h4>
-                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                                        {section.content.levels.map((level, index) => (
-                                                            <div key={index} className="p-3 bg-gray-50 rounded-lg border">
-                                                                <span className="text-sm font-medium text-gray-900">{level}</span>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            {/* Excel Format */}
-                                            {section.content.excelFormat && (
-                                                <div>
-                                                    <h4 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                                                        <FileSpreadsheet size={18} className="text-green-600" />
-                                                        Excel Format Requirements
-                                                    </h4>
-                                                    <FeatureList items={section.content.excelFormat} icon={CheckCircle} />
-                                                </div>
-                                            )}
-
-                                            {/* Workflows */}
-                                            {section.content.workflows && (
-                                                <div className="lg:col-span-2">
-                                                    <div className="space-y-6">
-                                                        {section.content.workflows.map((workflow, index) => (
-                                                            <div key={index} className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                                                                <h5 className="font-semibold text-blue-900 mb-2">{workflow.title}</h5>
-                                                                <StepsList steps={workflow.steps} />
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            {/* Grading Workflow */}
-                                            {section.content.gradingWorkflow && (
-                                                <div>
-                                                    <h4 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                                                        <BarChart3 size={18} className="text-green-500" />
-                                                        Grading Workflow
-                                                    </h4>
-                                                    <StepsList steps={section.content.gradingWorkflow} />
-                                                </div>
-                                            )}
-
-                                            {/* Problems and Solutions */}
-                                            {section.content.problems && (
-                                                <div className="lg:col-span-2">
-                                                    <div className="space-y-4">
-                                                        {section.content.problems.map((problem, index) => (
-                                                            <div key={index} className="p-4 bg-red-50 rounded-lg border border-red-200">
-                                                                <h5 className="font-semibold text-red-900 mb-2 flex items-center gap-2">
-                                                                    <AlertCircle size={16} />
-                                                                    {problem.issue}
-                                                                </h5>
-                                                                <div className="pl-6">
-                                                                    <FeatureList items={problem.solutions} icon={CheckCircle} />
-                                                                </div>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            {/* Advanced Features */}
-                                            {section.content.features && typeof section.content.features[0] === 'object' && (
-                                                <div className="lg:col-span-2">
-                                                    <div className="space-y-6">
-                                                        {section.content.features.map((feature, index) => (
-                                                            <div key={index} className="p-4 bg-indigo-50 rounded-lg border border-indigo-200">
-                                                                <h5 className="font-semibold text-indigo-900 mb-2">{feature.title}</h5>
-                                                                <p className="text-indigo-800 mb-3">{feature.description}</p>
-                                                                <FeatureList items={feature.details} icon={CheckCircle} />
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            {/* Best Practices */}
-                                            {section.content.practices && (
-                                                <div className="lg:col-span-2">
-                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                                        {section.content.practices.map((practice, index) => (
-                                                            <div key={index} className="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
-                                                                <h5 className="font-semibold text-yellow-900 mb-2 flex items-center gap-2">
-                                                                    <Star size={16} />
-                                                                    {practice.category}
-                                                                </h5>
-                                                                <FeatureList items={practice.tips} icon={Lightbulb} />
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
+                    return (
+                        <div
+                            key={section.id}
+                            className={`border rounded-lg overflow-hidden ${getColorClasses(section.color)}`}
+                        >
+                            {/* Section Header */}
+                            <button
+                                onClick={() => toggleSection(section.id)}
+                                className="w-full px-6 py-4 text-left flex items-center justify-between hover:bg-opacity-80 transition-colors"
+                            >
+                                <div className="flex items-center space-x-3">
+                                    <IconComponent className="h-6 w-6" />
+                                    <div>
+                                        <h2 className="text-xl font-semibold">{section.title}</h2>
+                                        {section.content.description && (
+                                            <p className="text-sm opacity-80 mt-1">
+                                                {section.content.description}
+                                            </p>
+                                        )}
                                     </div>
-                                )}
-                            </div>
-                        );
-                    })}
-                </div>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                    {section.tabId && (
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                navigateToTab(section.tabId);
+                                            }}
+                                            className="px-3 py-1 bg-white bg-opacity-50 rounded-md text-sm font-medium hover:bg-opacity-70 transition-colors"
+                                        >
+                                            Open Tool
+                                        </button>
+                                    )}
+                                    {isExpanded ? (
+                                        <ChevronDown className="h-5 w-5" />
+                                    ) : (
+                                        <ChevronRight className="h-5 w-5" />
+                                    )}
+                                </div>
+                            </button>
 
-                {/* Footer */}
-                <div className="mt-12 p-6 bg-blue-50 rounded-lg border border-blue-200">
-                    <div className="flex items-start gap-3">
-                        <Info size={24} className="text-blue-600 flex-shrink-0 mt-1" />
-                        <div>
-                            <h3 className="text-lg font-semibold text-blue-900 mb-2">Need More Help?</h3>
-                            <p className="text-blue-800 mb-4">
-                                This comprehensive guide covers all major features and workflows. For specific questions or advanced customizations, consider:
-                            </p>
-                            <ul className="space-y-2 text-blue-800">
-                                <li className="flex items-center gap-2">
-                                    <CheckCircle size={16} className="text-blue-600" />
-                                    Testing features with sample data first
-                                </li>
-                                <li className="flex items-center gap-2">
-                                    <CheckCircle size={16} className="text-blue-600" />
-                                    Exporting sessions regularly as backups
-                                </li>
-                                <li className="flex items-center gap-2">
-                                    <CheckCircle size={16} className="text-blue-600" />
-                                    Starting with simple workflows and building complexity
-                                </li>
-                            </ul>
+                            {/* Section Content */}
+                            {isExpanded && (
+                                <div className="px-6 pb-6 bg-white bg-opacity-50">
+                                    {/* Features List */}
+                                    {section.content.features && (
+                                        <div className="mb-6">
+                                            <h3 className="text-lg font-semibold text-gray-900 mb-3">Key Features</h3>
+                                            <ul className="space-y-2">
+                                                {section.content.features.map((feature, index) => (
+                                                    <li key={index} className="flex items-start space-x-2">
+                                                        <CheckCircle className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
+                                                        <span className="text-gray-700">{feature}</span>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
+
+                                    {/* New Features */}
+                                    {section.content.newFeatures && (
+                                        <div className="mb-6 p-4 bg-green-50 rounded-lg border border-green-200">
+                                            <h3 className="text-lg font-semibold text-green-800 mb-3 flex items-center">
+                                                <Zap className="h-5 w-5 mr-2" />
+                                                New in v2.0
+                                            </h3>
+                                            <ul className="space-y-2">
+                                                {section.content.newFeatures.map((feature, index) => (
+                                                    <li key={index} className="flex items-start space-x-2">
+                                                        <Star className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+                                                        <span className="text-green-700">{feature}</span>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
+
+                                    {/* Workflow */}
+                                    {section.content.workflow && (
+                                        <div className="mb-6">
+                                            <h3 className="text-lg font-semibold text-gray-900 mb-3">Workflow</h3>
+                                            <ol className="space-y-2">
+                                                {section.content.workflow.map((step, index) => (
+                                                    <li key={index} className="flex items-start space-x-3">
+                                                        <span className="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-sm font-medium">
+                                                            {index + 1}
+                                                        </span>
+                                                        <span className="text-gray-700">{step}</span>
+                                                    </li>
+                                                ))}
+                                            </ol>
+                                        </div>
+                                    )}
+
+                                    {/* Workflows (multiple) */}
+                                    {section.content.workflows && (
+                                        <div className="space-y-6">
+                                            {section.content.workflows.map((workflow, workflowIndex) => (
+                                                <div key={workflowIndex} className="border border-gray-200 rounded-lg p-4">
+                                                    <h3 className="text-lg font-semibold text-gray-900 mb-3">
+                                                        {workflow.title}
+                                                    </h3>
+                                                    <ol className="space-y-2">
+                                                        {workflow.steps.map((step, stepIndex) => (
+                                                            <li key={stepIndex} className="flex items-start space-x-3">
+                                                                <span className="flex-shrink-0 w-6 h-6 bg-teal-100 text-teal-600 rounded-full flex items-center justify-center text-sm font-medium">
+                                                                    {stepIndex + 1}
+                                                                </span>
+                                                                <span className="text-gray-700">{step}</span>
+                                                            </li>
+                                                        ))}
+                                                    </ol>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {/* Levels */}
+                                    {section.content.levels && (
+                                        <div className="mb-6">
+                                            <h3 className="text-lg font-semibold text-gray-900 mb-3">Assessment Levels</h3>
+                                            <div className="space-y-2">
+                                                {section.content.levels.map((level, index) => (
+                                                    <div key={index} className="p-3 bg-gray-50 rounded-lg border">
+                                                        <span className="text-gray-700">{level}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Tips */}
+                                    {section.content.tips && (
+                                        <div className="mb-6">
+                                            <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
+                                                <Lightbulb className="h-5 w-5 mr-2 text-yellow-500" />
+                                                Pro Tips
+                                            </h3>
+                                            <ul className="space-y-2">
+                                                {section.content.tips.map((tip, index) => (
+                                                    <li key={index} className="flex items-start space-x-2">
+                                                        <Info className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                                                        <span className="text-gray-700">{tip}</span>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
+
+                                    {/* Common Issues */}
+                                    {section.content.commonIssues && (
+                                        <div className="space-y-4">
+                                            <h3 className="text-lg font-semibold text-gray-900 mb-3">Common Issues & Solutions</h3>
+                                            {section.content.commonIssues.map((item, index) => (
+                                                <div key={index} className="border border-red-200 rounded-lg p-4 bg-red-50">
+                                                    <h4 className="font-medium text-red-800 mb-2 flex items-center">
+                                                        <AlertTriangle className="h-4 w-4 mr-2" />
+                                                        {item.issue}
+                                                    </h4>
+                                                    <ul className="space-y-1">
+                                                        {item.solutions.map((solution, solutionIndex) => (
+                                                            <li key={solutionIndex} className="flex items-start space-x-2">
+                                                                <CheckCircle className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+                                                                <span className="text-red-700 text-sm">{solution}</span>
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {/* Advanced Features */}
+                                    {section.content.features?.filter(f => typeof f === 'object').length > 0 && (
+                                        <div className="space-y-4">
+                                            {section.content.features.filter(f => typeof f === 'object').map((feature, index) => (
+                                                <div key={index} className="border border-gray-200 rounded-lg p-4">
+                                                    <h4 className="font-medium text-gray-900 mb-2">{feature.title}</h4>
+                                                    <p className="text-gray-600 text-sm mb-3">{feature.description}</p>
+                                                    {feature.shortcuts && (
+                                                        <ul className="space-y-1">
+                                                            {feature.shortcuts.map((shortcut, shortcutIndex) => (
+                                                                <li key={shortcutIndex} className="text-sm text-gray-600 font-mono">
+                                                                    {shortcut}
+                                                                </li>
+                                                            ))}
+                                                        </ul>
+                                                    )}
+                                                    {feature.operations && (
+                                                        <ul className="space-y-1">
+                                                            {feature.operations.map((operation, opIndex) => (
+                                                                <li key={opIndex} className="flex items-start space-x-2">
+                                                                    <ArrowRight className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                                                                    <span className="text-sm text-gray-600">{operation}</span>
+                                                                </li>
+                                                            ))}
+                                                        </ul>
+                                                    )}
+                                                    {feature.tips && (
+                                                        <ul className="space-y-1">
+                                                            {feature.tips.map((tip, tipIndex) => (
+                                                                <li key={tipIndex} className="flex items-start space-x-2">
+                                                                    <Lightbulb className="h-4 w-4 text-yellow-500 mt-0.5 flex-shrink-0" />
+                                                                    <span className="text-sm text-gray-600">{tip}</span>
+                                                                </li>
+                                                            ))}
+                                                        </ul>
+                                                    )}
+                                                    {feature.optimizations && (
+                                                        <ul className="space-y-1">
+                                                            {feature.optimizations.map((optimization, optIndex) => (
+                                                                <li key={optIndex} className="flex items-start space-x-2">
+                                                                    <Zap className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                                                                    <span className="text-sm text-gray-600">{optimization}</span>
+                                                                </li>
+                                                            ))}
+                                                        </ul>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {/* Additional Details */}
+                                    {section.content.details && (
+                                        <div className="space-y-4">
+                                            {section.content.details.map((detail, index) => (
+                                                <div key={index} className="border border-gray-200 rounded-lg p-4">
+                                                    <h4 className="font-medium text-gray-900 mb-2">{detail.title}</h4>
+                                                    <p className="text-gray-600 text-sm mb-3">{detail.description}</p>
+                                                    {detail.features && (
+                                                        <ul className="space-y-1">
+                                                            {detail.features.map((feature, featureIndex) => (
+                                                                <li key={featureIndex} className="flex items-start space-x-2">
+                                                                    <CheckCircle className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+                                                                    <span className="text-sm text-gray-600">{feature}</span>
+                                                                </li>
+                                                            ))}
+                                                        </ul>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
+                    );
+                })}
+            </div>
+
+            {/* Footer */}
+            <div className="mt-12 pt-8 border-t border-gray-200">
+                <div className="text-center">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Need Additional Help?</h3>
+                    <div className="grid md:grid-cols-3 gap-4 max-w-2xl mx-auto">
+                        <div className="p-4 bg-blue-50 rounded-lg">
+                            <FileJson className="h-6 w-6 text-blue-600 mx-auto mb-2" />
+                            <h4 className="font-medium text-blue-900">Export Data</h4>
+                            <p className="text-sm text-blue-700">Download session data for backup</p>
+                        </div>
+                        <div className="p-4 bg-green-50 rounded-lg">
+                            <Shield className="h-6 w-6 text-green-600 mx-auto mb-2" />
+                            <h4 className="font-medium text-green-900">Privacy Compliant</h4>
+                            <p className="text-sm text-green-700">No permanent data storage</p>
+                        </div>
+                        <div className="p-4 bg-purple-50 rounded-lg">
+                            <Cloud className="h-6 w-6 text-purple-600 mx-auto mb-2" />
+                            <h4 className="font-medium text-purple-900">Cloud Ready</h4>
+                            <p className="text-sm text-purple-700">Deploy anywhere</p>
+                        </div>
+                    </div>
+                    <div className="mt-6 text-sm text-gray-500">
+                        GradingPilot Professional Suite v2.0 - Advanced Educational Assessment Platform
                     </div>
                 </div>
             </div>
