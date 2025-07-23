@@ -14,7 +14,7 @@ export const useAssessment = () => {
 };
 
 // DEFAULT LATE POLICY SYSTEM
-const DEFAULT_LATE_POLICY = {
+export const DEFAULT_LATE_POLICY = {
     id: 'institutional',
     name: 'Institutional Policy',
     description: 'Standard institutional late assignment policy',
