@@ -740,6 +740,12 @@ const ClassListManager = () => {
                 color: '#dc2626'
             }
         };
+        const getSafeLatePolicy = (level) => {
+            if (!level || typeof level !== "string" || !latePolicyLevels[level]) {
+                return latePolicyLevels.none;
+            }
+            return latePolicyLevels[level];
+        };
 
         // 5. Calculate scores (replicated from GradingTemplate.js)
         const calculateTotalScore = () => {
@@ -767,7 +773,7 @@ const ClassListManager = () => {
 
             // Apply late penalty if applicable
             if (gradeData.latePolicy && gradeData.latePolicy.level !== 'none') {
-                const latePolicyLevel = latePolicyLevels[gradeData.latePolicy.level];
+                const latePolicyLevel = getSafeLatePolicy(gradeData.latePolicy?.level);
                 if (latePolicyLevel) {
                     finalScore = totalScore * latePolicyLevel.multiplier;
                     penaltyApplied = true;
@@ -903,15 +909,15 @@ const ClassListManager = () => {
         </div>
         <p style="margin: 10px 0; color: #555;">
             ${sharedRubric ? `Rubric: ${sharedRubric.assignmentInfo.title}` : ""}
-            ${penaltyApplied ? ` | Late Policy: ${latePolicyLevels[gradeData.latePolicy.level].name}` : ""}
+            ${penaltyApplied ? ` | Late Policy: ${getSafeLatePolicy(gradeData.latePolicy?.level).name}` : ""}
         </p>
     </div>
 
     ${penaltyApplied ? `
         <div class="late-policy-section">
             <h3 style="color: #dc2626;">📅 Late Submission Policy Applied</h3>
-            <p><strong>Policy Status:</strong> ${latePolicyLevels[gradeData.latePolicy.level].name}</p>
-            <p>${latePolicyLevels[gradeData.latePolicy.level].description}</p>
+            <p><strong>Policy Status:</strong> ${getSafeLatePolicy(gradeData.latePolicy?.level).name}</p>
+            <p>${getSafeLatePolicy(gradeData.latePolicy?.level).description}</p>
             <p><strong>Raw Score:</strong> ${Math.round(rawScore * 10) / 10}/${maxPoints} → <strong>Final Score:</strong> ${Math.round(totalScore * 10) / 10}/${maxPoints}</p>
         </div>
     ` : ""}
