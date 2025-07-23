@@ -2620,4 +2620,6 @@ Write the feedback now, making it sound personal and genuine while keeping it co
       </div>
     </div>
   );
+};
+
 export default GradingTemplate;
