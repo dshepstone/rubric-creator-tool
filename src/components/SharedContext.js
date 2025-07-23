@@ -434,17 +434,23 @@ export const AssessmentProvider = ({ children }) => {
         try {
             const saved = localStorage.getItem('customLatePolicies');
             if (saved) {
-                const policies = JSON.parse(saved);
-                setCustomLatePolicies(policies);
+                const parsed = JSON.parse(saved);
+                if (Array.isArray(parsed)) {
+                    setCustomLatePolicies(parsed);
+                }
             }
 
             const currentSaved = localStorage.getItem('currentLatePolicy');
             if (currentSaved) {
-                const current = JSON.parse(currentSaved);
-                setCurrentLatePolicy(current);
+                const parsedCurrent = JSON.parse(currentSaved);
+                if (parsedCurrent) {
+                    setCurrentLatePolicy(parsedCurrent);
+                }
             }
         } catch (error) {
             console.error('Error loading late policies:', error);
+            setCustomLatePolicies([]);
+            setCurrentLatePolicy(DEFAULT_LATE_POLICY);
         }
     }, []);
 

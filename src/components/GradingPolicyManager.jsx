@@ -497,7 +497,7 @@ const LatePolicyManager = () => {
     const [showForm, setShowForm] = useState(false);
     const [formPolicy, setFormPolicy] = useState(null);
 
-    const allPolicies = [DEFAULT_LATE_POLICY, ...customLatePolicies];
+    const allPolicies = [DEFAULT_LATE_POLICY, ...(customLatePolicies || [])];
 
     const startCreate = () => {
         setFormPolicy({ id: null, name: '', description: '', levels: { none: { name: 'On Time', multiplier: 1, description: '', color: '#16a34a' } } });
@@ -512,7 +512,7 @@ const LatePolicyManager = () => {
     const handleSave = (policy) => {
         if (policy.id) {
             updateCustomLatePolicy(policy.id, policy);
-            if (currentLatePolicy.id === policy.id) setCurrentLatePolicy(policy);
+            if (currentLatePolicy?.id === policy.id) setCurrentLatePolicy(policy);
         } else {
             const saved = saveCustomLatePolicy(policy);
             setCurrentLatePolicy(saved);
@@ -531,7 +531,7 @@ const LatePolicyManager = () => {
                         <div>
                             <div className="font-medium">{policy.name}</div>
                             <div className="text-sm text-gray-600">{policy.description}</div>
-                            {currentLatePolicy.id === policy.id && (
+                            {currentLatePolicy?.id === policy.id && (
                                 <span className="text-green-600 text-xs">Active</span>
                             )}
                         </div>
