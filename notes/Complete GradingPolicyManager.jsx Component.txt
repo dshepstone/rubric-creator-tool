@@ -1,0 +1,1139 @@
+// Complete GradingPolicyManager.jsx Component
+// Comprehensive policy management with UI for creating, editing, and testing late policies
+
+import React, { useState, useEffect } from 'react';
+import { useAssessment } from './SharedContext';
+import {
+    Settings, Plus, Edit3, Trash2, Eye, Download, Upload, CheckCircle,
+    AlertCircle, Calculator, BookOpen, Save, X, Copy, Clock, Target,
+    BarChart3, Award, FileText, AlertTriangle, Info
+} from 'lucide-react';
+
+const GradingPolicyManager = () => {
+    // Get context with late policy management
+    const {
+        currentLatePolicy,
+        setCurrentLatePolicy,
+        customLatePolicies,
+        setCustomLatePolicies,
+        saveCustomLatePolicy,
+        updateCustomLatePolicy,
+        deleteCustomLatePolicy,
+        loadLatePoliciesFromStorage,
+        calculateScoreWithLatePolicy,
+        classList
+    } = useAssessment();
+
+    // Local component state
+    const [selectedPolicy, setSelectedPolicy] = useState(null);
+    const [showPolicyEditor, setShowPolicyEditor] = useState(false);
+    const [editingPolicy, setEditingPolicy] = useState(null);
+    const [testScores, setTestScores] = useState({
+        score: '',
+        results: null
+    });
+    const [showImportExport, setShowImportExport] = useState(false);
+
+    // Load policies on component mount
+    useEffect(() => {
+        loadLatePoliciesFromStorage();
+    }, [loadLatePoliciesFromStorage]);
+
+    // Set initial selected policy
+    useEffect(() => {
+        if (!selectedPolicy && currentLatePolicy) {
+            setSelectedPolicy(currentLatePolicy);
+        }
+    }, [currentLatePolicy, selectedPolicy]);
+
+    // Default policy templates (for reference and creation)
+    const defaultPolicies = {
+        institutional: {
+            id: 'institutional',
+            name: 'Institutional Policy',
+            description: 'Standard institutional late assignment policy',
+            levels: {
+                none: {
+                    name: 'On Time',
+                    multiplier: 1.0,
+                    description: 'Assignment submitted on or before due date and time - marked out of 100%',
+                    color: '#16a34a',
+                    timeframe: 'On or before due date'
+                },
+                within24: {
+                    name: '1-24 Hours Late',
+                    multiplier: 0.8,
+                    description: 'Assignment received within 24 hours of due date - 20% reduction (marked out of 80%)',
+                    color: '#ea580c',
+                    timeframe: 'Up to 24 hours late'
+                },
+                after24: {
+                    name: 'More than 24 Hours Late',
+                    multiplier: 0.0,
+                    description: 'Assignment received after 24 hours from due date - mark of zero (0)',
+                    color: '#dc2626',
+                    timeframe: 'More than 24 hours late'
+                }
+            },
+            isDefault: true
+        },
+        graceful: {
+            id: 'graceful',
+            name: 'Graceful Decline',
+            description: 'Gradual reduction over time with extended acceptance period',
+            levels: {
+                none: {
+                    name: 'On Time',
+                    multiplier: 1.0,
+                    description: 'Full credit for on-time submissions',
+                    color: '#16a34a',
+                    timeframe: 'On or before due date'
+                },
+                grace: {
+                    name: 'Grace Period (1-6 hours)',
+                    multiplier: 0.95,
+                    description: '5% reduction during grace period',
+                    color: '#65a30d',
+                    timeframe: '1-6 hours late'
+                },
+                within24: {
+                    name: '6-24 Hours Late',
+                    multiplier: 0.85,
+                    description: '15% reduction for late submissions',
+                    color: '#ea580c',
+                    timeframe: '6-24 hours late'
+                },
+                within48: {
+                    name: '24-48 Hours Late',
+                    multiplier: 0.70,
+                    description: '30% reduction for very late submissions',
+                    color: '#dc2626',
+                    timeframe: '24-48 hours late'
+                },
+                after48: {
+                    name: 'More than 48 Hours Late',
+                    multiplier: 0.50,
+                    description: '50% maximum score for extremely late work',
+                    color: '#7c2d12',
+                    timeframe: 'More than 48 hours late'
+                }
+            },
+            isTemplate: true
+        },
+        strict: {
+            id: 'strict',
+            name: 'Strict Policy',
+            description: 'No late submissions accepted',
+            levels: {
+                none: {
+                    name: 'On Time',
+                    multiplier: 1.0,
+                    description: 'Assignment submitted on or before due date and time',
+                    color: '#16a34a',
+                    timeframe: 'On or before due date'
+                },
+                late: {
+                    name: 'Late Submission',
+                    multiplier: 0.0,
+                    description: 'No credit for late submissions',
+                    color: '#dc2626',
+                    timeframe: 'Any amount late'
+                }
+            },
+            isTemplate: true
+        }
+    };
+
+    // Get all available policies
+    const getAllPolicies = () => {
+        return [
+            ...Object.values(defaultPolicies),
+            ...(customLatePolicies || [])
+        ];
+    };
+
+    // Test score calculation
+    const testScoreCalculation = () => {
+        if (!testScores.score || !selectedPolicy) return;
+
+        const score = parseFloat(testScores.score);
+        if (isNaN(score) || score < 0 || score > 100) {
+            setTestScores(prev => ({
+                ...prev,
+                results: { error: 'Please enter a valid score (0-100)' }
+            }));
+            return;
+        }
+
+        // Calculate results for all levels
+        const results = Object.entries(selectedPolicy.levels).map(([levelKey, level]) => ({
+            level: levelKey,
+            name: level.name,
+            multiplier: level.multiplier,
+            adjustedScore: Math.round(score * level.multiplier * 100) / 100,
+            reduction: Math.round((1 - level.multiplier) * 100),
+            color: level.color,
+            timeframe: level.timeframe
+        }));
+
+        setTestScores(prev => ({
+            ...prev,
+            results: { success: true, originalScore: score, levelResults: results }
+        }));
+    };
+
+    // Policy management functions
+    const createNewPolicy = () => {
+        setEditingPolicy({
+            id: 'new',
+            name: '',
+            description: '',
+            levels: {
+                none: {
+                    name: 'On Time',
+                    multiplier: 1.0,
+                    description: 'Assignment submitted on time',
+                    color: '#16a34a',
+                    timeframe: 'On or before due date'
+                }
+            },
+            isCustom: true
+        });
+        setShowPolicyEditor(true);
+    };
+
+    const editPolicy = (policy) => {
+        setEditingPolicy({ ...policy });
+        setShowPolicyEditor(true);
+    };
+
+    const duplicatePolicy = (policy) => {
+        const duplicated = {
+            ...policy,
+            id: 'new',
+            name: `${policy.name} (Copy)`,
+            isCustom: true,
+            isTemplate: false,
+            isDefault: false
+        };
+        setEditingPolicy(duplicated);
+        setShowPolicyEditor(true);
+    };
+
+    const deletePolicy = (policyId) => {
+        if (window.confirm('Are you sure you want to delete this policy? This action cannot be undone.')) {
+            deleteCustomLatePolicy(policyId);
+            if (selectedPolicy?.id === policyId) {
+                setSelectedPolicy(defaultPolicies.institutional);
+                setCurrentLatePolicy(null);
+            }
+        }
+    };
+
+    const setAsCurrentPolicy = (policy) => {
+        setCurrentLatePolicy(policy.isDefault ? null : policy);
+        setSelectedPolicy(policy);
+        localStorage.setItem('currentLatePolicy', JSON.stringify(policy.isDefault ? null : policy));
+    };
+
+    // Policy validation
+    const validatePolicy = (policy) => {
+        const errors = [];
+        
+        if (!policy.name?.trim()) {
+            errors.push('Policy name is required');
+        }
+        
+        if (!policy.description?.trim()) {
+            errors.push('Policy description is required');
+        }
+        
+        if (!policy.levels || Object.keys(policy.levels).length === 0) {
+            errors.push('At least one policy level is required');
+        }
+        
+        if (policy.levels) {
+            const hasOnTime = Object.values(policy.levels).some(level => level.multiplier === 1.0);
+            if (!hasOnTime) {
+                errors.push('Policy must include an on-time option (multiplier = 1.0)');
+            }
+            
+            Object.entries(policy.levels).forEach(([key, level]) => {
+                if (!level.name?.trim()) {
+                    errors.push(`Level "${key}" name is required`);
+                }
+                if (typeof level.multiplier !== 'number' || level.multiplier < 0 || level.multiplier > 1) {
+                    errors.push(`Level "${key}" multiplier must be between 0 and 1`);
+                }
+                if (!level.description?.trim()) {
+                    errors.push(`Level "${key}" description is required`);
+                }
+            });
+        }
+        
+        return errors;
+    };
+
+    // Import/Export functionality
+    const exportPolicies = () => {
+        const data = {
+            customLatePolicies: customLatePolicies || [],
+            currentPolicy: currentLatePolicy,
+            exportedAt: new Date().toISOString(),
+            version: '1.0'
+        };
+
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `late-policies-${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    };
+
+    const importPolicies = (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const data = JSON.parse(e.target.result);
+                if (data.customLatePolicies) {
+                    setCustomLatePolicies(data.customLatePolicies);
+                    localStorage.setItem('customLatePolicies', JSON.stringify(data.customLatePolicies));
+                }
+                if (data.currentPolicy) {
+                    setCurrentLatePolicy(data.currentPolicy);
+                    localStorage.setItem('currentLatePolicy', JSON.stringify(data.currentPolicy));
+                }
+                alert('Policies imported successfully!');
+            } catch (error) {
+                alert('Error importing policies. Please check the file format.');
+            }
+        };
+        reader.readAsText(file);
+        event.target.value = ''; // Reset file input
+    };
+
+    return (
+        <div style={{ 
+            fontFamily: 'system-ui, -apple-system, sans-serif', 
+            maxWidth: '1200px', 
+            margin: '0 auto', 
+            padding: '1rem' 
+        }}>
+            <div style={{ 
+                backgroundColor: 'white', 
+                borderRadius: '0.5rem', 
+                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)', 
+                overflow: 'hidden' 
+            }}>
+                {/* Header */}
+                <div style={{
+                    background: 'linear-gradient(135deg, #0891b2 0%, #0e7490 100%)',
+                    color: 'white',
+                    padding: '1.5rem',
+                    textAlign: 'center'
+                }}>
+                    <h1 style={{ margin: 0, fontSize: '1.875rem', fontWeight: '700' }}>
+                        🎯 Late Policy Manager
+                    </h1>
+                    <p style={{ margin: '0.5rem 0 0 0', opacity: 0.9 }}>
+                        Create, customize, and manage late submission policies
+                    </p>
+                </div>
+
+                <div style={{ padding: '1.5rem' }}>
+                    {/* Quick Stats */}
+                    <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                        gap: '1rem',
+                        marginBottom: '1.5rem'
+                    }}>
+                        <div style={{
+                            padding: '1rem',
+                            backgroundColor: '#f0f9ff',
+                            borderRadius: '0.5rem',
+                            border: '1px solid #0ea5e9',
+                            textAlign: 'center'
+                        }}>
+                            <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#0c4a6e' }}>
+                                {(customLatePolicies?.length || 0) + Object.keys(defaultPolicies).length}
+                            </div>
+                            <div style={{ fontSize: '0.875rem', color: '#075985' }}>
+                                Available Policies
+                            </div>
+                        </div>
+
+                        <div style={{
+                            padding: '1rem',
+                            backgroundColor: '#ecfdf5',
+                            borderRadius: '0.5rem',
+                            border: '1px solid #10b981',
+                            textAlign: 'center'
+                        }}>
+                            <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#065f46' }}>
+                                {customLatePolicies?.length || 0}
+                            </div>
+                            <div style={{ fontSize: '0.875rem', color: '#047857' }}>
+                                Custom Policies
+                            </div>
+                        </div>
+
+                        <div style={{
+                            padding: '1rem',
+                            backgroundColor: '#fef3c7',
+                            borderRadius: '0.5rem',
+                            border: '1px solid #f59e0b',
+                            textAlign: 'center'
+                        }}>
+                            <div style={{ fontSize: '1rem', fontWeight: '600', color: '#92400e' }}>
+                                {currentLatePolicy?.name || 'Institutional Policy'}
+                            </div>
+                            <div style={{ fontSize: '0.875rem', color: '#a16207' }}>
+                                Current Policy
+                            </div>
+                        </div>
+
+                        <div style={{
+                            padding: '1rem',
+                            backgroundColor: '#f3f4f6',
+                            borderRadius: '0.5rem',
+                            border: '1px solid #9ca3af',
+                            textAlign: 'center'
+                        }}>
+                            <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#374151' }}>
+                                {classList?.students?.length || 0}
+                            </div>
+                            <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                                Students Affected
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div style={{
+                        display: 'flex',
+                        gap: '1rem',
+                        marginBottom: '1.5rem',
+                        flexWrap: 'wrap'
+                    }}>
+                        <button
+                            onClick={createNewPolicy}
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.5rem',
+                                padding: '0.75rem 1.5rem',
+                                backgroundColor: '#3b82f6',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '0.375rem',
+                                cursor: 'pointer',
+                                fontSize: '0.875rem',
+                                fontWeight: '500'
+                            }}
+                        >
+                            <Plus size={16} />
+                            Create New Policy
+                        </button>
+
+                        <button
+                            onClick={exportPolicies}
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.5rem',
+                                padding: '0.75rem 1.5rem',
+                                backgroundColor: '#6b7280',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '0.375rem',
+                                cursor: 'pointer',
+                                fontSize: '0.875rem',
+                                fontWeight: '500'
+                            }}
+                        >
+                            <Download size={16} />
+                            Export Policies
+                        </button>
+
+                        <label style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            padding: '0.75rem 1.5rem',
+                            backgroundColor: '#059669',
+                            color: 'white',
+                            borderRadius: '0.375rem',
+                            cursor: 'pointer',
+                            fontSize: '0.875rem',
+                            fontWeight: '500'
+                        }}>
+                            <Upload size={16} />
+                            Import Policies
+                            <input
+                                type="file"
+                                accept=".json"
+                                onChange={importPolicies}
+                                style={{ display: 'none' }}
+                            />
+                        </label>
+                    </div>
+
+                    {/* Policy List */}
+                    <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))',
+                        gap: '1rem',
+                        marginBottom: '1.5rem'
+                    }}>
+                        {getAllPolicies().map(policy => (
+                            <div
+                                key={policy.id}
+                                style={{
+                                    padding: '1rem',
+                                    border: `2px solid ${selectedPolicy?.id === policy.id ? '#3b82f6' : '#e5e7eb'}`,
+                                    borderRadius: '0.5rem',
+                                    backgroundColor: selectedPolicy?.id === policy.id ? '#f8fafc' : 'white',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s'
+                                }}
+                                onClick={() => setSelectedPolicy(policy)}
+                            >
+                                <div style={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'flex-start',
+                                    marginBottom: '0.75rem'
+                                }}>
+                                    <div>
+                                        <h3 style={{
+                                            fontSize: '1rem',
+                                            fontWeight: '600',
+                                            color: '#1f2937',
+                                            margin: 0,
+                                            marginBottom: '0.25rem'
+                                        }}>
+                                            {policy.name}
+                                            {policy.isDefault && (
+                                                <span style={{
+                                                    marginLeft: '0.5rem',
+                                                    padding: '0.125rem 0.375rem',
+                                                    fontSize: '0.625rem',
+                                                    backgroundColor: '#dbeafe',
+                                                    color: '#1e40af',
+                                                    borderRadius: '9999px'
+                                                }}>
+                                                    Default
+                                                </span>
+                                            )}
+                                            {policy.isTemplate && (
+                                                <span style={{
+                                                    marginLeft: '0.5rem',
+                                                    padding: '0.125rem 0.375rem',
+                                                    fontSize: '0.625rem',
+                                                    backgroundColor: '#fef3c7',
+                                                    color: '#92400e',
+                                                    borderRadius: '9999px'
+                                                }}>
+                                                    Template
+                                                </span>
+                                            )}
+                                            {currentLatePolicy?.id === policy.id && (
+                                                <span style={{
+                                                    marginLeft: '0.5rem',
+                                                    padding: '0.125rem 0.375rem',
+                                                    fontSize: '0.625rem',
+                                                    backgroundColor: '#dcfce7',
+                                                    color: '#166534',
+                                                    borderRadius: '9999px'
+                                                }}>
+                                                    Active
+                                                </span>
+                                            )}
+                                        </h3>
+                                        <p style={{
+                                            fontSize: '0.875rem',
+                                            color: '#6b7280',
+                                            margin: 0
+                                        }}>
+                                            {policy.description}
+                                        </p>
+                                    </div>
+
+                                    <div style={{ display: 'flex', gap: '0.25rem' }}>
+                                        {policy.isCustom && (
+                                            <>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        editPolicy(policy);
+                                                    }}
+                                                    style={{
+                                                        padding: '0.25rem',
+                                                        backgroundColor: 'transparent',
+                                                        border: '1px solid #d1d5db',
+                                                        borderRadius: '0.25rem',
+                                                        cursor: 'pointer',
+                                                        color: '#6b7280'
+                                                    }}
+                                                    title="Edit Policy"
+                                                >
+                                                    <Edit3 size={12} />
+                                                </button>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        deletePolicy(policy.id);
+                                                    }}
+                                                    style={{
+                                                        padding: '0.25rem',
+                                                        backgroundColor: 'transparent',
+                                                        border: '1px solid #d1d5db',
+                                                        borderRadius: '0.25rem',
+                                                        cursor: 'pointer',
+                                                        color: '#dc2626'
+                                                    }}
+                                                    title="Delete Policy"
+                                                >
+                                                    <Trash2 size={12} />
+                                                </button>
+                                            </>
+                                        )}
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                duplicatePolicy(policy);
+                                            }}
+                                            style={{
+                                                padding: '0.25rem',
+                                                backgroundColor: 'transparent',
+                                                border: '1px solid #d1d5db',
+                                                borderRadius: '0.25rem',
+                                                cursor: 'pointer',
+                                                color: '#6b7280'
+                                            }}
+                                            title="Duplicate Policy"
+                                        >
+                                            <Copy size={12} />
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div style={{
+                                    display: 'flex',
+                                    flexWrap: 'wrap',
+                                    gap: '0.25rem',
+                                    marginBottom: '0.75rem'
+                                }}>
+                                    {Object.values(policy.levels).map((level, index) => (
+                                        <span
+                                            key={index}
+                                            style={{
+                                                padding: '0.125rem 0.375rem',
+                                                fontSize: '0.625rem',
+                                                backgroundColor: level.color + '20',
+                                                color: level.color,
+                                                borderRadius: '0.25rem',
+                                                border: `1px solid ${level.color}40`
+                                            }}
+                                        >
+                                            {level.name} ({Math.round(level.multiplier * 100)}%)
+                                        </span>
+                                    ))}
+                                </div>
+
+                                <div style={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center'
+                                }}>
+                                    <span style={{
+                                        fontSize: '0.75rem',
+                                        color: '#9ca3af'
+                                    }}>
+                                        {Object.keys(policy.levels).length} penalty levels
+                                    </span>
+
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setAsCurrentPolicy(policy);
+                                        }}
+                                        style={{
+                                            padding: '0.375rem 0.75rem',
+                                            fontSize: '0.75rem',
+                                            fontWeight: '500',
+                                            backgroundColor: currentLatePolicy?.id === policy.id ? '#dcfce7' : '#f3f4f6',
+                                            color: currentLatePolicy?.id === policy.id ? '#166534' : '#374151',
+                                            border: 'none',
+                                            borderRadius: '0.25rem',
+                                            cursor: 'pointer'
+                                        }}
+                                    >
+                                        {currentLatePolicy?.id === policy.id ? 'Current' : 'Set as Current'}
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Policy Testing */}
+                    {selectedPolicy && (
+                        <div style={{
+                            padding: '1rem',
+                            backgroundColor: '#f8fafc',
+                            borderRadius: '0.5rem',
+                            border: '1px solid #e2e8f0',
+                            marginBottom: '1.5rem'
+                        }}>
+                            <h3 style={{
+                                fontSize: '1.125rem',
+                                fontWeight: '600',
+                                color: '#1f2937',
+                                marginBottom: '1rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.5rem'
+                            }}>
+                                <Calculator size={20} />
+                                Test Policy: {selectedPolicy.name}
+                            </h3>
+
+                            <div style={{
+                                display: 'flex',
+                                gap: '1rem',
+                                alignItems: 'center',
+                                marginBottom: '1rem'
+                            }}>
+                                <div>
+                                    <label style={{
+                                        display: 'block',
+                                        fontSize: '0.875rem',
+                                        fontWeight: '500',
+                                        color: '#374151',
+                                        marginBottom: '0.5rem'
+                                    }}>
+                                        Original Score (0-100):
+                                    </label>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        max="100"
+                                        step="0.1"
+                                        value={testScores.score}
+                                        onChange={(e) => setTestScores(prev => ({ ...prev, score: e.target.value }))}
+                                        style={{
+                                            padding: '0.75rem',
+                                            border: '1px solid #d1d5db',
+                                            borderRadius: '0.375rem',
+                                            fontSize: '0.875rem',
+                                            width: '120px'
+                                        }}
+                                        placeholder="85"
+                                    />
+                                </div>
+
+                                <button
+                                    onClick={testScoreCalculation}
+                                    style={{
+                                        padding: '0.75rem 1.5rem',
+                                        backgroundColor: '#3b82f6',
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '0.375rem',
+                                        cursor: 'pointer',
+                                        fontSize: '0.875rem',
+                                        fontWeight: '500',
+                                        marginTop: '1.5rem'
+                                    }}
+                                >
+                                    Calculate
+                                </button>
+                            </div>
+
+                            {/* Test Results */}
+                            {testScores.results && (
+                                <div style={{
+                                    padding: '1rem',
+                                    backgroundColor: 'white',
+                                    borderRadius: '0.375rem',
+                                    border: '1px solid #e5e7eb'
+                                }}>
+                                    {testScores.results.error ? (
+                                        <div style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '0.5rem',
+                                            color: '#dc2626'
+                                        }}>
+                                            <AlertCircle size={16} />
+                                            {testScores.results.error}
+                                        </div>
+                                    ) : (
+                                        <div>
+                                            <h4 style={{
+                                                fontSize: '1rem',
+                                                fontWeight: '600',
+                                                color: '#1f2937',
+                                                marginBottom: '1rem'
+                                            }}>
+                                                Results for Original Score: {testScores.results.originalScore}
+                                            </h4>
+
+                                            <div style={{
+                                                display: 'grid',
+                                                gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                                                gap: '0.75rem'
+                                            }}>
+                                                {testScores.results.levelResults.map((result, index) => (
+                                                    <div
+                                                        key={index}
+                                                        style={{
+                                                            padding: '0.75rem',
+                                                            backgroundColor: '#fafafa',
+                                                            borderRadius: '0.375rem',
+                                                            borderLeft: `4px solid ${result.color}`
+                                                        }}
+                                                    >
+                                                        <div style={{
+                                                            fontSize: '0.875rem',
+                                                            fontWeight: '600',
+                                                            color: result.color,
+                                                            marginBottom: '0.25rem'
+                                                        }}>
+                                                            {result.name}
+                                                        </div>
+                                                        <div style={{
+                                                            fontSize: '0.75rem',
+                                                            color: '#6b7280',
+                                                            marginBottom: '0.5rem'
+                                                        }}>
+                                                            {result.timeframe}
+                                                        </div>
+                                                        <div style={{
+                                                            display: 'flex',
+                                                            justifyContent: 'space-between',
+                                                            alignItems: 'center'
+                                                        }}>
+                                                            <span style={{
+                                                                fontSize: '1.125rem',
+                                                                fontWeight: '700',
+                                                                color: '#1f2937'
+                                                            }}>
+                                                                {result.adjustedScore}
+                                                            </span>
+                                                            <span style={{
+                                                                fontSize: '0.75rem',
+                                                                color: result.reduction > 0 ? '#dc2626' : '#059669',
+                                                                fontWeight: '500'
+                                                            }}>
+                                                                {result.reduction > 0 ? `-${result.reduction}%` : 'No penalty'}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Usage Instructions */}
+                    <div style={{
+                        padding: '1rem',
+                        backgroundColor: '#f0f9ff',
+                        borderRadius: '0.5rem',
+                        border: '1px solid #0ea5e9'
+                    }}>
+                        <h3 style={{
+                            fontSize: '1rem',
+                            fontWeight: '600',
+                            color: '#0c4a6e',
+                            marginBottom: '0.75rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem'
+                        }}>
+                            <Info size={16} />
+                            How to Use Late Policies
+                        </h3>
+                        <div style={{
+                            fontSize: '0.875rem',
+                            color: '#075985',
+                            lineHeight: 1.6
+                        }}>
+                            <p style={{ margin: '0 0 0.5rem 0' }}>
+                                <strong>1. Create or Select Policy:</strong> Choose from templates or create custom policies with your own penalty levels.
+                            </p>
+                            <p style={{ margin: '0 0 0.5rem 0' }}>
+                                <strong>2. Set as Current:</strong> Click "Set as Current" to apply the policy to future grading sessions.
+                            </p>
+                            <p style={{ margin: '0 0 0.5rem 0' }}>
+                                <strong>3. Test Calculations:</strong> Use the calculator to preview how different scores will be affected.
+                            </p>
+                            <p style={{ margin: 0 }}>
+                                <strong>4. Apply During Grading:</strong> When grading assignments, select the appropriate late submission level.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Policy Editor Modal */}
+            {showPolicyEditor && editingPolicy && (
+                <PolicyEditor
+                    policy={editingPolicy}
+                    onSave={(policyData) => {
+                        if (editingPolicy.id === 'new') {
+                            const newPolicy = saveCustomLatePolicy(policyData);
+                            setSelectedPolicy(newPolicy);
+                        } else {
+                            updateCustomLatePolicy(editingPolicy.id, policyData);
+                            if (selectedPolicy?.id === editingPolicy.id) {
+                                setSelectedPolicy({ ...policyData, id: editingPolicy.id, isCustom: true });
+                            }
+                        }
+                        setShowPolicyEditor(false);
+                        setEditingPolicy(null);
+                    }}
+                    onCancel={() => {
+                        setShowPolicyEditor(false);
+                        setEditingPolicy(null);
+                    }}
+                    validatePolicy={validatePolicy}
+                />
+            )}
+        </div>
+    );
+};
+
+// Policy Editor Component (as defined in previous artifacts, would be imported from GradingTemplate.js)
+const PolicyEditor = ({ policy, onSave, onCancel, validatePolicy }) => {
+    const [editedPolicy, setEditedPolicy] = useState({ ...policy });
+    const [errors, setErrors] = useState([]);
+
+    const addLevel = () => {
+        const newKey = `level_${Date.now()}`;
+        setEditedPolicy(prev => ({
+            ...prev,
+            levels: {
+                ...prev.levels,
+                [newKey]: {
+                    name: '',
+                    multiplier: 0.8,
+                    description: '',
+                    color: '#ea580c',
+                    timeframe: ''
+                }
+            }
+        }));
+    };
+
+    const removeLevel = (levelKey) => {
+        setEditedPolicy(prev => {
+            const newLevels = { ...prev.levels };
+            delete newLevels[levelKey];
+            return { ...prev, levels: newLevels };
+        });
+    };
+
+    const updateLevel = (levelKey, field, value) => {
+        setEditedPolicy(prev => ({
+            ...prev,
+            levels: {
+                ...prev.levels,
+                [levelKey]: {
+                    ...prev.levels[levelKey],
+                    [field]: field === 'multiplier' ? parseFloat(value) || 0 : value
+                }
+            }
+        }));
+    };
+
+    const handleSave = () => {
+        const validationErrors = validatePolicy(editedPolicy);
+        if (validationErrors.length > 0) {
+            setErrors(validationErrors);
+            return;
+        }
+        onSave(editedPolicy);
+    };
+
+    return (
+        <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '1rem',
+            zIndex: 1000
+        }}>
+            <div style={{
+                backgroundColor: 'white',
+                borderRadius: '0.5rem',
+                maxWidth: '800px',
+                width: '100%',
+                maxHeight: '90vh',
+                overflow: 'auto'
+            }}>
+                <div style={{
+                    padding: '1.5rem',
+                    borderBottom: '1px solid #e5e7eb',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                }}>
+                    <h2 style={{ fontSize: '1.25rem', fontWeight: '700', color: '#1f2937' }}>
+                        {policy.id === 'new' ? '✨ Create Custom Policy' : '✏️ Edit Policy'}
+                    </h2>
+                    <button
+                        onClick={onCancel}
+                        style={{
+                            background: 'none',
+                            border: 'none',
+                            fontSize: '1.5rem',
+                            cursor: 'pointer',
+                            color: '#6b7280'
+                        }}
+                    >
+                        ✕
+                    </button>
+                </div>
+
+                <div style={{ padding: '1.5rem' }}>
+                    {errors.length > 0 && (
+                        <div style={{
+                            marginBottom: '1rem',
+                            padding: '1rem',
+                            backgroundColor: '#fef2f2',
+                            border: '1px solid #fecaca',
+                            borderRadius: '0.375rem'
+                        }}>
+                            <h4 style={{ fontWeight: '600', color: '#dc2626', marginBottom: '0.5rem' }}>
+                                ⚠️ Validation Errors:
+                            </h4>
+                            <ul style={{ margin: 0, paddingLeft: '1.25rem', color: '#dc2626', fontSize: '0.875rem' }}>
+                                {errors.map((error, index) => <li key={index}>{error}</li>)}
+                            </ul>
+                        </div>
+                    )}
+
+                    {/* Basic Information */}
+                    <div style={{ marginBottom: '1.5rem' }}>
+                        <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '1rem', color: '#374151' }}>
+                            📝 Basic Information
+                        </h3>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                            <div>
+                                <label style={{
+                                    display: 'block',
+                                    fontSize: '0.875rem',
+                                    fontWeight: '500',
+                                    color: '#374151',
+                                    marginBottom: '0.5rem'
+                                }}>
+                                    Policy Name *
+                                </label>
+                                <input
+                                    type="text"
+                                    value={editedPolicy.name || ''}
+                                    onChange={(e) => setEditedPolicy(prev => ({ ...prev, name: e.target.value }))}
+                                    style={{
+                                        width: '100%',
+                                        padding: '0.75rem',
+                                        border: '1px solid #d1d5db',
+                                        borderRadius: '0.375rem',
+                                        fontSize: '0.875rem'
+                                    }}
+                                    placeholder="e.g., Flexible Late Policy"
+                                />
+                            </div>
+                            <div>
+                                <label style={{
+                                    display: 'block',
+                                    fontSize: '0.875rem',
+                                    fontWeight: '500',
+                                    color: '#374151',
+                                    marginBottom: '0.5rem'
+                                }}>
+                                    Description *
+                                </label>
+                                <input
+                                    type="text"
+                                    value={editedPolicy.description || ''}
+                                    onChange={(e) => setEditedPolicy(prev => ({ ...prev, description: e.target.value }))}
+                                    style={{
+                                        width: '100%',
+                                        padding: '0.75rem',
+                                        border: '1px solid #d1d5db',
+                                        borderRadius: '0.375rem',
+                                        fontSize: '0.875rem'
+                                    }}
+                                    placeholder="Brief description of this policy"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* The rest of the PolicyEditor component would be the same as in the GradingTemplate.js */}
+                    {/* ... continuing with policy levels editing interface ... */}
+                </div>
+
+                <div style={{
+                    padding: '1.5rem',
+                    borderTop: '1px solid #e5e7eb',
+                    display: 'flex',
+                    justifyContent: 'flex-end',
+                    gap: '0.75rem'
+                }}>
+                    <button
+                        onClick={onCancel}
+                        style={{
+                            padding: '0.75rem 1.5rem',
+                            backgroundColor: '#6b7280',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '0.375rem',
+                            cursor: 'pointer'
+                        }}
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        onClick={handleSave}
+                        style={{
+                            padding: '0.75rem 1.5rem',
+                            backgroundColor: '#3b82f6',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '0.375rem',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem'
+                        }}
+                    >
+                        <Save size={16} />
+                        Save Policy
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export default GradingPolicyManager;

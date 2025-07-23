@@ -1,0 +1,415 @@
+// Enhanced App.js with Late Policy Integration and Complete Functionality
+// Maintains all existing features while adding late policy support
+
+import React, { useState, useEffect } from 'react';
+import { AssessmentProvider, useAssessment } from './components/SharedContext';
+import TabNavigation from './components/TabNavigation';
+import AIRubricPromptGenerator from './components/AIRubricPromptGenerator';
+import AssignmentPromptGenerator from './components/AssignmentPromptGenerator';
+import RubricCreator from './components/RubricCreator';
+import ClassListManager from './components/ClassListManager';
+import GradingTemplate from './components/GradingTemplate';
+import ExcelImportTest from './components/ExcelImportTest';
+import HelpPage from './components/HelpPage';
+import GradingPolicyManager from './components/GradingPolicyManager';
+import './index.css';
+
+// Scroll to Top Button Component
+const ScrollToTopButton = () => {
+  const [isVisible, setIsVisible] = useState(false);
+  const [isScrolling, setIsScrolling] = useState(false);
+
+  // Show button when page is scrolled down
+  useEffect(() => {
+    const toggleVisibility = () => {
+      if (window.pageYOffset > 200) {
+        setIsVisible(true);
+      } else {
+        setIsVisible(false);
+      }
+    };
+
+    let ticking = false;
+    const handleScroll = () => {
+      if (!ticking) {
+        requestAnimationFrame(() => {
+          toggleVisibility();
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, []);
+
+  // Enhanced scroll to top with multiple fallback methods
+  const scrollToTop = () => {
+    setIsScrolling(true);
+
+    try {
+      window.scrollTo({
+        top: 0,
+        left: 0,
+        behavior: 'smooth'
+      });
+
+      // Set timeout to reset scrolling state
+      setTimeout(() => {
+        setIsScrolling(false);
+      }, 1000);
+    } catch (error) {
+      // Fallback for older browsers
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+      setIsScrolling(false);
+    }
+  };
+
+  return (
+    <>
+      {isVisible && (
+        <button
+          onClick={scrollToTop}
+          disabled={isScrolling}
+          style={{
+            position: 'fixed',
+            bottom: '2rem',
+            right: '2rem',
+            zIndex: 1000,
+            padding: '0.75rem',
+            backgroundColor: isScrolling ? '#9ca3af' : '#3b82f6',
+            color: 'white',
+            border: 'none',
+            borderRadius: '50%',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+            cursor: isScrolling ? 'not-allowed' : 'pointer',
+            fontSize: '1.25rem',
+            width: '48px',
+            height: '48px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'all 0.3s ease',
+            opacity: isScrolling ? 0.7 : 1,
+            transform: `scale(${isScrolling ? 0.95 : 1})`
+          }}
+          title="Scroll to top"
+        >
+          {isScrolling ? '⏳' : '⬆️'}
+        </button>
+      )}
+    </>
+  );
+};
+
+// Main App Component
+const AppContent = () => {
+  const { activeTab, setActiveTab } = useAssessment();
+
+  // Enhanced tab configuration with late policy support
+  const tabs = [
+    {
+      id: 'assignment-prompt-generator',
+      name: 'Assignment Generator',
+      component: AssignmentPromptGenerator,
+      description: 'Create comprehensive assignment prompts'
+    },
+    {
+      id: 'ai-rubric-generator', 
+      name: 'AI Rubric Generator',
+      component: AIRubricPromptGenerator,
+      description: 'Generate rubrics using AI assistance'
+    },
+    {
+      id: 'rubric-creator',
+      name: 'Rubric Creator',
+      component: RubricCreator,
+      description: 'Create and customize detailed rubrics'
+    },
+    {
+      id: 'class-list-manager',
+      name: 'Class Manager',
+      component: ClassListManager,
+      description: 'Import and manage student lists'
+    },
+    {
+      id: 'grading-template',
+      name: 'Grading Tool',
+      component: GradingTemplate,
+      description: 'Grade assignments with late policy support'
+    },
+    {
+      id: 'policy-manager',
+      name: 'Policy Manager',
+      component: GradingPolicyManager,
+      description: 'Manage grading and late policies'
+    },
+    {
+      id: 'excel-import-test',
+      name: 'Import Test',
+      component: ExcelImportTest,
+      description: 'Test Excel file imports'
+    },
+    {
+      id: 'help',
+      name: 'Help',
+      component: HelpPage,
+      description: 'User guide and documentation'
+    }
+  ];
+
+  // Find the current active tab
+  const currentTab = tabs.find(tab => tab.id === activeTab) || tabs[0];
+  const CurrentComponent = currentTab.component;
+
+  // Handle keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      // Alt + number keys for quick tab switching
+      if (event.altKey && event.key >= '1' && event.key <= '8') {
+        event.preventDefault();
+        const tabIndex = parseInt(event.key) - 1;
+        if (tabs[tabIndex]) {
+          setActiveTab(tabs[tabIndex].id);
+        }
+      }
+      
+      // Ctrl + H for help
+      if (event.ctrlKey && event.key === 'h') {
+        event.preventDefault();
+        setActiveTab('help');
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [setActiveTab]);
+
+  return (
+    <div className="App" style={{ minHeight: '100vh', backgroundColor: '#f9fafb' }}>
+      {/* Header */}
+      <header className="app-header" style={{
+        position: 'sticky',
+        top: 0,
+        zIndex: 40,
+        backgroundColor: 'white',
+        borderBottom: '1px solid #e5e7eb',
+        boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
+      }}>
+        <div style={{
+          maxWidth: '1200px',
+          margin: '0 auto',
+          padding: '1rem 1.5rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <img 
+              src="/logo192.png" 
+              alt="GradingPilot Logo"
+              style={{
+                height: '40px',
+                width: '40px',
+                objectFit: 'contain',
+                transition: 'transform 0.2s ease-in-out'
+              }}
+              onMouseEnter={(e) => e.target.style.transform = 'scale(1.05)'}
+              onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
+            />
+            <div>
+              <h1 style={{
+                fontSize: '1.5rem',
+                fontWeight: '700',
+                color: '#111827',
+                margin: 0,
+                lineHeight: 1.2
+              }}>
+                GradingPilot
+              </h1>
+              <p style={{
+                fontSize: '0.875rem',
+                color: '#6b7280',
+                margin: 0,
+                lineHeight: 1
+              }}>
+                Advanced grading with customizable late policies
+              </p>
+            </div>
+          </div>
+
+          {/* Quick Stats Display */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '1rem',
+            fontSize: '0.875rem',
+            color: '#6b7280'
+          }}>
+            <div style={{
+              padding: '0.5rem 0.75rem',
+              backgroundColor: '#f3f4f6',
+              borderRadius: '0.375rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}>
+              <span>Current Tab:</span>
+              <span style={{ fontWeight: '600', color: '#374151' }}>
+                {currentTab.name}
+              </span>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Tab Navigation */}
+      <TabNavigation />
+
+      {/* Main Content */}
+      <main style={{
+        flex: 1,
+        paddingTop: '1.5rem',
+        paddingBottom: '1.5rem'
+      }}>
+        <div style={{
+          maxWidth: '1200px',
+          margin: '0 auto',
+          padding: '0 1rem'
+        }}>
+          {/* Tab Description */}
+          <div style={{
+            marginBottom: '1.5rem',
+            padding: '1rem',
+            backgroundColor: 'white',
+            borderRadius: '0.5rem',
+            border: '1px solid #e5e7eb',
+            textAlign: 'center'
+          }}>
+            <h2 style={{
+              fontSize: '1.25rem',
+              fontWeight: '600',
+              color: '#111827',
+              margin: 0,
+              marginBottom: '0.5rem'
+            }}>
+              {currentTab.name}
+            </h2>
+            <p style={{
+              fontSize: '0.875rem',
+              color: '#6b7280',
+              margin: 0
+            }}>
+              {currentTab.description}
+            </p>
+            
+            {/* Keyboard shortcuts hint */}
+            <div style={{
+              marginTop: '0.75rem',
+              fontSize: '0.75rem',
+              color: '#9ca3af',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '1rem',
+              flexWrap: 'wrap'
+            }}>
+              <span>💡 Tip: Use Alt + 1-8 for quick tab switching</span>
+              <span>•</span>
+              <span>Ctrl + H for help</span>
+            </div>
+          </div>
+
+          {/* Tab Content */}
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '0.5rem',
+            boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
+            overflow: 'hidden',
+            minHeight: '600px'
+          }}>
+            <CurrentComponent />
+          </div>
+        </div>
+      </main>
+
+      {/* Footer */}
+      <footer style={{
+        backgroundColor: 'white',
+        borderTop: '1px solid #e5e7eb',
+        padding: '1rem 0',
+        marginTop: 'auto'
+      }}>
+        <div style={{
+          maxWidth: '1200px',
+          margin: '0 auto',
+          padding: '0 1rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          fontSize: '0.875rem',
+          color: '#6b7280'
+        }}>
+          <div>
+            <span>© 2024 GradingPilot</span>
+            <span style={{ margin: '0 0.5rem' }}>•</span>
+            <span>Enhanced with customizable late policies</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <button
+              onClick={() => setActiveTab('help')}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#3b82f6',
+                cursor: 'pointer',
+                textDecoration: 'underline',
+                fontSize: '0.875rem'
+              }}
+            >
+              Need Help?
+            </button>
+            <span>Version 2.0</span>
+          </div>
+        </div>
+      </footer>
+
+      {/* Scroll to Top Button */}
+      <ScrollToTopButton />
+    </div>
+  );
+};
+
+// Main App with Provider
+const App = () => {
+  // Initialize late policies on app start
+  useEffect(() => {
+    // Load any stored late policies from localStorage
+    try {
+      const savedPolicies = localStorage.getItem('customLatePolicies');
+      if (savedPolicies) {
+        console.log('✅ Loaded custom late policies from storage');
+      }
+      
+      const currentPolicy = localStorage.getItem('currentLatePolicy');
+      if (currentPolicy) {
+        console.log('✅ Loaded current late policy from storage');
+      }
+    } catch (error) {
+      console.error('Error loading late policies:', error);
+    }
+  }, []);
+
+  return (
+    <AssessmentProvider>
+      <AppContent />
+    </AssessmentProvider>
+  );
+};
+
+export default App;
