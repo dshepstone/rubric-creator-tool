@@ -899,8 +899,7 @@ ${JSON.stringify(gradeData, null, 2)}
 
 Write feedback in this exact structure:
 
-**Opening Paragraph:** 
-Start with "${studentFirstName}" and write 2-3 sentences giving your overall impression of their ${assignmentTitle}. Mention their ${gradeData.gradeData.overallPercentage}% (${gradeData.gradeData.letterGrade}) performance and whether they ${gradeData.gradeData.passed ? 'met' : 'did not meet'} course standards. ${gradeData.gradeData.latePenaltyApplied ? 'Briefly acknowledge the late submission but focus on work quality.' : ''} Keep it warm but honest, appropriate for a ${getStudentLevel()} student.
+**Opening Paragraph:** Start with "${studentFirstName}" and write 2-3 sentences giving your overall impression of their ${assignmentTitle}. Mention their ${gradeData.gradeData.overallPercentage}% (${gradeData.gradeData.letterGrade}) performance and whether they ${gradeData.gradeData.passed ? 'met' : 'did not meet'} course standards. ${gradeData.gradeData.latePenaltyApplied ? 'Briefly acknowledge the late submission but focus on work quality.' : ''} Keep it warm but honest, appropriate for a ${getStudentLevel()} student.
 
 **Key Observations:**
 Write 3-5 concise bullet points (use actual bullet points •) covering:
@@ -986,6 +985,51 @@ Write the feedback now, making it sound personal and genuine while keeping it co
   };
 
   // --- END: CODE FIX ---
+
+  // NEW HELPER FUNCTIONS FOR COURSE INFO
+  const getEffectiveCourseData = () => {
+    const course = gradingData.course;
+    const metadata = classList?.courseMetadata;
+
+    return {
+      code: course.code || metadata?.courseCode || '',
+      name: course.name || metadata?.courseName || '',
+      instructor: course.instructor || metadata?.instructor || metadata?.professors || '',
+      term: course.term || metadata?.term || ''
+    };
+  };
+
+  const pullCourseDataFromClassList = () => {
+    if (!classList?.courseMetadata) {
+      alert('No class list course metadata available to pull from.');
+      return;
+    }
+
+    const courseMetadata = classList.courseMetadata;
+    const newCourseInfo = {
+      code: courseMetadata.courseCode || '',
+      name: courseMetadata.courseName || '',
+      instructor: courseMetadata.instructor || courseMetadata.professors || '',
+      term: courseMetadata.term || ''
+    };
+
+    // Update both local and shared state
+    setGradingData(prevData => ({
+      ...prevData,
+      course: newCourseInfo
+    }));
+
+    updateCourseInfo(newCourseInfo);
+
+    console.log('📥 Pulled course data from class list:', newCourseInfo);
+    alert(`Course information updated!\n\nCode: ${newCourseInfo.code}\nName: ${newCourseInfo.name}\nInstructor: ${newCourseInfo.instructor}\nTerm: ${newCourseInfo.term}`);
+  };
+
+  const isCourseDataMissing = () => {
+    const course = gradingData.course;
+    return !course.code && !course.name && !course.instructor && !course.term;
+  };
+
 
   return (
     <div style={{ minHeight: '100vh', background: '#f9fafb', padding: '1.5rem' }}>
@@ -1271,16 +1315,67 @@ Write the feedback now, making it sound personal and genuine while keeping it co
               </div>
             )}
 
-            {/* Course Information */}
+            {/* ENHANCED Course Information Section */}
             <div style={{ marginBottom: '2rem' }}>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem', color: '#374151' }}>
-                Course Information
-              </h2>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <h2 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#374151' }}>
+                  Course Information
+                </h2>
+
+                {/* Pull Course Data Button - show if data is missing and classList has metadata */}
+                {isCourseDataMissing() && classList?.courseMetadata && (
+                  <button
+                    onClick={pullCourseDataFromClassList}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      background: '#3b82f6',
+                      color: 'white',
+                      padding: '0.5rem 1rem',
+                      borderRadius: '0.5rem',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem',
+                      fontWeight: '500'
+                    }}
+                    title="Pull course information from imported class list"
+                  >
+                    <Download size={16} />
+                    Pull Course Data
+                  </button>
+                )}
+              </div>
+
+              {/* Data source indicator */}
+              {(() => {
+                const effectiveData = getEffectiveCourseData();
+                if (effectiveData.code || effectiveData.name) {
+                  return (
+                    <div style={{
+                      background: '#f0f9ff',
+                      border: '1px solid #0ea5e9',
+                      borderRadius: '0.5rem',
+                      padding: '0.75rem',
+                      marginBottom: '1rem',
+                      fontSize: '0.875rem',
+                      color: '#0369a1'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <CheckCircle size={16} />
+                        <span>Course information loaded {gradingData.course.code ? 'from grading session' : 'from class list metadata'}</span>
+                      </div>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
+
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem' }}>
                 <input
                   type="text"
                   placeholder="Course Code (e.g., ART101)"
-                  value={gradingData.course.code}
+                  value={getEffectiveCourseData().code}
                   onChange={(e) => {
                     const newValue = e.target.value;
                     setGradingData(prevData => ({
@@ -1294,13 +1389,14 @@ Write the feedback now, making it sound personal and genuine while keeping it co
                     padding: '0.75rem',
                     border: '1px solid #d1d5db',
                     borderRadius: '0.5rem',
-                    fontSize: '0.875rem'
+                    fontSize: '0.875rem',
+                    backgroundColor: getEffectiveCourseData().code && !gradingData.course.code ? '#f9fafb' : 'white'
                   }}
                 />
                 <input
                   type="text"
                   placeholder="Course Name"
-                  value={gradingData.course.name}
+                  value={getEffectiveCourseData().name}
                   onChange={(e) => {
                     const newValue = e.target.value;
                     setGradingData(prevData => ({
@@ -1314,13 +1410,14 @@ Write the feedback now, making it sound personal and genuine while keeping it co
                     padding: '0.75rem',
                     border: '1px solid #d1d5db',
                     borderRadius: '0.5rem',
-                    fontSize: '0.875rem'
+                    fontSize: '0.875rem',
+                    backgroundColor: getEffectiveCourseData().name && !gradingData.course.name ? '#f9fafb' : 'white'
                   }}
                 />
                 <input
                   type="text"
                   placeholder="Instructor Name"
-                  value={gradingData.course.instructor}
+                  value={getEffectiveCourseData().instructor}
                   onChange={(e) => {
                     const newValue = e.target.value;
                     setGradingData(prevData => ({
@@ -1334,13 +1431,14 @@ Write the feedback now, making it sound personal and genuine while keeping it co
                     padding: '0.75rem',
                     border: '1px solid #d1d5db',
                     borderRadius: '0.5rem',
-                    fontSize: '0.875rem'
+                    fontSize: '0.875rem',
+                    backgroundColor: getEffectiveCourseData().instructor && !gradingData.course.instructor ? '#f9fafb' : 'white'
                   }}
                 />
                 <input
                   type="text"
                   placeholder="Term (e.g., Fall 2024)"
-                  value={gradingData.course.term}
+                  value={getEffectiveCourseData().term}
                   onChange={(e) => {
                     const newValue = e.target.value;
                     setGradingData(prevData => ({
@@ -1354,7 +1452,8 @@ Write the feedback now, making it sound personal and genuine while keeping it co
                     padding: '0.75rem',
                     border: '1px solid #d1d5db',
                     borderRadius: '0.5rem',
-                    fontSize: '0.875rem'
+                    fontSize: '0.875rem',
+                    backgroundColor: getEffectiveCourseData().term && !gradingData.course.term ? '#f9fafb' : 'white'
                   }}
                 />
               </div>

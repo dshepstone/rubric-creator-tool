@@ -4,6 +4,9 @@
   "private": true,
   "description": "GradingPilot - Advanced grading and rubric creation tool for educators",
   "dependencies": {
+    "@tanstack/react-query": "^5.83.0",
+    "@tanstack/react-query-devtools": "^5.83.0",
+    "axios": "^1.10.0",
     "html2pdf.js": "^0.10.3",
     "lucide-react": "^0.525.0",
     "papaparse": "^5.4.1",

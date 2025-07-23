@@ -506,7 +506,7 @@ const RubricCreator = () => {
     const transferToGrading = () => {
         const exportData = prepareRubricForExport();
 
-        // STEP 1: Check if class list is loaded
+        // STEP 1: Check if class list is loaded and has course metadata
         if (!classList || !classList.students || classList.students.length === 0) {
             // If no class list, show confirmation dialog
             const userChoice = window.confirm(
@@ -514,7 +514,7 @@ const RubricCreator = () => {
                 "Would you like to:\n" +
                 "• Click 'OK' to go to Class Manager to load a class list first\n" +
                 "• Click 'Cancel' to proceed to Grading Tool for individual grading\n\n" +
-                "Note: Batch grading requires a loaded class list."
+                "Note: Batch grading requires a loaded class list with course information."
             );
 
             if (userChoice) {
@@ -535,31 +535,45 @@ const RubricCreator = () => {
         // STEP 2: Class list exists - proceed with batch grading setup
         setSharedRubric(exportData);
 
-        // STEP 3: Initialize grading session with first student and course info
+        // STEP 3: Enhanced initialization with course data verification
+        console.log('🔄 Initializing grading session with course metadata:', classList.courseMetadata);
+
         const success = initializeGradingSession(classList);
 
         if (success) {
             // STEP 4: Switch to grading tool
             setActiveTab('grading-tool');
 
-            // STEP 5: Show success message
+            // STEP 5: Show enhanced success message with course info
+            const courseInfo = classList.courseMetadata || {};
+            const hasCompleteInfo = courseInfo.courseCode && courseInfo.courseName &&
+                (courseInfo.instructor || courseInfo.professors) && courseInfo.term;
+
             alert(
                 `🎯 Batch Grading Started!\n\n` +
                 `Rubric: ${exportData.assignmentInfo?.title || 'Untitled'}\n` +
                 `Class: ${classList.students.length} students\n` +
                 `Starting with: ${classList.students[0]?.name || 'First Student'}\n\n` +
-                `Course information has been automatically loaded from your class list.`
+                `Course Information:\n` +
+                `• Code: ${courseInfo.courseCode || 'Not specified'}\n` +
+                `• Name: ${courseInfo.courseName || 'Not specified'}\n` +
+                `• Instructor: ${courseInfo.instructor || courseInfo.professors || 'Not specified'}\n` +
+                `• Term: ${courseInfo.term || 'Not specified'}\n\n` +
+                `${hasCompleteInfo ?
+                    '✅ Course information has been automatically loaded from your class list.' :
+                    '⚠️ Some course information is missing. You can manually enter it in the grading tool or use the "Pull Course Data" button.'}`
             );
 
             console.log('✅ Batch grading session started:', {
                 rubric: exportData.assignmentInfo?.title,
                 students: classList.students.length,
-                firstStudent: classList.students[0]?.name
+                firstStudent: classList.students[0]?.name,
+                courseMetadata: classList.courseMetadata
             });
         } else {
             // Fallback if session initialization fails
             setActiveTab('grading-tool');
-            alert('Rubric transferred, but batch grading session could not be initialized. You can grade individual students.');
+            alert('Rubric transferred, but batch grading session could not be initialized. You can grade individual students and manually enter course information.');
         }
     };
 
