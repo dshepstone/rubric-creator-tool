@@ -1026,7 +1026,7 @@ Write the feedback now, making it sound personal and genuine while keeping it co
   };
 
   const isCourseDataMissing = () => {
-    const course = gradingData.course;
+    const course = gradingData.course || {};
     return !course.code && !course.name && !course.instructor && !course.term;
   };
 

@@ -324,6 +324,19 @@ export const AssessmentProvider = ({ children }) => {
         console.log('✅ Draft saved for student:', studentId);
     }, [gradingFormData.latePolicy]);
 
+    const ensureCompleteGradeData = (data) => ({
+        student: { name: '', id: '', email: '', ...(data.student || {}) },
+        course: { code: '', name: '', instructor: '', term: '', ...(data.course || {}) },
+        assignment: { title: '', description: '', dueDate: '', totalPoints: 100, maxPoints: 100, name: '', ...(data.assignment || {}) },
+        rubricGrading: data.rubricGrading || {},
+        feedback: { strengths: '', improvements: '', general: '', ...(data.feedback || {}) },
+        attachments: data.attachments || [],
+        videoLinks: data.videoLinks || [],
+        metadata: data.metadata || {},
+        latePolicy: data.latePolicy || { level: 'none', penaltyApplied: false },
+        ...data
+    });
+
     const loadDraft = useCallback((studentId) => {
         let draft = drafts[studentId];
 
@@ -337,10 +350,8 @@ export const AssessmentProvider = ({ children }) => {
         }
 
         if (draft) {
-            if (!draft.latePolicy) {
-                draft = { ...draft, latePolicy: { level: 'none', penaltyApplied: false } };
-            }
-            setGradingFormData(draft);
+            const safeDraft = ensureCompleteGradeData(draft);
+            setGradingFormData(safeDraft);
             console.log('✅ Draft loaded for student:', studentId);
             return true;
         }
@@ -388,10 +399,11 @@ export const AssessmentProvider = ({ children }) => {
             }
         }
 
-        if (finalGrade && !finalGrade.latePolicy) {
-            finalGrade = { ...finalGrade, latePolicy: { level: 'none', penaltyApplied: false } };
+        if (finalGrade) {
+            const safeFinal = ensureCompleteGradeData(finalGrade);
+            return safeFinal;
         }
-        return finalGrade || null;
+        return null;
     }, [finalGrades]);
 
     const getGradeStatus = useCallback((studentId) => {
