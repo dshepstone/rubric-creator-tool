@@ -980,8 +980,8 @@ ${formData.specialInstructions && formData.specialInstructions.trim() !== '' ? `
                                 onClick={saveAssignmentJSON}
                                 disabled={!hasDataToSave}
                                 className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all duration-200 ${hasDataToSave
-                                        ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm'
-                                        : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                    ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm'
+                                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                                     }`}
                                 title="Save current assignment as JSON file"
                             >

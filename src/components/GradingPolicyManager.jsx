@@ -64,8 +64,8 @@ const GradingPolicyManager = () => {
     const PolicyCard = ({ policy, isSelected, onClick }) => (
         <div
             className={`p-4 border rounded-lg cursor-pointer transition-all ${isSelected
-                    ? 'border-blue-500 bg-blue-50 shadow-md'
-                    : 'border-gray-200 hover:border-gray-300 hover:shadow-sm'
+                ? 'border-blue-500 bg-blue-50 shadow-md'
+                : 'border-gray-200 hover:border-gray-300 hover:shadow-sm'
                 }`}
             onClick={onClick}
         >
@@ -190,8 +190,8 @@ const GradingPolicyManager = () => {
 
                             {testResult && (
                                 <div className={`p-4 rounded-lg ${testResult.error
-                                        ? 'bg-red-50 border border-red-200'
-                                        : 'bg-green-50 border border-green-200'
+                                    ? 'bg-red-50 border border-red-200'
+                                    : 'bg-green-50 border border-green-200'
                                     }`}>
                                     {testResult.error ? (
                                         <div className="flex items-center gap-2 text-red-800">
