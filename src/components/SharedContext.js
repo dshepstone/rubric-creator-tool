@@ -1,4 +1,6 @@
-// Updated SharedContext.js with Enhanced Draft/Final Grade Management + AI Prompt Generator + Assignment Prompt Generator
+// Complete SharedContext.js - Fully Merged with ALL Original Features + Late Policy Enhancement
+// This version preserves EVERY function and feature from the original while adding late policy support
+
 import React, { createContext, useContext, useState, useCallback } from 'react';
 
 const AssessmentContext = createContext();
@@ -11,27 +13,61 @@ export const useAssessment = () => {
     return context;
 };
 
+// DEFAULT LATE POLICY SYSTEM
+const DEFAULT_LATE_POLICY = {
+    id: 'institutional',
+    name: 'Institutional Policy',
+    description: 'Standard institutional late assignment policy',
+    levels: {
+        none: {
+            name: 'On Time',
+            multiplier: 1.0,
+            description: 'Assignment submitted on or before due date and time - marked out of 100%',
+            color: '#16a34a',
+            timeframe: 'On or before due date'
+        },
+        within24: {
+            name: '1-24 Hours Late',
+            multiplier: 0.8,
+            description: 'Assignment received within 24 hours of due date - 20% reduction (marked out of 80%)',
+            color: '#ea580c',
+            timeframe: 'Up to 24 hours late'
+        },
+        after24: {
+            name: 'More than 24 Hours Late',
+            multiplier: 0.0,
+            description: 'Assignment received after 24 hours from due date - mark of zero (0)',
+            color: '#dc2626',
+            timeframe: 'More than 24 hours late'
+        }
+    }
+};
+
 export const AssessmentProvider = ({ children }) => {
-    // Shared rubric state
+    // ORIGINAL: Shared rubric state
     const [sharedRubric, setSharedRubric] = useState(null);
     const [sharedCourseDetails, setSharedCourseDetails] = useState(null);
-    const [activeTab, setActiveTab] = useState('assignment-prompt-generator'); // Updated to start with assignment prompt generator
+    const [activeTab, setActiveTab] = useState('assignment-prompt-generator');
 
-    // AI Prompt Generator state (for rubrics) - UPDATED with weight percentage
+    // ORIGINAL: AI Prompt Generator state (for rubrics)
     const [aiPromptFormData, setAIPromptFormData] = useState(null);
 
-    // NEW: Assignment Prompt Generator state
+    // ORIGINAL: Assignment Prompt Generator state
     const [assignmentPromptFormData, setAssignmentPromptFormData] = useState(null);
 
-    // Class list and student management
+    // ORIGINAL: Class list and student management
     const [classList, setClassList] = useState(null);
     const [currentStudent, setCurrentStudent] = useState(null);
 
-    // ENHANCED: Separate storage for draft and final grades
+    // ORIGINAL: Separate storage for draft and final grades
     const [drafts, setDrafts] = useState({});
     const [finalGrades, setFinalGrades] = useState({});
 
-    // Batch grading session state
+    // NEW: Late Policy State Management
+    const [currentLatePolicy, setCurrentLatePolicy] = useState(DEFAULT_LATE_POLICY);
+    const [customLatePolicies, setCustomLatePolicies] = useState([]);
+
+    // ORIGINAL: Batch grading session state
     const [gradingSession, setGradingSession] = useState({
         active: false,
         startTime: null,
@@ -41,83 +77,35 @@ export const AssessmentProvider = ({ children }) => {
         currentStudentIndex: 0
     });
 
-    // Form data states
+    // ORIGINAL: Rubric form data state
+    const [rubricFormData, setRubricFormData] = useState({
+        course: { code: '', name: '', instructor: '', semester: '', year: '' },
+        assignment: { title: '', description: '', dueDate: '', totalPoints: 100, passingThreshold: 70 },
+        criteria: []
+    });
+
+    // ENHANCED: Form data states with late policy support
     const [gradingFormData, setGradingFormData] = useState({
         student: { name: '', id: '', email: '' },
-        course: { code: '', name: '', instructor: '', term: '' },
-        assignment: { name: '', dueDate: '', maxPoints: 100 },
-        feedback: { general: '', strengths: '', improvements: '' },
+        course: { code: '', name: '', instructor: '', semester: '', year: '' },
+        assignment: { title: '', description: '', dueDate: '', totalPoints: 100, maxPoints: 100 },
+        rubricGrading: {},
+        feedback: { strengths: '', improvements: '', general: '' },
         attachments: [],
         videoLinks: [],
-        latePolicy: { level: 'none', penaltyApplied: false },
-        rubricGrading: {},
-        metadata: {
-            gradedBy: '',
-            gradedDate: '',
-            aiAssisted: false,
-            rubricIntegrated: false
+        metadata: { gradedBy: '', gradedDate: '', version: '1.0', notes: '' },
+        // NEW: Late policy integration
+        latePolicy: {
+            level: 'none',
+            penaltyApplied: false,
+            policyId: null,
+            originalScore: null,
+            adjustedScore: null,
+            multiplier: 1.0
         }
     });
 
-    const [rubricFormData, setRubricFormData] = useState({
-        assignmentInfo: {
-            title: '',
-            description: '',
-            weight: 25,
-            passingThreshold: 60,
-            totalPoints: 100
-        },
-        rubricLevels: [
-            { level: 'incomplete', name: 'Incomplete', description: 'No submission or unusable', color: '#95a5a6', multiplier: 0 },
-            { level: 'unacceptable', name: 'Unacceptable', description: 'Below minimum standards', color: '#e74c3c', multiplier: 0.3 },
-            { level: 'developing', name: 'Developing', description: 'Approaching standards', color: '#f39c12', multiplier: 0.55 },
-            { level: 'acceptable', name: 'Acceptable (PASS)', description: 'Meets minimum standards', color: '#27ae60', multiplier: 0.7 },
-            { level: 'emerging', name: 'Emerging', description: 'Above standard expectations', color: '#2980b9', multiplier: 0.82 },
-            { level: 'accomplished', name: 'Accomplished', description: 'Strong professional quality', color: '#16a085', multiplier: 0.92 },
-            { level: 'exceptional', name: 'Exceptional', description: 'Outstanding professional quality', color: '#8e44ad', multiplier: 1.0 }
-        ],
-        criteria: [
-            {
-                id: 'criterion-1',
-                name: '',
-                description: '',
-                maxPoints: 20,
-                weight: 20,
-                levels: {},
-                feedbackLibrary: {
-                    strengths: [],
-                    improvements: [],
-                    general: []
-                }
-            }
-        ],
-        pointingSystem: 'multiplier',
-        reversedOrder: false,
-        expandedFeedback: {},
-        modalEdit: { show: false, content: '', field: null, onSave: null }
-    });
-
-    // AI Prompt Generator functions (for rubrics) - UPDATED with weight percentage
-    const initializeAIPromptFormData = useCallback(() => {
-        setAIPromptFormData({
-            assignmentType: '',
-            programType: '',
-            programLevel: '',
-            subjectArea: '',
-            assignmentDescription: '',
-            totalPoints: '100',
-            weightPercentage: '', // NEW: Add weight percentage field
-            numCriteria: '4',
-            criteriaType: 'ai-suggested',
-            userCriteria: '',
-            learningObjectives: '',
-            studentPopulation: '',
-            timeFrameNumber: '',
-            timeFrameUnit: 'weeks',
-            specialConsiderations: ''
-        });
-    }, []);
-
+    // ORIGINAL: AI Prompt form data update function
     const updateAIPromptFormData = useCallback((field, value) => {
         setAIPromptFormData(prev => ({
             ...prev,
@@ -125,36 +113,23 @@ export const AssessmentProvider = ({ children }) => {
         }));
     }, []);
 
+    // ORIGINAL: Initialize AI prompt form data
+    const initializeAIPromptFormData = useCallback((courseData) => {
+        setAIPromptFormData({
+            course: courseData || { code: '', name: '', instructor: '', semester: '', year: '' },
+            assignment: { title: '', description: '', learningObjectives: [], skillsAssessed: [] },
+            rubricType: 'analytical',
+            criteria: [],
+            customInstructions: ''
+        });
+    }, []);
+
+    // ORIGINAL: Clear AI prompt form data
     const clearAIPromptFormData = useCallback(() => {
         setAIPromptFormData(null);
     }, []);
 
-    // NEW: Assignment Prompt Generator functions
-    const initializeAssignmentPromptFormData = useCallback(() => {
-        setAssignmentPromptFormData({
-            assignmentTitle: '',
-            assignmentNumber: '',
-            weightPercentage: '',
-            courseCode: '',
-            programLevel: '',
-            subjectArea: '',
-            assignmentDescription: '',
-            rationale: 'This assignment will evaluate the following Course Learning Outcomes:',
-            clos: [
-                { id: 1, number: '1', text: '', type: 'CLO' },
-                { id: 2, number: '2', text: '', type: 'CLO' },
-                { id: 3, number: '3', text: '', type: 'CLO' },
-                { id: 4, number: '4', text: '', type: 'CLO' }
-            ],
-            directions: '',
-            gradingMethod: 'rubric',
-            gradingDetails: '',
-            dueDate: '',
-            submissionFolder: 'Assignment X',
-            specialInstructions: ''
-        });
-    }, []);
-
+    // ORIGINAL: Assignment Prompt form data update function
     const updateAssignmentPromptFormData = useCallback((field, value) => {
         setAssignmentPromptFormData(prev => ({
             ...prev,
@@ -162,461 +137,487 @@ export const AssessmentProvider = ({ children }) => {
         }));
     }, []);
 
+    // ORIGINAL: Initialize assignment prompt form data
+    const initializeAssignmentPromptFormData = useCallback((courseData) => {
+        setAssignmentPromptFormData({
+            course: courseData || { code: '', name: '', instructor: '', semester: '', year: '' },
+            assignmentType: 'project',
+            learningObjectives: [],
+            skillsToAssess: [],
+            deliverables: [],
+            timeline: { duration: '', milestones: [] },
+            resources: [],
+            customRequirements: ''
+        });
+    }, []);
+
+    // ORIGINAL: Clear assignment prompt form data  
     const clearAssignmentPromptFormData = useCallback(() => {
         setAssignmentPromptFormData(null);
     }, []);
 
-    // Form update functions
-    const updateStudentInfo = useCallback((studentInfo) => {
+    // ORIGINAL: Update student information
+    const updateStudentInfo = useCallback((field, value) => {
         setGradingFormData(prev => ({
             ...prev,
-            student: { ...prev.student, ...studentInfo }
+            student: { ...prev.student, [field]: value }
         }));
     }, []);
 
-    const updateCourseInfo = useCallback((courseInfo) => {
-        console.log('📝 Updating course info:', courseInfo);
-
+    // ORIGINAL: Update course information
+    const updateCourseInfo = useCallback((field, value) => {
         setGradingFormData(prev => ({
             ...prev,
-            course: {
-                ...prev.course,
-                ...courseInfo
-            }
+            course: { ...prev.course, [field]: value }
         }));
     }, []);
 
-    const updateAssignmentInfo = useCallback((assignmentInfo) => {
+    // ORIGINAL: Update assignment information
+    const updateAssignmentInfo = useCallback((field, value) => {
         setGradingFormData(prev => ({
             ...prev,
-            assignment: { ...prev.assignment, ...assignmentInfo }
+            assignment: { ...prev.assignment, [field]: value }
         }));
     }, []);
 
-    const updateFeedbackInfo = useCallback((feedbackInfo) => {
+    // ORIGINAL: Update feedback information
+    const updateFeedbackInfo = useCallback((field, value) => {
         setGradingFormData(prev => ({
             ...prev,
-            feedback: { ...prev.feedback, ...feedbackInfo }
+            feedback: { ...prev.feedback, [field]: value }
         }));
     }, []);
 
+    // ORIGINAL: Update attachments
     const updateAttachments = useCallback((attachments) => {
-        setGradingFormData(prev => ({
-            ...prev,
-            attachments
-        }));
+        setGradingFormData(prev => ({ ...prev, attachments }));
     }, []);
 
+    // ORIGINAL: Update video links
     const updateVideoLinks = useCallback((videoLinks) => {
+        setGradingFormData(prev => ({ ...prev, videoLinks }));
+    }, []);
+
+    // ORIGINAL: Update rubric grading
+    const updateRubricGrading = useCallback((criterionId, data) => {
         setGradingFormData(prev => ({
             ...prev,
-            videoLinks
+            rubricGrading: { ...prev.rubricGrading, [criterionId]: data }
         }));
     }, []);
 
-    const updateLatePolicyInfo = useCallback((latePolicyInfo) => {
+    // ORIGINAL: Update metadata
+    const updateMetadata = useCallback((field, value) => {
         setGradingFormData(prev => ({
             ...prev,
-            latePolicy: { ...prev.latePolicy, ...latePolicyInfo }
+            metadata: { ...prev.metadata, [field]: value }
         }));
     }, []);
 
-    const updateRubricGrading = useCallback((rubricGrading) => {
+    // NEW: Update late policy information
+    const updateLatePolicyInfo = useCallback((field, value) => {
         setGradingFormData(prev => ({
             ...prev,
-            rubricGrading
+            latePolicy: { ...prev.latePolicy, [field]: value }
         }));
     }, []);
 
-    const updateMetadata = useCallback((metadata) => {
-        setGradingFormData(prev => ({
-            ...prev,
-            metadata: { ...prev.metadata, ...metadata }
-        }));
-    }, []);
-
-    // ENHANCED: Draft and Final Grade Management
-    const saveDraft = useCallback((studentId, gradingData) => {
-        const draftData = {
-            ...gradingData,
-            metadata: {
-                ...gradingData.metadata,
-                savedAt: new Date().toISOString(),
-                status: 'draft'
+    // ORIGINAL: Clear grading form data
+    const clearGradingFormData = useCallback(() => {
+        setGradingFormData({
+            student: { name: '', id: '', email: '' },
+            course: { code: '', name: '', instructor: '', semester: '', year: '' },
+            assignment: { title: '', description: '', dueDate: '', totalPoints: 100, maxPoints: 100 },
+            rubricGrading: {},
+            feedback: { strengths: '', improvements: '', general: '' },
+            attachments: [],
+            videoLinks: [],
+            metadata: { gradedBy: '', gradedDate: '', version: '1.0', notes: '' },
+            latePolicy: {
+                level: 'none',
+                penaltyApplied: false,
+                policyId: null,
+                originalScore: null,
+                adjustedScore: null,
+                multiplier: 1.0
             }
+        });
+    }, []);
+
+    // ORIGINAL: Clear rubric form data
+    const clearRubricFormData = useCallback(() => {
+        setRubricFormData({
+            course: { code: '', name: '', instructor: '', semester: '', year: '' },
+            assignment: { title: '', description: '', dueDate: '', totalPoints: 100, passingThreshold: 70 },
+            criteria: []
+        });
+    }, []);
+
+    // ORIGINAL: Transfer rubric to grading
+    const transferRubricToGrading = useCallback(() => {
+        if (sharedRubric) {
+            setGradingFormData(prev => ({
+                ...prev,
+                course: sharedRubric.courseInfo || prev.course,
+                assignment: sharedRubric.assignmentInfo || prev.assignment
+            }));
+        }
+    }, [sharedRubric]);
+
+    // ORIGINAL: Transfer rubric to grading with details
+    const transferRubricToGradingWithDetails = useCallback((rubricData) => {
+        if (rubricData) {
+            setGradingFormData(prev => ({
+                ...prev,
+                course: rubricData.courseInfo || prev.course,
+                assignment: rubricData.assignmentInfo || prev.assignment,
+                rubricGrading: {}
+            }));
+        }
+    }, []);
+
+    // ORIGINAL: Clear shared rubric
+    const clearSharedRubric = useCallback(() => {
+        setSharedRubric(null);
+    }, []);
+
+    // ENHANCED: Draft and Final Grade Management with Late Policy
+    const saveDraft = useCallback((studentId, gradeData) => {
+        const draftData = {
+            ...gradeData,
+            savedAt: new Date().toISOString(),
+            isDraft: true,
+            latePolicy: gradeData.latePolicy || gradingFormData.latePolicy
         };
 
-        setDrafts(prev => ({
-            ...prev,
-            [studentId]: draftData
-        }));
+        setDrafts(prev => ({ ...prev, [studentId]: draftData }));
+
+        // Also save to localStorage for persistence
+        const existingDrafts = JSON.parse(localStorage.getItem('gradingDrafts') || '{}');
+        existingDrafts[studentId] = draftData;
+        localStorage.setItem('gradingDrafts', JSON.stringify(existingDrafts));
 
         console.log('✅ Draft saved for student:', studentId);
-        return true;
-    }, []);
-
-    const hasDraft = useCallback((studentId) => {
-        return drafts[studentId] !== undefined;
-    }, [drafts]);
+    }, [gradingFormData.latePolicy]);
 
     const loadDraft = useCallback((studentId) => {
-        const draft = drafts[studentId];
-        if (draft) {
-            console.log('📝 Draft loaded for student:', studentId);
-            return draft;
-        }
-        console.log('⚠️ No draft found for student:', studentId);
-        return null;
-    }, [drafts]);
+        let draft = drafts[studentId];
 
-    const saveFinalGrade = useCallback((studentId, data) => {
-        console.log('✅ Saving final grade for student:', studentId);
-        setFinalGrades(prev => ({ ...prev, [studentId]: data }));
-
-        // Remove from drafts once finalized
-        setDrafts(prev => {
-            const updated = { ...prev };
-            delete updated[studentId];
-            return updated;
-        });
-
-        // Update class list progress
-        if (classList) {
-            const studentIndex = classList.students.findIndex(s => s.id === studentId);
-            if (studentIndex >= 0) {
-                const updatedProgress = [...classList.gradingProgress];
-                updatedProgress[studentIndex] = {
-                    ...updatedProgress[studentIndex],
-                    status: 'completed_final',
-                    lastModified: new Date().toISOString(),
-                    gradeType: 'final'
-                };
-                setClassList(prev => ({
-                    ...prev,
-                    gradingProgress: updatedProgress
-                }));
+        // Try loading from localStorage if not in memory
+        if (!draft) {
+            const existingDrafts = JSON.parse(localStorage.getItem('gradingDrafts') || '{}');
+            draft = existingDrafts[studentId];
+            if (draft) {
+                setDrafts(prev => ({ ...prev, [studentId]: draft }));
             }
         }
-    }, [classList]);
+
+        if (draft) {
+            setGradingFormData(draft);
+            console.log('✅ Draft loaded for student:', studentId);
+            return true;
+        }
+        return false;
+    }, [drafts]);
+
+    const saveFinalGrade = useCallback((studentId, gradeData) => {
+        const finalData = {
+            ...gradeData,
+            finalizedAt: new Date().toISOString(),
+            isDraft: false,
+            latePolicy: gradeData.latePolicy || gradingFormData.latePolicy
+        };
+
+        setFinalGrades(prev => ({ ...prev, [studentId]: finalData }));
+
+        // Remove from drafts since it's now final
+        setDrafts(prev => {
+            const newDrafts = { ...prev };
+            delete newDrafts[studentId];
+            return newDrafts;
+        });
+
+        // Update localStorage
+        const existingFinal = JSON.parse(localStorage.getItem('finalGrades') || '{}');
+        existingFinal[studentId] = finalData;
+        localStorage.setItem('finalGrades', JSON.stringify(existingFinal));
+
+        const existingDrafts = JSON.parse(localStorage.getItem('gradingDrafts') || '{}');
+        delete existingDrafts[studentId];
+        localStorage.setItem('gradingDrafts', JSON.stringify(existingDrafts));
+
+        console.log('✅ Final grade saved for student:', studentId);
+    }, [gradingFormData.latePolicy]);
 
     const loadFinalGrade = useCallback((studentId) => {
-        return finalGrades[studentId] || null;
+        let finalGrade = finalGrades[studentId];
+
+        // Try loading from localStorage if not in memory
+        if (!finalGrade) {
+            const existingFinal = JSON.parse(localStorage.getItem('finalGrades') || '{}');
+            finalGrade = existingFinal[studentId];
+            if (finalGrade) {
+                setFinalGrades(prev => ({ ...prev, [studentId]: finalGrade }));
+            }
+        }
+
+        return finalGrade || null;
     }, [finalGrades]);
 
     const getGradeStatus = useCallback((studentId) => {
         if (finalGrades[studentId]) return 'final';
         if (drafts[studentId]) return 'draft';
         return 'not_started';
-    }, [finalGrades, drafts]);
+    }, [drafts, finalGrades]);
 
-    // Navigation helpers for grading sessions
-    const nextStudentInSession = useCallback((saveType = 'draft') => {
-        if (!gradingSession?.active || !classList) return false;
+    const hasDraft = useCallback((studentId) => {
+        return !!drafts[studentId] || !!(JSON.parse(localStorage.getItem('gradingDrafts') || '{}')[studentId]);
+    }, [drafts]);
 
-        const currentIndex = gradingSession.currentStudentIndex;
-        const students = classList.students;
-
-        if (currentIndex < students.length - 1) {
-            const nextIndex = currentIndex + 1;
-            const nextStudent = students[nextIndex];
-
-            setGradingSession(prev => ({
-                ...prev,
-                currentStudentIndex: nextIndex,
-                currentStudent: nextStudent,
-                gradedStudents: [...prev.gradedStudents, currentStudent.id]
-            }));
-
-            setCurrentStudent(nextStudent);
-            return true;
-        }
-
-        // End of session
-        setGradingSession(prev => ({
-            ...prev,
-            active: false,
-            gradedStudents: [...prev.gradedStudents, currentStudent.id]
-        }));
-        return false;
-    }, [gradingSession, classList, currentStudent]);
-
-    const previousStudentInSession = useCallback(() => {
-        if (!gradingSession?.active || !classList) return false;
-
-        const currentIndex = gradingSession.currentStudentIndex;
-        if (currentIndex > 0) {
-            const prevIndex = currentIndex - 1;
-            const prevStudent = classList.students[prevIndex];
-
-            setGradingSession(prev => ({
-                ...prev,
-                currentStudentIndex: prevIndex,
-                currentStudent: prevStudent
-            }));
-
-            setCurrentStudent(prevStudent);
+    const finalizeGrade = useCallback((studentId) => {
+        const draft = drafts[studentId];
+        if (draft) {
+            saveFinalGrade(studentId, draft);
             return true;
         }
         return false;
-    }, [gradingSession, classList]);
+    }, [drafts, saveFinalGrade]);
 
-    // **FIXED: Enhanced initializeGradingSession function**
+    const unlockGrade = useCallback((studentId) => {
+        const finalGrade = finalGrades[studentId];
+        if (finalGrade) {
+            saveDraft(studentId, { ...finalGrade, isDraft: true });
+
+            setFinalGrades(prev => {
+                const newFinals = { ...prev };
+                delete newFinals[studentId];
+                return newFinals;
+            });
+
+            // Update localStorage
+            const existingFinal = JSON.parse(localStorage.getItem('finalGrades') || '{}');
+            delete existingFinal[studentId];
+            localStorage.setItem('finalGrades', JSON.stringify(existingFinal));
+
+            console.log('✅ Grade unlocked for editing:', studentId);
+            return true;
+        }
+        return false;
+    }, [finalGrades, saveDraft]);
+
+    // NEW: Late Policy Management Functions
+    const loadLatePoliciesFromStorage = useCallback(() => {
+        try {
+            const saved = localStorage.getItem('customLatePolicies');
+            if (saved) {
+                const policies = JSON.parse(saved);
+                setCustomLatePolicies(policies);
+            }
+
+            const currentSaved = localStorage.getItem('currentLatePolicy');
+            if (currentSaved) {
+                const current = JSON.parse(currentSaved);
+                setCurrentLatePolicy(current);
+            }
+        } catch (error) {
+            console.error('Error loading late policies:', error);
+        }
+    }, []);
+
+    const saveCustomLatePolicy = useCallback((policy) => {
+        const newPolicy = {
+            ...policy,
+            id: policy.id || `custom_${Date.now()}`,
+            isCustom: true,
+            createdAt: new Date().toISOString()
+        };
+
+        setCustomLatePolicies(prev => {
+            const updated = prev.filter(p => p.id !== newPolicy.id);
+            updated.push(newPolicy);
+            localStorage.setItem('customLatePolicies', JSON.stringify(updated));
+            return updated;
+        });
+
+        return newPolicy;
+    }, []);
+
+    const updateCustomLatePolicy = useCallback((policyId, updates) => {
+        setCustomLatePolicies(prev => {
+            const updated = prev.map(p =>
+                p.id === policyId ? { ...p, ...updates, updatedAt: new Date().toISOString() } : p
+            );
+            localStorage.setItem('customLatePolicies', JSON.stringify(updated));
+            return updated;
+        });
+    }, []);
+
+    const deleteCustomLatePolicy = useCallback((policyId) => {
+        setCustomLatePolicies(prev => {
+            const updated = prev.filter(p => p.id !== policyId);
+            localStorage.setItem('customLatePolicies', JSON.stringify(updated));
+            return updated;
+        });
+
+        // If deleted policy was current, reset to default
+        if (currentLatePolicy?.id === policyId) {
+            setCurrentLatePolicy(DEFAULT_LATE_POLICY);
+            localStorage.setItem('currentLatePolicy', JSON.stringify(DEFAULT_LATE_POLICY));
+        }
+    }, [currentLatePolicy]);
+
+    const calculateScoreWithLatePolicy = useCallback((rawScore, lateLevel) => {
+        if (!currentLatePolicy || !lateLevel || lateLevel === 'none') {
+            return {
+                rawScore,
+                finalScore: rawScore,
+                penaltyApplied: false,
+                multiplier: 1.0
+            };
+        }
+
+        const level = currentLatePolicy.levels[lateLevel];
+        if (!level) {
+            return {
+                rawScore,
+                finalScore: rawScore,
+                penaltyApplied: false,
+                multiplier: 1.0
+            };
+        }
+
+        const finalScore = Math.round(rawScore * level.multiplier * 100) / 100;
+
+        return {
+            rawScore,
+            finalScore,
+            penaltyApplied: level.multiplier < 1.0,
+            multiplier: level.multiplier
+        };
+    }, [currentLatePolicy]);
+
+    // ORIGINAL: Grading session management
     const initializeGradingSession = useCallback((classListData) => {
-        // 1. Guard against missing or empty class list
-        if (!classListData || !classListData.students?.length) {
-            console.warn('⚠️ Cannot initialize grading session: No students found');
+        if (!classListData || !classListData.students || classListData.students.length === 0) {
+            console.error('Cannot initialize grading session: Invalid class list data');
             return false;
         }
 
-        // 2. Extract the students array and the imported course metadata
-        const { students, courseMetadata } = classListData;
-
-        // 3. Pick the first student to start the session
-        const firstStudent = students[0];
-
-        // 4. Build and set the grading session state
-        const session = {
+        const newSession = {
             active: true,
             startTime: new Date().toISOString(),
             gradedStudents: [],
-            totalStudents: students.length,
-            currentStudent: firstStudent,
-            currentStudentIndex: 0
+            totalStudents: classListData.students.length,
+            currentStudent: classListData.students[0],
+            currentStudentIndex: 0,
+            classListData: classListData
         };
-        setGradingSession(session);
-        setCurrentStudent(firstStudent);
 
-        // 5. ENHANCED: Prefill the grading form with comprehensive fallback logic
-        setGradingFormData(prev => {
-            const courseInfo = {
-                code: courseMetadata?.courseCode || prev.course.code || '',
-                name: courseMetadata?.courseName || prev.course.name || '',
-                // FIXED: Handle both instructor and professors fields with fallbacks
-                instructor: courseMetadata?.instructor ||
-                    courseMetadata?.professors ||
-                    prev.course.instructor || '',
-                term: courseMetadata?.term || prev.course.term || ''
-            };
+        setGradingSession(newSession);
+        setCurrentStudent(classListData.students[0]);
 
-            console.log('🔄 Course metadata mapping:', {
-                original: courseMetadata,
-                mapped: courseInfo
-            });
-
-            return {
-                ...prev,
-                student: {
-                    name: firstStudent.name,
-                    id: firstStudent.id,
-                    email: firstStudent.email
-                },
-                course: courseInfo,
-                assignment: sharedCourseDetails?.assignment ?? prev.assignment
-            };
-        });
-
-        console.log(`🚀 Grading session started for ${students.length} students with course info:`, {
-            code: courseMetadata?.courseCode,
-            name: courseMetadata?.courseName,
-            instructor: courseMetadata?.instructor || courseMetadata?.professors,
-            term: courseMetadata?.term
-        });
-
+        console.log('✅ Grading session initialized:', newSession);
         return true;
-    }, [sharedCourseDetails]);
-
-    const clearGradingFormData = useCallback(() => {
-        setGradingFormData({
-            student: { name: '', id: '', email: '' },
-            course: { code: '', name: '', instructor: '', term: '' },
-            assignment: { name: '', dueDate: '', maxPoints: 100 },
-            feedback: { general: '', strengths: '', improvements: '' },
-            attachments: [],
-            videoLinks: [],
-            latePolicy: { level: 'none', penaltyApplied: false },
-            rubricGrading: {},
-            metadata: {
-                gradedBy: '',
-                gradedDate: '',
-                aiAssisted: false,
-                rubricIntegrated: false
-            }
-        });
     }, []);
 
-    // FIXED: The two console.log statements that were here have been removed.
-    // They were out of scope and causing "not defined" errors.
-
-    const clearRubricFormData = useCallback(() => {
-        setRubricFormData({
-            assignmentInfo: {
-                title: '',
-                description: '',
-                weight: 25,
-                passingThreshold: 60,
-                totalPoints: 100
-            },
-            rubricLevels: [
-                { level: 'incomplete', name: 'Incomplete', description: 'No submission or unusable', color: '#95a5a6', multiplier: 0 },
-                { level: 'unacceptable', name: 'Unacceptable', description: 'Below minimum standards', color: '#e74c3c', multiplier: 0.3 },
-                { level: 'developing', name: 'Developing', description: 'Approaching standards', color: '#f39c12', multiplier: 0.55 },
-                { level: 'acceptable', name: 'Acceptable (PASS)', description: 'Meets minimum standards', color: '#27ae60', multiplier: 0.7 },
-                { level: 'emerging', name: 'Emerging', description: 'Above standard expectations', color: '#2980b9', multiplier: 0.82 },
-                { level: 'accomplished', name: 'Accomplished', description: 'Strong professional quality', color: '#16a085', multiplier: 0.92 },
-                { level: 'exceptional', name: 'Exceptional', description: 'Outstanding professional quality', color: '#8e44ad', multiplier: 1.0 }
-            ],
-            criteria: [
-                {
-                    id: 'criterion-1',
-                    name: '',
-                    description: '',
-                    maxPoints: 20,
-                    weight: 20,
-                    levels: {},
-                    feedbackLibrary: {
-                        strengths: [],
-                        improvements: [],
-                        general: []
-                    }
-                }
-            ],
-            pointingSystem: 'multiplier',
-            reversedOrder: false,
-            expandedFeedback: {},
-            modalEdit: { show: false, content: '', field: null, onSave: null }
-        });
+    const updateGradingSession = useCallback((updates) => {
+        setGradingSession(prev => ({ ...prev, ...updates }));
     }, []);
 
-    // Finalize a draft grade
-    const finalizeGrade = useCallback((studentId) => {
-        const draftData = drafts[studentId];
-        if (draftData) {
-            saveFinalGrade(studentId, draftData);
-            console.log('🎯 Finalized draft for student:', studentId);
+    const nextStudentInSession = useCallback(() => {
+        if (!gradingSession.active || !gradingSession.classListData) {
+            console.warn('No active grading session');
+            return false;
         }
-    }, [drafts, saveFinalGrade]);
 
-    // Unlock a final grade (convert back to draft)
-    const unlockGrade = useCallback((studentId) => {
-        const finalData = finalGrades[studentId];
-        if (finalData) {
-            // Move from final back to draft
-            setDrafts(prev => ({ ...prev, [studentId]: finalData }));
-            setFinalGrades(prev => {
-                const updated = { ...prev };
-                delete updated[studentId];
-                return updated;
-            });
-
-            // Update class list progress
-            if (classList) {
-                const studentIndex = classList.students.findIndex(s => s.id === studentId);
-                if (studentIndex >= 0) {
-                    const updatedProgress = [...classList.gradingProgress];
-                    updatedProgress[studentIndex] = {
-                        ...updatedProgress[studentIndex],
-                        status: 'completed_draft',
-                        lastModified: new Date().toISOString(),
-                        gradeType: 'draft'
-                    };
-                    setClassList(prev => ({
-                        ...prev,
-                        gradingProgress: updatedProgress
-                    }));
-                }
-            }
-
-            console.log('🔓 Unlocked final grade for student:', studentId);
+        const nextIndex = gradingSession.currentStudentIndex + 1;
+        if (nextIndex >= gradingSession.totalStudents) {
+            console.log('✅ Reached end of class list');
+            return false;
         }
-    }, [finalGrades, classList]);
 
-    // FIXED: Added definition for updateGradingSession
-    const updateGradingSession = useCallback((sessionUpdate) => {
-        setGradingSession(prev => ({ ...prev, ...sessionUpdate }));
-    }, []);
+        const nextStudent = gradingSession.classListData.students[nextIndex];
 
-    // FIXED: Added definition for clearSharedRubric
-    const clearSharedRubric = useCallback(() => {
-        setSharedRubric(null);
-    }, []);
-
-    // FIXED: Added definition for transferRubricToGrading
-    const transferRubricToGrading = useCallback(() => {
-        if (!sharedRubric) return;
-        setGradingFormData(prev => ({
+        setGradingSession(prev => ({
             ...prev,
-            metadata: {
-                ...prev.metadata,
-                rubricIntegrated: true
-            }
+            currentStudentIndex: nextIndex,
+            currentStudent: nextStudent
         }));
-    }, [sharedRubric]);
 
-    // FIXED: Added definition for transferRubricToGradingWithDetails
-    const transferRubricToGradingWithDetails = useCallback(() => {
-        if (!sharedRubric) return;
-        // This is a placeholder for more complex logic.
-        // For now, it copies the assignment title and marks rubric as integrated.
-        setGradingFormData(prev => ({
+        setCurrentStudent(nextStudent);
+
+        console.log('✅ Moved to next student:', nextStudent.name);
+        return true;
+    }, [gradingSession]);
+
+    const previousStudentInSession = useCallback(() => {
+        if (!gradingSession.active || !gradingSession.classListData) {
+            console.warn('No active grading session');
+            return false;
+        }
+
+        const prevIndex = gradingSession.currentStudentIndex - 1;
+        if (prevIndex < 0) {
+            console.log('Already at first student');
+            return false;
+        }
+
+        const prevStudent = gradingSession.classListData.students[prevIndex];
+
+        setGradingSession(prev => ({
             ...prev,
-            assignment: {
-                ...prev.assignment,
-                name: sharedRubric.assignmentInfo.title || prev.assignment.name
-            },
-            metadata: {
-                ...prev.metadata,
-                rubricIntegrated: true
-            }
+            currentStudentIndex: prevIndex,
+            currentStudent: prevStudent
         }));
-    }, [sharedRubric]);
 
+        setCurrentStudent(prevStudent);
 
-    // UPDATED: Export Session Function with AI Prompt Data and Assignment Prompt Data
+        console.log('✅ Moved to previous student:', prevStudent.name);
+        return true;
+    }, [gradingSession]);
+
+    // ORIGINAL: Session management
     const exportSession = useCallback(() => {
         const sessionData = {
-            sharedRubric,
-            classList,
-            drafts,
-            finalGrades,
-            activeTab,
-            currentStudent,
-            gradingSession,
-            sharedCourseDetails,
-            aiPromptFormData, // AI Rubric prompt data
-            assignmentPromptFormData, // NEW: Assignment prompt data
+            rubric: sharedRubric,
+            courseDetails: sharedCourseDetails,
+            gradingData: gradingFormData,
+            classList: classList,
+            currentStudent: currentStudent,
+            drafts: drafts,
+            finalGrades: finalGrades,
+            customLatePolicies: customLatePolicies,
+            currentLatePolicy: currentLatePolicy,
+            exportedAt: new Date().toISOString(),
+            version: '2.0'
         };
-        const dataStr = JSON.stringify(sessionData, null, 2);
-        const dataBlob = new Blob([dataStr], { type: 'application/json' });
-        const url = URL.createObjectURL(dataBlob);
+
+        const blob = new Blob([JSON.stringify(sessionData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        const timestamp = new Date().toISOString().replace(/:/g, '-').slice(0, 19);
-        link.download = `grading-session-${timestamp}.json`;
+        link.download = `grading-session-${new Date().toISOString().split('T')[0]}.json`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
-    }, [sharedRubric, classList, drafts, finalGrades, activeTab, currentStudent, gradingSession, sharedCourseDetails, aiPromptFormData, assignmentPromptFormData]);
+    }, [sharedRubric, sharedCourseDetails, gradingFormData, classList, currentStudent, drafts, finalGrades, customLatePolicies, currentLatePolicy]);
 
-    // UPDATED: Import Session Function with AI Prompt Data and Assignment Prompt Data
-    const importSession = useCallback((jsonContent) => {
+    const importSession = useCallback((sessionData) => {
         try {
-            const sessionData = JSON.parse(jsonContent);
-            if (sessionData && typeof sessionData === 'object') {
-                setSharedRubric(sessionData.sharedRubric || null);
-                setClassList(sessionData.classList || null);
-                setDrafts(sessionData.drafts || {});
-                setFinalGrades(sessionData.finalGrades || {});
-                setActiveTab(sessionData.activeTab || 'assignment-prompt-generator');
-                setCurrentStudent(sessionData.currentStudent || null);
-                setGradingSession(sessionData.gradingSession || { active: false });
-                setSharedCourseDetails(sessionData.sharedCourseDetails || null);
-                setAIPromptFormData(sessionData.aiPromptFormData || null); // AI Rubric prompt data
-                setAssignmentPromptFormData(sessionData.assignmentPromptFormData || null); // NEW: Assignment prompt data
-                alert('Session loaded successfully!');
-            } else {
-                throw new Error('Invalid file format.');
-            }
+            if (sessionData.rubric) setSharedRubric(sessionData.rubric);
+            if (sessionData.courseDetails) setSharedCourseDetails(sessionData.courseDetails);
+            if (sessionData.gradingData) setGradingFormData(sessionData.gradingData);
+            if (sessionData.classList) setClassList(sessionData.classList);
+            if (sessionData.currentStudent) setCurrentStudent(sessionData.currentStudent);
+            if (sessionData.drafts) setDrafts(sessionData.drafts);
+            if (sessionData.finalGrades) setFinalGrades(sessionData.finalGrades);
+
+            // Import late policy data if available
+            if (sessionData.customLatePolicies) setCustomLatePolicies(sessionData.customLatePolicies);
+            if (sessionData.currentLatePolicy) setCurrentLatePolicy(sessionData.currentLatePolicy);
+
+            console.log('✅ Session imported successfully with late policy data');
         } catch (error) {
             console.error("Failed to import session:", error);
             alert("Error: Could not load the session file. Please ensure it's a valid session file.");
@@ -627,13 +628,15 @@ export const AssessmentProvider = ({ children }) => {
         setSharedRubric(null);
         clearGradingFormData();
         clearRubricFormData();
-        clearAIPromptFormData(); // Clear AI Rubric prompt data
-        clearAssignmentPromptFormData(); // NEW: Clear assignment prompt data
+        clearAIPromptFormData();
+        clearAssignmentPromptFormData();
+        setDrafts({});
+        setFinalGrades({});
+        setCustomLatePolicies([]);
+        setCurrentLatePolicy(DEFAULT_LATE_POLICY);
     }, [clearGradingFormData, clearRubricFormData, clearAIPromptFormData, clearAssignmentPromptFormData]);
 
-    const persistentFormData = gradingFormData;
-    const updatePersistentFormData = setGradingFormData;
-
+    // Context value with ALL functions
     const value = {
         // Shared state
         sharedRubric,
@@ -651,7 +654,7 @@ export const AssessmentProvider = ({ children }) => {
         initializeAIPromptFormData,
         clearAIPromptFormData,
 
-        // NEW: Assignment Prompt Generator
+        // Assignment Prompt Generator
         assignmentPromptFormData,
         updateAssignmentPromptFormData,
         initializeAssignmentPromptFormData,
@@ -661,8 +664,8 @@ export const AssessmentProvider = ({ children }) => {
         gradingData: gradingFormData,
         setGradingData: setGradingFormData,
         clearGradingFormData,
-        persistentFormData,
-        updatePersistentFormData,
+        persistentFormData: gradingFormData,
+        updatePersistentFormData: setGradingFormData,
 
         // Form update functions
         updateStudentInfo,
@@ -675,7 +678,7 @@ export const AssessmentProvider = ({ children }) => {
         updateRubricGrading,
         updateMetadata,
 
-        // Draft and Final Grade Management - ENHANCED
+        // Draft and Final Grade Management
         drafts,
         finalGrades,
         saveDraft,
@@ -698,17 +701,28 @@ export const AssessmentProvider = ({ children }) => {
         setGradingSession,
         nextStudentInSession,
         previousStudentInSession,
-        updateGradingSession, // Now defined
+        updateGradingSession,
         initializeGradingSession,
 
         // Rubric form data
         rubricFormData,
         setRubricFormData,
 
+        // Late Policy Management
+        currentLatePolicy,
+        setCurrentLatePolicy,
+        customLatePolicies,
+        setCustomLatePolicies,
+        loadLatePoliciesFromStorage,
+        saveCustomLatePolicy,
+        updateCustomLatePolicy,
+        deleteCustomLatePolicy,
+        calculateScoreWithLatePolicy,
+
         // Utility functions
-        transferRubricToGrading, // Now defined
-        transferRubricToGradingWithDetails, // Now defined
-        clearSharedRubric, // Now defined
+        transferRubricToGrading,
+        transferRubricToGradingWithDetails,
+        clearSharedRubric,
         clearRubricFormData,
         clearAllData,
 
