@@ -222,6 +222,30 @@ export const AssessmentProvider = ({ children }) => {
         }));
     }, []);
 
+    // Apply a late policy to a given score and update grading data
+    const applyLatePolicy = useCallback((policyId, level, originalScore) => {
+        const policy = customLatePolicies.find(p => p.id === policyId) || currentLatePolicy;
+        if (!policy || !policy.levels[level]) return originalScore;
+
+        const multiplier = policy.levels[level].multiplier;
+        const adjustedScore = originalScore * multiplier;
+
+        setGradingFormData(prevData => ({
+            ...prevData,
+            latePolicy: {
+                ...prevData.latePolicy,
+                level,
+                policyId,
+                originalScore,
+                adjustedScore,
+                multiplier,
+                penaltyApplied: level !== 'none'
+            }
+        }));
+
+        return adjustedScore;
+    }, [customLatePolicies, currentLatePolicy]);
+
     // ORIGINAL: Clear grading form data
     const clearGradingFormData = useCallback(() => {
         setGradingFormData({
@@ -717,6 +741,7 @@ export const AssessmentProvider = ({ children }) => {
         saveCustomLatePolicy,
         updateCustomLatePolicy,
         deleteCustomLatePolicy,
+        applyLatePolicy,
         calculateScoreWithLatePolicy,
 
         // Utility functions
