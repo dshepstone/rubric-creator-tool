@@ -2,8 +2,11 @@ import React, { useRef } from 'react';
 import { useAssessment } from './SharedContext';
 import {
     FileText, GraduationCap, Users, ArrowRight, Database,
-    PlayCircle, Clock, CheckCircle, AlertTriangle, Save, Upload, Sparkles, BookOpen, HelpCircle // ADDED HelpCircle
+    PlayCircle, Clock, CheckCircle, AlertTriangle, Save, Upload, Sparkles, BookOpen, HelpCircle, Settings // ADDED Settings
 } from 'lucide-react';
+
+// Add grading policy hooks
+import { useGradingPolicies } from '../hooks/useGradingPolicies';
 
 const TabNavigation = () => {
     const {
@@ -17,6 +20,9 @@ const TabNavigation = () => {
         exportSession,
         importSession,
     } = useAssessment();
+
+    // Add grading policy state
+    const { data: availablePolicies = [], isLoading: policiesLoading } = useGradingPolicies({ isActive: true });
 
     const importSessionInputRef = useRef(null);
 
@@ -59,6 +65,12 @@ const TabNavigation = () => {
             description: 'Import and manage class lists'
         },
         {
+            id: 'policy-manager',
+            name: 'Policy Manager',
+            icon: Settings,
+            description: 'Manage dynamic grading policies and scales'
+        },
+        {
             id: 'grading-tool',
             name: 'Grading Tool',
             icon: GraduationCap,
@@ -77,8 +89,9 @@ const TabNavigation = () => {
         'assignment-prompt-generator': 'active-assignment-prompt border-orange-500 text-orange-700',
         'rubric-creator': 'active-rubric border-purple-500 text-purple-700',
         'class-manager': 'active-class border-indigo-500 text-indigo-700',
+        'policy-manager': 'active-policy border-teal-500 text-teal-700',
         'grading-tool': 'active-grading border-green-500 text-green-700',
-        'help': 'active-help border-gray-500 text-gray-700', // NEW STYLE
+        'help': 'active-help border-gray-500 text-gray-700',
     };
 
     // Check if there's data that indicates active work
@@ -92,6 +105,10 @@ const TabNavigation = () => {
     );
     const hasClassListData = classList && classList.students?.length > 0;
     const hasActiveSession = gradingSession?.active;
+
+    // Add grading policy status checks
+    const hasPolicyData = availablePolicies && availablePolicies.length > 0;
+    const currentProgramType = classList?.courseMetadata?.programType || 'degree';
 
     // Calculate grading progress
     const getGradingProgress = () => {
@@ -177,6 +194,30 @@ const TabNavigation = () => {
                                         </div>
                                     )}
 
+                                    {/* Policy Manager indicators */}
+                                    {tab.id === 'policy-manager' && (
+                                        <div className="flex flex-col gap-1">
+                                            {hasPolicyData && (
+                                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-teal-100 text-teal-800 whitespace-nowrap">
+                                                    <Settings size={10} className="mr-1 flex-shrink-0" />
+                                                    {availablePolicies.length} Policies
+                                                </span>
+                                            )}
+                                            {currentProgramType && (
+                                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 whitespace-nowrap">
+                                                    <Database size={10} className="mr-1 flex-shrink-0" />
+                                                    {currentProgramType.charAt(0).toUpperCase() + currentProgramType.slice(1)}
+                                                </span>
+                                            )}
+                                            {policiesLoading && (
+                                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 whitespace-nowrap">
+                                                    <Clock size={10} className="mr-1 flex-shrink-0" />
+                                                    Loading...
+                                                </span>
+                                            )}
+                                        </div>
+                                    )}
+
                                     {/* Grading Tool Indicators */}
                                     {tab.id === 'grading-tool' && (
                                         <div className="flex flex-col gap-1">
@@ -257,6 +298,18 @@ const TabNavigation = () => {
                                     Need Help?
                                 </button>
                             )}
+
+                            {/* Policy Manager shortcut - only show when class data exists */}
+                            {activeTab !== 'policy-manager' && hasClassListData && (
+                                <button
+                                    onClick={() => setActiveTab('policy-manager')}
+                                    className="flex items-center gap-1 text-teal-600 hover:text-teal-800 text-xs font-medium"
+                                    title="Manage grading policies for your program type"
+                                >
+                                    <Settings size={12} />
+                                    Manage Policies
+                                </button>
+                            )}
                         </div>
 
                         {/* Smart workflow navigation buttons */}
@@ -272,33 +325,81 @@ const TabNavigation = () => {
                             )}
 
                             {activeTab === 'rubric-creator' && hasRubricData && hasClassListData && (
-                                <button
-                                    onClick={() => setActiveTab('grading-tool')}
-                                    className="flex items-center gap-2 text-green-700 hover:text-green-800 text-sm font-medium bg-white px-3 py-1.5 rounded-lg border border-green-200 hover:border-green-300 transition-all duration-200 shadow-sm hover:shadow"
-                                >
-                                    <GraduationCap size={14} />
-                                    Start Grading
-                                </button>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => setActiveTab('policy-manager')}
+                                        className="flex items-center gap-2 text-teal-700 hover:text-teal-800 text-sm font-medium bg-white px-3 py-1.5 rounded-lg border border-teal-200 hover:border-teal-300 transition-all duration-200 shadow-sm hover:shadow"
+                                    >
+                                        <Settings size={14} />
+                                        Check Policies
+                                    </button>
+                                    <button
+                                        onClick={() => setActiveTab('grading-tool')}
+                                        className="flex items-center gap-2 text-green-700 hover:text-green-800 text-sm font-medium bg-white px-3 py-1.5 rounded-lg border border-green-200 hover:border-green-300 transition-all duration-200 shadow-sm hover:shadow"
+                                    >
+                                        <GraduationCap size={14} />
+                                        Start Grading
+                                    </button>
+                                </div>
                             )}
 
                             {activeTab === 'class-manager' && hasRubricData && hasClassListData && (
-                                <button
-                                    onClick={() => setActiveTab('grading-tool')}
-                                    className="flex items-center gap-2 text-green-700 hover:text-green-800 text-sm font-medium bg-white px-3 py-1.5 rounded-lg border border-green-200 hover:border-green-300 transition-all duration-200 shadow-sm hover:shadow"
-                                >
-                                    <GraduationCap size={14} />
-                                    Go to Grading
-                                </button>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => setActiveTab('policy-manager')}
+                                        className="flex items-center gap-2 text-teal-700 hover:text-teal-800 text-sm font-medium bg-white px-3 py-1.5 rounded-lg border border-teal-200 hover:border-teal-300 transition-all duration-200 shadow-sm hover:shadow"
+                                    >
+                                        <Settings size={14} />
+                                        Review Policies
+                                    </button>
+                                    <button
+                                        onClick={() => setActiveTab('grading-tool')}
+                                        className="flex items-center gap-2 text-green-700 hover:text-green-800 text-sm font-medium bg-white px-3 py-1.5 rounded-lg border border-green-200 hover:border-green-300 transition-all duration-200 shadow-sm hover:shadow"
+                                    >
+                                        <GraduationCap size={14} />
+                                        Go to Grading
+                                    </button>
+                                </div>
+                            )}
+
+                            {activeTab === 'policy-manager' && hasClassListData && (
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => setActiveTab('class-manager')}
+                                        className="flex items-center gap-2 text-indigo-700 hover:text-indigo-800 text-sm font-medium bg-white px-3 py-1.5 rounded-lg border border-indigo-200 hover:border-indigo-300 transition-all duration-200 shadow-sm hover:shadow"
+                                    >
+                                        <Users size={14} />
+                                        Back to Class
+                                    </button>
+                                    {hasRubricData && (
+                                        <button
+                                            onClick={() => setActiveTab('grading-tool')}
+                                            className="flex items-center gap-2 text-green-700 hover:text-green-800 text-sm font-medium bg-white px-3 py-1.5 rounded-lg border border-green-200 hover:border-green-300 transition-all duration-200 shadow-sm hover:shadow"
+                                        >
+                                            <GraduationCap size={14} />
+                                            Start Grading
+                                        </button>
+                                    )}
+                                </div>
                             )}
 
                             {activeTab === 'grading-tool' && hasRubricData && (
-                                <button
-                                    onClick={() => setActiveTab('rubric-creator')}
-                                    className="flex items-center gap-2 text-purple-700 hover:text-purple-800 text-sm font-medium bg-white px-3 py-1.5 rounded-lg border border-purple-200 hover:border-purple-300 transition-all duration-200 shadow-sm hover:shadow"
-                                >
-                                    <FileText size={14} />
-                                    Edit Rubric
-                                </button>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => setActiveTab('policy-manager')}
+                                        className="flex items-center gap-2 text-teal-700 hover:text-teal-800 text-sm font-medium bg-white px-3 py-1.5 rounded-lg border border-teal-200 hover:border-teal-300 transition-all duration-200 shadow-sm hover:shadow"
+                                    >
+                                        <Settings size={14} />
+                                        Policies
+                                    </button>
+                                    <button
+                                        onClick={() => setActiveTab('rubric-creator')}
+                                        className="flex items-center gap-2 text-purple-700 hover:text-purple-800 text-sm font-medium bg-white px-3 py-1.5 rounded-lg border border-purple-200 hover:border-purple-300 transition-all duration-200 shadow-sm hover:shadow"
+                                    >
+                                        <FileText size={14} />
+                                        Edit Rubric
+                                    </button>
+                                </div>
                             )}
 
                             {activeTab === 'grading-tool' && hasClassListData && (

@@ -168,13 +168,15 @@ const parseStudentData = (hdrs, rows) => {
 };
 
 // 4) Extract **all** header-card fields
+// COMPLETE extractCourseMetadata function with instructor field mapping fix
 const extractCourseMetadata = (raw, students) => {
     const md = {
         courseCode: '',
         courseName: '',
         section: '',
         campus: '',
-        professors: '',
+        professors: '',  // Keep original field
+        instructor: '',  // ADD: New standardized field for compatibility
         term: '',
         hours: '',
         gradeScale: '',
@@ -218,10 +220,12 @@ const extractCourseMetadata = (raw, students) => {
             md.courseName = rest.split(/Section/i)[0].trim();
         }
 
-        // — Professors —
+        // — Professors — ENHANCED: Map to both fields
         const pi = row.findIndex(c => /Professors?:/i.test(c));
         if (pi > -1) {
-            md.professors = nextNonEmpty(row, pi);
+            const professorValue = nextNonEmpty(row, pi);
+            md.professors = professorValue;  // Keep original field
+            md.instructor = professorValue;  // ADD: Map to standardized field for compatibility
         }
 
         // — Hours —

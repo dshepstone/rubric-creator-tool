@@ -9,7 +9,13 @@ import ClassListManager from './components/ClassListManager';
 import GradingTemplate from './components/GradingTemplate';
 import ExcelImportTest from './components/ExcelImportTest';
 import HelpPage from './components/HelpPage';
+import GradingPolicyManager from './components/GradingPolicyManager';
 import './index.css';
+
+// Add TanStack Query imports
+import { QueryClientProvider } from '@tanstack/react-query';
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
+import { queryClient } from './lib/queryClient';
 
 // Scroll to Top Button Component
 const ScrollToTopButton = () => {
@@ -224,6 +230,7 @@ const AppContent = () => {
         {activeTab === 'assignment-prompt-generator' && <AssignmentPromptGenerator />}
         {activeTab === 'rubric-creator' && <RubricCreator />}
         {activeTab === 'class-manager' && <ClassListManager />}
+        {activeTab === 'policy-manager' && <GradingPolicyManager />}
         {activeTab === 'grading-tool' && <GradingTemplate />}
         {activeTab === 'excel-import-test' && <ExcelImportTest />}
         {activeTab === 'help' && <HelpPage />}
@@ -235,11 +242,23 @@ const AppContent = () => {
   );
 };
 
+// Updated App component with QueryClient integration
 const App = () => {
   return (
-    <AssessmentProvider>
-      <AppContent />
-    </AssessmentProvider>
+    <QueryClientProvider client={queryClient}>
+      <AssessmentProvider>
+        <AppContent />
+      </AssessmentProvider>
+
+      {/* Add ReactQuery DevTools for development */}
+      {process.env.NODE_ENV === 'development' && (
+        <ReactQueryDevtools
+          initialIsOpen={false}
+          position="bottom-left"
+          buttonPosition="bottom-left"
+        />
+      )}
+    </QueryClientProvider>
   );
 };
 
