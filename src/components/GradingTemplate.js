@@ -988,7 +988,7 @@ Write the feedback now, making it sound personal and genuine while keeping it co
 
   // NEW HELPER FUNCTIONS FOR COURSE INFO
   const getEffectiveCourseData = () => {
-    const course = gradingData.course;
+    const course = gradingData?.course || {};
     const metadata = classList?.courseMetadata;
 
     return {
@@ -1019,14 +1019,16 @@ Write the feedback now, making it sound personal and genuine while keeping it co
       course: newCourseInfo
     }));
 
-    updateCourseInfo(newCourseInfo);
+    Object.entries(newCourseInfo).forEach(([field, value]) => {
+      updateCourseInfo(field, value);
+    });
 
     console.log('📥 Pulled course data from class list:', newCourseInfo);
     alert(`Course information updated!\n\nCode: ${newCourseInfo.code}\nName: ${newCourseInfo.name}\nInstructor: ${newCourseInfo.instructor}\nTerm: ${newCourseInfo.term}`);
   };
 
   const isCourseDataMissing = () => {
-    const course = gradingData.course || {};
+    const course = gradingData?.course || {};
     return !course.code && !course.name && !course.instructor && !course.term;
   };
 
@@ -1382,7 +1384,7 @@ Write the feedback now, making it sound personal and genuine while keeping it co
                       ...prevData,
                       course: { ...prevData.course, code: newValue }
                     }));
-                    updateCourseInfo({ code: newValue });
+                    updateCourseInfo('code', newValue);
                   }}
                   style={{
                     width: '100%',
@@ -1403,7 +1405,7 @@ Write the feedback now, making it sound personal and genuine while keeping it co
                       ...prevData,
                       course: { ...prevData.course, name: newValue }
                     }));
-                    updateCourseInfo({ name: newValue });
+                    updateCourseInfo('name', newValue);
                   }}
                   style={{
                     width: '100%',
@@ -1424,7 +1426,7 @@ Write the feedback now, making it sound personal and genuine while keeping it co
                       ...prevData,
                       course: { ...prevData.course, instructor: newValue }
                     }));
-                    updateCourseInfo({ instructor: newValue });
+                    updateCourseInfo('instructor', newValue);
                   }}
                   style={{
                     width: '100%',
@@ -1445,7 +1447,7 @@ Write the feedback now, making it sound personal and genuine while keeping it co
                       ...prevData,
                       course: { ...prevData.course, term: newValue }
                     }));
-                    updateCourseInfo({ term: newValue });
+                    updateCourseInfo('term', newValue);
                   }}
                   style={{
                     width: '100%',
