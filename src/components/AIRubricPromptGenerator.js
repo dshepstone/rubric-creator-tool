@@ -606,8 +606,8 @@ Please generate a complete, ready-to-import, downloadable JSON file that matches
                     onClick={generatePrompt}
                     disabled={!isFormValid}
                     className={`px-8 py-4 rounded-lg font-semibold text-lg flex items-center gap-3 transition-all ${isFormValid
-                        ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl transform hover:-translate-y-1'
-                        : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl transform hover:-translate-y-1'
+                      : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                       }`}
                   >
                     <Sparkles className="w-6 h-6" />
