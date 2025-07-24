@@ -17,11 +17,15 @@ import {
     Save,
     X,
     Copy,
-    Clock
+    Clock,
+    Info,
+    Check
 } from 'lucide-react';
 import gradingPolicyService from '../services/gradingPolicyService';
 import { useGradingPolicies, useGradeCalculation } from '../hooks/useGradingPolicies';
 import { useAssessment, DEFAULT_LATE_POLICY } from './SharedContext';
+import Tooltip from 'rc-tooltip';
+import 'rc-tooltip/assets/bootstrap.css';
 
 const GradingPolicyManager = () => {
     // Use TanStack Query hooks instead of manual state
@@ -401,83 +405,159 @@ const LatePolicyForm = ({ policy, onSave, onCancel }) => {
         });
     };
 
-    const handleSubmit = () => {
-        onSave(formData);
-    };
-
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg max-w-xl w-full p-6 overflow-y-auto max-h-[90vh]">
-                <h2 className="text-lg font-bold mb-4">{formData.id ? 'Edit Late Policy' : 'New Late Policy'}</h2>
-                <div className="space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium mb-1">Name</label>
-                        <input
-                            type="text"
-                            value={formData.name}
-                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                            className="w-full p-2 border rounded"
-                        />
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-lg max-w-2xl w-full p-6 overflow-y-auto max-h-[90vh]">
+                {/* Header */}
+                <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-xl font-bold">{formData.id ? 'Edit Late Policy' : 'New Late Policy'}</h2>
+                    <button onClick={onCancel} className="p-1 text-gray-600 hover:text-gray-800">
+                        <X />
+                    </button>
+                </div>
+
+                {/* Help Panel */}
+                <div className="bg-blue-50 border border-blue-100 rounded p-4 mb-6 text-sm text-blue-800">
+                    <strong>How to fill this form:</strong>
+                    <ul className="list-disc ml-5 mt-2">
+                        <li><strong>Name:</strong> e.g. “Creative Industries.”</li>
+                        <li><strong>Description:</strong> Optional short note for your own reference.</li>
+                        <li><strong>Levels:</strong> These are your “On Time”, “24h Late” etc. slots.</li>
+                        <li><strong>Multiplier:</strong> Enter a decimal (0 – 1) to scale the grade.</li>
+                        <li><strong>Color:</strong> Pick a color to highlight this level in UI.</li>
+                    </ul>
+                </div>
+
+                {/* Basic fields */}
+                <div className="space-y-4 mb-6">
+                    {/* Name */}
+                    <label className="block text-sm font-medium">
+                        Policy Name{' '}
+                        <Tooltip overlay="Give your policy a clear, unique name">
+                            <Info className="inline text-gray-400 cursor-pointer" size={14} />
+                        </Tooltip>
+                    </label>
+                    <input
+                        type="text"
+                        value={formData.name}
+                        onChange={e => setFormData({ ...formData, name: e.target.value })}
+                        placeholder="e.g. Creative Industries"
+                        className="w-full p-2 border rounded"
+                    />
+
+                    {/* Description */}
+                    <label className="block text-sm font-medium">
+                        Description{' '}
+                        <Tooltip overlay="Short note (optional)">
+                            <Info className="inline text-gray-400 cursor-pointer" size={14} />
+                        </Tooltip>
+                    </label>
+                    <input
+                        type="text"
+                        value={formData.description}
+                        onChange={e => setFormData({ ...formData, description: e.target.value })}
+                        placeholder="Describe when this policy applies"
+                        className="w-full p-2 border rounded"
+                    />
+                </div>
+
+                {/* Levels */}
+                <div>
+                    <div className="flex justify-between items-center mb-2">
+                        <h3 className="font-medium">Levels</h3>
+                        <button onClick={addLevel} className="text-sm text-green-600 hover:underline">+ Add Level</button>
                     </div>
-                    <div>
-                        <label className="block text-sm font-medium mb-1">Description</label>
-                        <input
-                            type="text"
-                            value={formData.description}
-                            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                            className="w-full p-2 border rounded"
-                        />
-                    </div>
-                    <div>
-                        <div className="flex justify-between items-center mb-2">
-                            <span className="font-medium">Levels</span>
-                            <button onClick={addLevel} className="text-sm text-blue-600">Add Level</button>
-                        </div>
-                        <div className="space-y-3">
-                            {Object.entries(formData.levels).map(([levelKey, level]) => (
-                                <div key={levelKey} className="border p-2 rounded">
-                                    <div className="grid grid-cols-4 gap-2 mb-2">
+
+                    <div className="space-y-4">
+                        {Object.entries(formData.levels).map(([key, lvl]) => (
+                            <div key={key} className="border rounded-lg p-4 bg-gray-50">
+                                <div className="flex justify-between items-center mb-3">
+                                    <strong>Level: {lvl.name || 'Unnamed'}</strong>
+                                    <button onClick={() => removeLevel(key)} className="text-red-500 hover:underline text-sm">Remove</button>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                                    {/* Name */}
+                                    <div>
+                                        <label className="block text-xs font-medium">
+                                            Name{' '}
+                                            <Tooltip overlay="e.g. On Time, 24h Late">
+                                                <Info className="inline text-gray-400 cursor-pointer" size={12} />
+                                            </Tooltip>
+                                        </label>
                                         <input
                                             type="text"
-                                            value={level.name}
-                                            onChange={(e) => updateLevel(levelKey, 'name', e.target.value)}
-                                            className="p-1 border rounded"
+                                            value={lvl.name}
+                                            onChange={e => updateLevel(key, 'name', e.target.value)}
                                             placeholder="Level Name"
+                                            className="w-full p-1 border rounded text-sm"
                                         />
+                                    </div>
+
+                                    {/* Multiplier */}
+                                    <div>
+                                        <label className="block text-xs font-medium">
+                                            Multiplier{' '}
+                                            <Tooltip overlay="Decimal between 0 (zero) and 1 (full credit)">
+                                                <Info className="inline text-gray-400 cursor-pointer" size={12} />
+                                            </Tooltip>
+                                        </label>
                                         <input
                                             type="number"
                                             step="0.01"
                                             min="0"
                                             max="1"
-                                            value={level.multiplier}
-                                            onChange={(e) => updateLevel(levelKey, 'multiplier', e.target.value)}
-                                            className="p-1 border rounded"
-                                            placeholder="Multiplier"
+                                            value={lvl.multiplier}
+                                            onChange={e => updateLevel(key, 'multiplier', e.target.value)}
+                                            placeholder="e.g. 0.8"
+                                            className="w-full p-1 border rounded text-sm"
                                         />
-                                        <input
-                                            type="text"
-                                            value={level.color}
-                                            onChange={(e) => updateLevel(levelKey, 'color', e.target.value)}
-                                            className="p-1 border rounded"
-                                            placeholder="#ea580c"
-                                        />
-                                        <button onClick={() => removeLevel(levelKey)} className="text-red-600 text-sm">Remove</button>
                                     </div>
-                                    <textarea
-                                        value={level.description}
-                                        onChange={(e) => updateLevel(levelKey, 'description', e.target.value)}
-                                        className="w-full p-1 border rounded text-sm"
-                                        rows={2}
-                                        placeholder="Description"
-                                    />
+
+                                    {/* Color Picker */}
+                                    <div>
+                                        <label className="block text-xs font-medium">
+                                            Color{' '}
+                                            <Tooltip overlay="Pick a highlight color">
+                                                <Info className="inline text-gray-400 cursor-pointer" size={12} />
+                                            </Tooltip>
+                                        </label>
+                                        <input
+                                            type="color"
+                                            value={lvl.color}
+                                            onChange={e => updateLevel(key, 'color', e.target.value)}
+                                            className="w-full h-8 border-0 p-0 bg-transparent"
+                                        />
+                                    </div>
+
+                                    {/* Optional description */}
+                                    <div className="sm:col-span-4">
+                                        <label className="block text-xs font-medium">
+                                            Description{' '}
+                                            <Tooltip overlay="Explain what happens at this level">
+                                                <Info className="inline text-gray-400 cursor-pointer" size={12} />
+                                            </Tooltip>
+                                        </label>
+                                        <textarea
+                                            rows={2}
+                                            value={lvl.description}
+                                            onChange={e => updateLevel(key, 'description', e.target.value)}
+                                            placeholder="Optional detail for instructors"
+                                            className="w-full p-1 border rounded text-sm"
+                                        />
+                                    </div>
                                 </div>
-                            ))}
-                        </div>
+                            </div>
+                        ))}
                     </div>
                 </div>
-                <div className="flex justify-end gap-2 mt-4">
-                    <button onClick={onCancel} className="px-4 py-2 bg-gray-600 text-white rounded">Cancel</button>
-                    <button onClick={handleSubmit} className="px-4 py-2 bg-blue-600 text-white rounded">Save</button>
+
+                {/* Actions */}
+                <div className="flex justify-end gap-2 mt-6">
+                    <button onClick={onCancel} className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700">Cancel</button>
+                    <button onClick={() => onSave(formData)} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center gap-1">
+                        <Check size={16} /> Save Policy
+                    </button>
                 </div>
             </div>
         </div>
@@ -497,7 +577,7 @@ const LatePolicyManager = () => {
     const [showForm, setShowForm] = useState(false);
     const [formPolicy, setFormPolicy] = useState(null);
 
-    const allPolicies = [DEFAULT_LATE_POLICY, ...(customLatePolicies || [])];
+    const allPolicies = [DEFAULT_LATE_POLICY, ...(customLatePolicies || [])].filter(Boolean);
 
     const startCreate = () => {
         setFormPolicy({ id: null, name: '', description: '', levels: { none: { name: 'On Time', multiplier: 1, description: '', color: '#16a34a' } } });

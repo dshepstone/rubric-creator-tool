@@ -454,14 +454,14 @@ export const AssessmentProvider = ({ children }) => {
             if (saved) {
                 const parsed = JSON.parse(saved);
                 if (Array.isArray(parsed)) {
-                    setCustomLatePolicies(parsed);
+                    setCustomLatePolicies(parsed.filter(Boolean));
                 }
             }
 
             const currentSaved = localStorage.getItem('currentLatePolicy');
             if (currentSaved) {
                 const parsedCurrent = JSON.parse(currentSaved);
-                if (parsedCurrent) {
+                if (parsedCurrent && typeof parsedCurrent === 'object') {
                     setCurrentLatePolicy(parsedCurrent);
                 }
             }
