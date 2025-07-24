@@ -15,7 +15,7 @@ import {
     FileSpreadsheet,
     Settings  // Add this for policy management
 } from 'lucide-react';
-import { useAssessment } from './SharedContext';
+import { useAssessment, DEFAULT_LATE_POLICY } from './SharedContext';
 import { parseExcelFile, validateStudentData } from '../utils/excelParser';
 
 // Add new imports for grading policy management
@@ -129,6 +129,7 @@ const ClassListManager = () => {
         loadFinalGrade,
         finalGrades,
         rubricFormData,
+        currentLatePolicy,
     } = useAssessment();
 
     // Load current program type from class metadata and update policy
@@ -335,11 +336,9 @@ const ClassListManager = () => {
         setCurrentStudent(student);
 
         // Load the student info into the grading form
-        updateStudentInfo({
-            name: student.name,
-            id: student.id,
-            email: student.email
-        });
+        updateStudentInfo('name', student.name || '');
+        updateStudentInfo('id', student.id || '');
+        updateStudentInfo('email', student.email || '');
 
         // Load rubric assignment info if available
         if (sharedRubric) {
@@ -719,26 +718,13 @@ const ClassListManager = () => {
             return;
         }
 
-        // 4. Late Policy Levels (same as in GradingTemplate.js)
-        const latePolicyLevels = {
-            none: {
-                name: 'On Time',
-                multiplier: 1.0,
-                description: 'Assignment submitted on or before due date and time - marked out of 100%',
-                color: '#16a34a'
-            },
-            within24: {
-                name: '1-24 Hours Late',
-                multiplier: 0.8,
-                description: 'Assignment received within 24 hours of due date - 20% reduction (marked out of 80%)',
-                color: '#ea580c'
-            },
-            after24: {
-                name: 'More than 24 Hours Late',
-                multiplier: 0.0,
-                description: 'Assignment received after 24 hours from due date - mark of zero (0)',
-                color: '#dc2626'
+        // 4. Access active late policy levels
+        const activeLevels = currentLatePolicy?.levels || DEFAULT_LATE_POLICY.levels;
+        const getSafeLatePolicy = (level) => {
+            if (!level || typeof level !== "string" || !activeLevels[level]) {
+                return activeLevels.none;
             }
+            return activeLevels[level];
         };
 
         // 5. Calculate scores (replicated from GradingTemplate.js)
@@ -767,7 +753,7 @@ const ClassListManager = () => {
 
             // Apply late penalty if applicable
             if (gradeData.latePolicy && gradeData.latePolicy.level !== 'none') {
-                const latePolicyLevel = latePolicyLevels[gradeData.latePolicy.level];
+                const latePolicyLevel = getSafeLatePolicy(gradeData.latePolicy?.level);
                 if (latePolicyLevel) {
                     finalScore = totalScore * latePolicyLevel.multiplier;
                     penaltyApplied = true;
@@ -903,15 +889,15 @@ const ClassListManager = () => {
         </div>
         <p style="margin: 10px 0; color: #555;">
             ${sharedRubric ? `Rubric: ${sharedRubric.assignmentInfo.title}` : ""}
-            ${penaltyApplied ? ` | Late Policy: ${latePolicyLevels[gradeData.latePolicy.level].name}` : ""}
+            ${penaltyApplied ? ` | Late Policy: ${getSafeLatePolicy(gradeData.latePolicy?.level).name}` : ""}
         </p>
     </div>
 
     ${penaltyApplied ? `
         <div class="late-policy-section">
             <h3 style="color: #dc2626;">📅 Late Submission Policy Applied</h3>
-            <p><strong>Policy Status:</strong> ${latePolicyLevels[gradeData.latePolicy.level].name}</p>
-            <p>${latePolicyLevels[gradeData.latePolicy.level].description}</p>
+            <p><strong>Policy Status:</strong> ${getSafeLatePolicy(gradeData.latePolicy?.level).name}</p>
+            <p>${getSafeLatePolicy(gradeData.latePolicy?.level).description}</p>
             <p><strong>Raw Score:</strong> ${Math.round(rawScore * 10) / 10}/${maxPoints} → <strong>Final Score:</strong> ${Math.round(totalScore * 10) / 10}/${maxPoints}</p>
         </div>
     ` : ""}
@@ -1090,7 +1076,9 @@ const ClassListManager = () => {
                 console.log('📊 Auto-populating course info from Excel:', courseInfo);
                 // Note: updateCourseInfo should be available from useAssessment hook
                 if (typeof updateCourseInfo === 'function') {
-                    updateCourseInfo(courseInfo);
+                    Object.entries(courseInfo).forEach(([field, value]) => {
+                        updateCourseInfo(field, value);
+                    });
                 }
             }
 
@@ -1622,6 +1610,8 @@ const ClassListManager = () => {
                 </div>
             </div>
         </div>
+   
+    
     );
 };
 

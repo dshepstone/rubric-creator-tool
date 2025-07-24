@@ -14,7 +14,7 @@ export const useAssessment = () => {
 };
 
 // DEFAULT LATE POLICY SYSTEM
-const DEFAULT_LATE_POLICY = {
+export const DEFAULT_LATE_POLICY = {
     id: 'institutional',
     name: 'Institutional Policy',
     description: 'Standard institutional late assignment policy',
@@ -222,6 +222,30 @@ export const AssessmentProvider = ({ children }) => {
         }));
     }, []);
 
+    // Apply a late policy to a given score and update grading data
+    const applyLatePolicy = useCallback((policyId, level, originalScore) => {
+        const policy = customLatePolicies.find(p => p.id === policyId) || currentLatePolicy;
+        if (!policy || !policy.levels[level]) return originalScore;
+
+        const multiplier = policy.levels[level].multiplier;
+        const adjustedScore = originalScore * multiplier;
+
+        setGradingFormData(prevData => ({
+            ...prevData,
+            latePolicy: {
+                ...prevData.latePolicy,
+                level,
+                policyId,
+                originalScore,
+                adjustedScore,
+                multiplier,
+                penaltyApplied: level !== 'none'
+            }
+        }));
+
+        return adjustedScore;
+    }, [customLatePolicies, currentLatePolicy]);
+
     // ORIGINAL: Clear grading form data
     const clearGradingFormData = useCallback(() => {
         setGradingFormData({
@@ -300,6 +324,19 @@ export const AssessmentProvider = ({ children }) => {
         console.log('✅ Draft saved for student:', studentId);
     }, [gradingFormData.latePolicy]);
 
+    const ensureCompleteGradeData = (data) => ({
+        student: { name: '', id: '', email: '', ...(data.student || {}) },
+        course: { code: '', name: '', instructor: '', term: '', ...(data.course || {}) },
+        assignment: { title: '', description: '', dueDate: '', totalPoints: 100, maxPoints: 100, name: '', ...(data.assignment || {}) },
+        rubricGrading: data.rubricGrading || {},
+        feedback: { strengths: '', improvements: '', general: '', ...(data.feedback || {}) },
+        attachments: data.attachments || [],
+        videoLinks: data.videoLinks || [],
+        metadata: data.metadata || {},
+        latePolicy: data.latePolicy || { level: 'none', penaltyApplied: false },
+        ...data
+    });
+
     const loadDraft = useCallback((studentId) => {
         let draft = drafts[studentId];
 
@@ -313,11 +350,12 @@ export const AssessmentProvider = ({ children }) => {
         }
 
         if (draft) {
-            setGradingFormData(draft);
+            const safeDraft = ensureCompleteGradeData(draft);
+            setGradingFormData(safeDraft);
             console.log('✅ Draft loaded for student:', studentId);
-            return true;
+            return safeDraft;
         }
-        return false;
+        return null;
     }, [drafts]);
 
     const saveFinalGrade = useCallback((studentId, gradeData) => {
@@ -361,7 +399,11 @@ export const AssessmentProvider = ({ children }) => {
             }
         }
 
-        return finalGrade || null;
+        if (finalGrade) {
+            const safeFinal = ensureCompleteGradeData(finalGrade);
+            return safeFinal;
+        }
+        return null;
     }, [finalGrades]);
 
     const getGradeStatus = useCallback((studentId) => {
@@ -410,17 +452,23 @@ export const AssessmentProvider = ({ children }) => {
         try {
             const saved = localStorage.getItem('customLatePolicies');
             if (saved) {
-                const policies = JSON.parse(saved);
-                setCustomLatePolicies(policies);
+                const parsed = JSON.parse(saved);
+                if (Array.isArray(parsed)) {
+                    setCustomLatePolicies(parsed.filter(Boolean));
+                }
             }
 
             const currentSaved = localStorage.getItem('currentLatePolicy');
             if (currentSaved) {
-                const current = JSON.parse(currentSaved);
-                setCurrentLatePolicy(current);
+                const parsedCurrent = JSON.parse(currentSaved);
+                if (parsedCurrent && typeof parsedCurrent === 'object') {
+                    setCurrentLatePolicy(parsedCurrent);
+                }
             }
         } catch (error) {
             console.error('Error loading late policies:', error);
+            setCustomLatePolicies([]);
+            setCurrentLatePolicy(DEFAULT_LATE_POLICY);
         }
     }, []);
 
@@ -717,6 +765,7 @@ export const AssessmentProvider = ({ children }) => {
         saveCustomLatePolicy,
         updateCustomLatePolicy,
         deleteCustomLatePolicy,
+        applyLatePolicy,
         calculateScoreWithLatePolicy,
 
         // Utility functions
