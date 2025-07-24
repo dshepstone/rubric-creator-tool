@@ -24,8 +24,7 @@ import {
 import gradingPolicyService from '../services/gradingPolicyService';
 import { useGradingPolicies, useGradeCalculation } from '../hooks/useGradingPolicies';
 import { useAssessment, DEFAULT_LATE_POLICY } from './SharedContext';
-import Tooltip from 'rc-tooltip';
-import 'rc-tooltip/assets/bootstrap.css';
+// Simplified tooltip using the native title attribute to avoid extra dependencies
 
 const GradingPolicyManager = () => {
     // Use TanStack Query hooks instead of manual state
@@ -433,9 +432,7 @@ const LatePolicyForm = ({ policy, onSave, onCancel }) => {
                     {/* Name */}
                     <label className="block text-sm font-medium">
                         Policy Name{' '}
-                        <Tooltip overlay="Give your policy a clear, unique name">
-                            <Info className="inline text-gray-400 cursor-pointer" size={14} />
-                        </Tooltip>
+                        <Info className="inline text-gray-400 cursor-pointer" size={14} title="Give your policy a clear, unique name" />
                     </label>
                     <input
                         type="text"
@@ -448,9 +445,7 @@ const LatePolicyForm = ({ policy, onSave, onCancel }) => {
                     {/* Description */}
                     <label className="block text-sm font-medium">
                         Description{' '}
-                        <Tooltip overlay="Short note (optional)">
-                            <Info className="inline text-gray-400 cursor-pointer" size={14} />
-                        </Tooltip>
+                        <Info className="inline text-gray-400 cursor-pointer" size={14} title="Short note (optional)" />
                     </label>
                     <input
                         type="text"
@@ -479,11 +474,9 @@ const LatePolicyForm = ({ policy, onSave, onCancel }) => {
                                 <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                                     {/* Name */}
                                     <div>
-                                        <label className="block text-xs font-medium">
+                                            <label className="block text-xs font-medium">
                                             Name{' '}
-                                            <Tooltip overlay="e.g. On Time, 24h Late">
-                                                <Info className="inline text-gray-400 cursor-pointer" size={12} />
-                                            </Tooltip>
+                                            <Info className="inline text-gray-400 cursor-pointer" size={12} title="e.g. On Time, 24h Late" />
                                         </label>
                                         <input
                                             type="text"
@@ -498,9 +491,7 @@ const LatePolicyForm = ({ policy, onSave, onCancel }) => {
                                     <div>
                                         <label className="block text-xs font-medium">
                                             Multiplier{' '}
-                                            <Tooltip overlay="Decimal between 0 (zero) and 1 (full credit)">
-                                                <Info className="inline text-gray-400 cursor-pointer" size={12} />
-                                            </Tooltip>
+                                            <Info className="inline text-gray-400 cursor-pointer" size={12} title="Decimal between 0 (zero) and 1 (full credit)" />
                                         </label>
                                         <input
                                             type="number"
@@ -518,9 +509,7 @@ const LatePolicyForm = ({ policy, onSave, onCancel }) => {
                                     <div>
                                         <label className="block text-xs font-medium">
                                             Color{' '}
-                                            <Tooltip overlay="Pick a highlight color">
-                                                <Info className="inline text-gray-400 cursor-pointer" size={12} />
-                                            </Tooltip>
+                                            <Info className="inline text-gray-400 cursor-pointer" size={12} title="Pick a highlight color" />
                                         </label>
                                         <input
                                             type="color"
@@ -534,9 +523,7 @@ const LatePolicyForm = ({ policy, onSave, onCancel }) => {
                                     <div className="sm:col-span-4">
                                         <label className="block text-xs font-medium">
                                             Description{' '}
-                                            <Tooltip overlay="Explain what happens at this level">
-                                                <Info className="inline text-gray-400 cursor-pointer" size={12} />
-                                            </Tooltip>
+                                            <Info className="inline text-gray-400 cursor-pointer" size={12} title="Explain what happens at this level" />
                                         </label>
                                         <textarea
                                             rows={2}
