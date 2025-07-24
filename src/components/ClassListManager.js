@@ -335,11 +335,9 @@ const ClassListManager = () => {
         setCurrentStudent(student);
 
         // Load the student info into the grading form
-        updateStudentInfo({
-            name: student.name,
-            id: student.id,
-            email: student.email
-        });
+        updateStudentInfo('name', student.name || '');
+        updateStudentInfo('id', student.id || '');
+        updateStudentInfo('email', student.email || '');
 
         // Load rubric assignment info if available
         if (sharedRubric) {
@@ -1096,7 +1094,9 @@ const ClassListManager = () => {
                 console.log('📊 Auto-populating course info from Excel:', courseInfo);
                 // Note: updateCourseInfo should be available from useAssessment hook
                 if (typeof updateCourseInfo === 'function') {
-                    updateCourseInfo(courseInfo);
+                    Object.entries(courseInfo).forEach(([field, value]) => {
+                        updateCourseInfo(field, value);
+                    });
                 }
             }
 

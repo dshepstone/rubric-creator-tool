@@ -353,9 +353,9 @@ export const AssessmentProvider = ({ children }) => {
             const safeDraft = ensureCompleteGradeData(draft);
             setGradingFormData(safeDraft);
             console.log('✅ Draft loaded for student:', studentId);
-            return true;
+            return safeDraft;
         }
-        return false;
+        return null;
     }, [drafts]);
 
     const saveFinalGrade = useCallback((studentId, gradeData) => {
