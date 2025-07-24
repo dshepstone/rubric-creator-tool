@@ -233,7 +233,8 @@ const GradingTemplate = () => {
     loadFinalGrade,
     finalGrades,
     getGradeStatus,
-    currentLatePolicy
+    currentLatePolicy,
+    customLatePolicies
   } = useAssessment();
 
   // Helper function to convert HTML content to readable text format
@@ -412,8 +413,15 @@ const GradingTemplate = () => {
 
 
   // Safely access the active late policy levels
-  const getSafeLatePolicy = (level) => {
-    const activeLevels = currentLatePolicy?.levels || DEFAULT_LATE_POLICY.levels;
+  const getPolicyById = (policyId) => {
+    if (!policyId) return null;
+    if (policyId === DEFAULT_LATE_POLICY.id) return DEFAULT_LATE_POLICY;
+    return customLatePolicies.find(p => p.id === policyId) || null;
+  };
+
+  const getSafeLatePolicy = (level, policyId) => {
+    const policy = getPolicyById(policyId) || currentLatePolicy || DEFAULT_LATE_POLICY;
+    const activeLevels = policy.levels || DEFAULT_LATE_POLICY.levels;
     if (!level || typeof level !== "string" || !activeLevels[level]) {
       return activeLevels.none;
     }
@@ -515,7 +523,8 @@ useEffect(() => {
         return total;
       }, 0);
     }
-    const latePolicyLevel = getSafeLatePolicy(gradingData.latePolicy?.level);
+    const policyId = gradingData.latePolicy?.policyId;
+    const latePolicyLevel = getSafeLatePolicy(gradingData.latePolicy?.level, policyId);
     const finalScore = rawScore * latePolicyLevel.multiplier;
     return {
       rawScore: rawScore,
@@ -529,7 +538,7 @@ useEffect(() => {
 
   useEffect(() => {
     setScoreSummary(calculateTotalScore());
-  }, [gradingData.rubricGrading, gradingData.latePolicy, currentLatePolicy]);
+  }, [gradingData.rubricGrading, gradingData.latePolicy, currentLatePolicy, customLatePolicies]);
 
   const updateLatePolicy = (level) => {
     setGradingData(prevData => ({
