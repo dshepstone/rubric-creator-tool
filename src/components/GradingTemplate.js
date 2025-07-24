@@ -523,7 +523,13 @@ useEffect(() => {
       penaltyApplied: gradingData.latePolicy.level !== 'none',
       latePolicyDescription: latePolicyLevel.description
     };
-  };
+  }; 
+
+  const [scoreSummary, setScoreSummary] = useState(calculateTotalScore());
+
+  useEffect(() => {
+    setScoreSummary(calculateTotalScore());
+  }, [gradingData.rubricGrading, gradingData.latePolicy, currentLatePolicy]);
 
   const updateLatePolicy = (level) => {
     setGradingData(prevData => ({
@@ -733,12 +739,11 @@ useEffect(() => {
 
   // Helper function to generate the student report HTML. This avoids code duplication.
   const generateStudentReportHTML = () => {
-    const scoreCalculation = calculateTotalScore();
-    const totalScore = scoreCalculation.finalScore;
-    const rawScore = scoreCalculation.rawScore;
+    const totalScore = scoreSummary.finalScore;
+    const rawScore = scoreSummary.rawScore;
     const maxPoints = loadedRubric ? loadedRubric.assignmentInfo.totalPoints : gradingData.assignment.maxPoints;
     const percentage = ((totalScore / (maxPoints || 1)) * 100).toFixed(1);
-    const penaltyApplied = scoreCalculation.penaltyApplied;
+    const penaltyApplied = scoreSummary.penaltyApplied;
 
     const attachmentsHTML = gradingData.attachments.map((att, index) => {
       if (att.base64Data) {
@@ -788,9 +793,8 @@ useEffect(() => {
     }
 
     // Calculate scores
-    const scoreCalculation = calculateTotalScore();
     const maxPoints = loadedRubric ? loadedRubric.assignmentInfo.totalPoints : gradingData.assignment.maxPoints;
-    const percentage = maxPoints > 0 ? Math.round((scoreCalculation.finalScore / maxPoints) * 100) : 0;
+    const percentage = maxPoints > 0 ? Math.round((scoreSummary.finalScore / maxPoints) * 100) : 0;
 
     // Determine letter grade
     const getLetterGrade = (percentage) => {
@@ -849,13 +853,13 @@ useEffect(() => {
         dueDate: localGradingData.assignment.dueDate
       },
       gradeData: {
-        overallScore: Math.round(scoreCalculation.finalScore * 10) / 10,
-        rawScore: Math.round(scoreCalculation.rawScore * 10) / 10,
+        overallScore: Math.round(scoreSummary.finalScore * 10) / 10,
+        rawScore: Math.round(scoreSummary.rawScore * 10) / 10,
         overallPercentage: percentage,
         letterGrade: getLetterGrade(percentage),
         passed: percentage >= (loadedRubric?.assignmentInfo?.passingThreshold || 60),
-        latePenaltyApplied: scoreCalculation.penaltyApplied,
-        latePolicyDescription: scoreCalculation.latePolicyDescription,
+        latePenaltyApplied: scoreSummary.penaltyApplied,
+        latePolicyDescription: scoreSummary.latePolicyDescription,
         criteria: criteriaPerformance
       },
       existingFeedback: {
@@ -1705,7 +1709,7 @@ Write the feedback now, making it sound personal and genuine while keeping it co
                 ))}
               </div>
 
-              {calculateTotalScore().penaltyApplied && (
+              {scoreSummary.penaltyApplied && (
                 <div style={{
                   background: '#fef2f2',
                   border: '1px solid #fecaca',
@@ -1717,13 +1721,13 @@ Write the feedback now, making it sound personal and genuine while keeping it co
                   </h5>
                   <div style={{ fontSize: '0.875rem', color: '#7f1d1d' }}>
                     <p style={{ marginBottom: '0.25rem' }}>
-                      <strong>Raw Score:</strong> {Math.round(calculateTotalScore().rawScore * 10) / 10} / {loadedRubric ? loadedRubric.assignmentInfo.totalPoints : gradingData.assignment.maxPoints}
+                      <strong>Raw Score:</strong> {Math.round(scoreSummary.rawScore * 10) / 10} / {loadedRubric ? loadedRubric.assignmentInfo.totalPoints : gradingData.assignment.maxPoints}
                     </p>
                     <p style={{ marginBottom: '0.25rem' }}>
                       <strong>Late Penalty:</strong> ×{getSafeLatePolicy(gradingData.latePolicy?.level).multiplier}
                     </p>
                     <p style={{ margin: 0 }}>
-                      <strong>Final Score:</strong> {Math.round(calculateTotalScore().finalScore * 10) / 10} / {loadedRubric ? loadedRubric.assignmentInfo.totalPoints : gradingData.assignment.maxPoints}
+                      <strong>Final Score:</strong> {Math.round(scoreSummary.finalScore * 10) / 10} / {loadedRubric ? loadedRubric.assignmentInfo.totalPoints : gradingData.assignment.maxPoints}
                     </p>
                   </div>
                 </div>
@@ -1743,13 +1747,13 @@ Write the feedback now, making it sound personal and genuine while keeping it co
                 📊 Final Score
               </h2>
               <div style={{ fontSize: '3rem', fontWeight: '700', color: '#16a34a', marginBottom: '1rem' }}>
-                {Math.round(calculateTotalScore().finalScore * 10) / 10}
+                {Math.round(scoreSummary.finalScore * 10) / 10}
                 <span style={{ fontSize: '1.5rem', color: '#6b7280' }}>
                   / {loadedRubric ? loadedRubric.assignmentInfo.totalPoints : gradingData.assignment.maxPoints}
                 </span>
               </div>
               <div style={{ fontSize: '1.25rem', color: '#6b7280', marginBottom: '1rem' }}>
-                ({Math.round((calculateTotalScore().finalScore / (loadedRubric ? (loadedRubric.assignmentInfo.totalPoints || 1) : (gradingData.assignment.maxPoints || 1))) * 1000) / 10}%)
+                ({Math.round((scoreSummary.finalScore / (loadedRubric ? (loadedRubric.assignmentInfo.totalPoints || 1) : (gradingData.assignment.maxPoints || 1))) * 1000) / 10}%)
               </div>
               <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', flexWrap: 'wrap' }}>
                 {loadedRubric && (
@@ -1763,7 +1767,7 @@ Write the feedback now, making it sound personal and genuine while keeping it co
                     📋 Rubric Assessment Active
                   </div>
                 )}
-                {calculateTotalScore().penaltyApplied && (
+                {scoreSummary.penaltyApplied && (
                   <div style={{
                     fontSize: '0.875rem',
                     background: '#fee2e2',
@@ -2121,23 +2125,23 @@ Write the feedback now, making it sound personal and genuine while keeping it co
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#3b82f6' }}>
-                        {Math.round(calculateTotalScore().finalScore * 10) / 10}/{loadedRubric.assignmentInfo.totalPoints}
+                        {Math.round(scoreSummary.finalScore * 10) / 10}/{loadedRubric.assignmentInfo.totalPoints}
                       </div>
                       <div style={{ fontSize: '1.125rem', color: '#6b7280' }}>
-                        ({Math.round((calculateTotalScore().finalScore / (loadedRubric.assignmentInfo.totalPoints || 1)) * 1000) / 10}%)
+                        ({Math.round((scoreSummary.finalScore / (loadedRubric.assignmentInfo.totalPoints || 1)) * 1000) / 10}%)
                       </div>
-                      {calculateTotalScore().penaltyApplied && (
+                      {scoreSummary.penaltyApplied && (
                         <div style={{ fontSize: '0.875rem', color: '#dc2626', marginTop: '0.25rem' }}>
-                          Raw: {Math.round(calculateTotalScore().rawScore * 10) / 10} (Late Penalty Applied)
+                          Raw: {Math.round(scoreSummary.rawScore * 10) / 10} (Late Penalty Applied)
                         </div>
                       )}
                       <div style={{
                         fontSize: '0.875rem',
                         fontWeight: '500',
-                        color: (calculateTotalScore().finalScore / (loadedRubric.assignmentInfo.totalPoints || 1)) * 100 >= loadedRubric.assignmentInfo.passingThreshold
+                        color: (scoreSummary.finalScore / (loadedRubric.assignmentInfo.totalPoints || 1)) * 100 >= loadedRubric.assignmentInfo.passingThreshold
                           ? '#16a34a' : '#dc2626'
                       }}>
-                        {(calculateTotalScore().finalScore / (loadedRubric.assignmentInfo.totalPoints || 1)) * 100 >= loadedRubric.assignmentInfo.passingThreshold
+                        {(scoreSummary.finalScore / (loadedRubric.assignmentInfo.totalPoints || 1)) * 100 >= loadedRubric.assignmentInfo.passingThreshold
                           ? '✓ PASSING' : '✗ NEEDS IMPROVEMENT'}
                       </div>
                     </div>
