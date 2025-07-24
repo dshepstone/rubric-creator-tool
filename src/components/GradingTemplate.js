@@ -264,20 +264,23 @@ const GradingTemplate = () => {
 
   // State for all grading data - initialize from shared context or defaults
   const [localGradingData, setLocalGradingData] = useState(() => {
-    // 1) Try loading a saved draft first
-    if (currentStudent?.id) {
-      const draft = loadDraft(currentStudent.id);
-      if (draft) {
-        return draft;
+      // 1) Try loading a saved draft first
+      if (currentStudent?.id) {
+        const draft = loadDraft(currentStudent.id);
+        if (draft) {
+          return draft;
+        }
       }
-    }
-    // 2) If rubric was just transferred, use that
-    if (sharedGradingData) {
-      return { ...sharedGradingData, student: currentStudent || sharedGradingData.student };
-    }
-    // 3) Otherwise, start fresh for this student
-    return {
-      student: currentStudent || { name: '', id: '', email: '' },
+      // 2) If rubric was just transferred, use that
+      if (sharedGradingData) {
+        return {
+          ...sharedGradingData,
+          student: currentStudent || sharedGradingData.student || { name: '', id: '', email: '' }
+        };
+      }
+      // 3) Otherwise, start fresh for this student
+      return {
+        student: currentStudent || { name: '', id: '', email: '' },
       course: sharedCourseDetails?.course || { code: '', name: '', instructor: '', term: '' },
       assignment: sharedCourseDetails?.assignment || { name: '', dueDate: '', maxPoints: 100 },
       feedback: { general: '', strengths: '', improvements: '' },
@@ -1494,14 +1497,14 @@ Write the feedback now, making it sound personal and genuine while keeping it co
                 <input
                   type="text"
                   placeholder="Student Name"
-                  value={currentStudent?.name || gradingData.student.name}
+                  value={currentStudent?.name || gradingData.student?.name || ''}
                   onChange={(e) => {
                     const newValue = e.target.value;
                     setGradingData(prevData => ({
                       ...prevData,
                       student: { ...prevData.student, name: newValue }
                     }));
-                    updateStudentInfo({ name: newValue });
+                    updateStudentInfo('name', newValue);
                   }}
                   style={{
                     width: '100%',
@@ -1516,14 +1519,14 @@ Write the feedback now, making it sound personal and genuine while keeping it co
                 <input
                   type="text"
                   placeholder="Student ID"
-                  value={currentStudent?.id || gradingData.student.id}
+                  value={currentStudent?.id || gradingData.student?.id || ''}
                   onChange={(e) => {
                     const newValue = e.target.value;
                     setGradingData(prevData => ({
                       ...prevData,
                       student: { ...prevData.student, id: newValue }
                     }));
-                    updateStudentInfo({ id: newValue });
+                    updateStudentInfo('id', newValue);
                   }}
                   style={{
                     width: '100%',
@@ -1538,14 +1541,14 @@ Write the feedback now, making it sound personal and genuine while keeping it co
                 <input
                   type="email"
                   placeholder="Student Email"
-                  value={currentStudent?.email || gradingData.student.email}
+                  value={currentStudent?.email || gradingData.student?.email || ''}
                   onChange={(e) => {
                     const newValue = e.target.value;
                     setGradingData(prevData => ({
                       ...prevData,
                       student: { ...prevData.student, email: newValue }
                     }));
-                    updateStudentInfo({ email: newValue });
+                    updateStudentInfo('email', newValue);
                   }}
                   style={{
                     width: '100%',
