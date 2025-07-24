@@ -4,7 +4,7 @@ import {
   ChevronDown, ChevronUp, ArrowLeft, ArrowRight, Users, PlayCircle,
   CheckCircle, Clock, SkipForward, SkipBack, Pause, RotateCcw
 } from 'lucide-react';
-import { useAssessment } from './SharedContext';
+import { useAssessment, DEFAULT_LATE_POLICY } from './SharedContext';
 
 // Sample comprehensive rubric from the PDF
 const sampleRubric = {
@@ -232,7 +232,9 @@ const GradingTemplate = () => {
     saveFinalGrade,
     loadFinalGrade,
     finalGrades,
-    getGradeStatus
+    getGradeStatus,
+    currentLatePolicy,
+    customLatePolicies
   } = useAssessment();
 
   // Helper function to convert HTML content to readable text format
@@ -264,20 +266,23 @@ const GradingTemplate = () => {
 
   // State for all grading data - initialize from shared context or defaults
   const [localGradingData, setLocalGradingData] = useState(() => {
-    // 1) Try loading a saved draft first
-    if (currentStudent?.id) {
-      const draft = loadDraft(currentStudent.id);
-      if (draft) {
-        return draft;
+      // 1) Try loading a saved draft first
+      if (currentStudent?.id) {
+        const draft = loadDraft(currentStudent.id);
+        if (draft) {
+          return draft;
+        }
       }
-    }
-    // 2) If rubric was just transferred, use that
-    if (sharedGradingData) {
-      return { ...sharedGradingData, student: currentStudent || sharedGradingData.student };
-    }
-    // 3) Otherwise, start fresh for this student
-    return {
-      student: currentStudent || { name: '', id: '', email: '' },
+      // 2) If rubric was just transferred, use that
+      if (sharedGradingData) {
+        return {
+          ...sharedGradingData,
+          student: currentStudent || sharedGradingData.student || { name: '', id: '', email: '' }
+        };
+      }
+      // 3) Otherwise, start fresh for this student
+      return {
+        student: currentStudent || { name: '', id: '', email: '' },
       course: sharedCourseDetails?.course || { code: '', name: '', instructor: '', term: '' },
       assignment: sharedCourseDetails?.assignment || { name: '', dueDate: '', maxPoints: 100 },
       feedback: { general: '', strengths: '', improvements: '' },
@@ -407,26 +412,20 @@ const GradingTemplate = () => {
   }, [currentStudent, getGradeStatus, loadDraft, loadFinalGrade]);
 
 
-  // Late Policy Levels
-  const latePolicyLevels = {
-    none: {
-      name: 'On Time',
-      multiplier: 1.0,
-      description: 'Assignment submitted on or before due date and time - marked out of 100%',
-      color: '#16a34a'
-    },
-    within24: {
-      name: '1-24 Hours Late',
-      multiplier: 0.8,
-      description: 'Assignment received within 24 hours of due date - 20% reduction (marked out of 80%)',
-      color: '#ea580c'
-    },
-    after24: {
-      name: 'More than 24 Hours Late',
-      multiplier: 0.0,
-      description: 'Assignment received after 24 hours from due date - mark of zero (0)',
-      color: '#dc2626'
+  // Safely access the active late policy levels
+  const getPolicyById = (policyId) => {
+    if (!policyId) return null;
+    if (policyId === DEFAULT_LATE_POLICY.id) return DEFAULT_LATE_POLICY;
+    return customLatePolicies.find(p => p.id === policyId) || null;
+  };
+
+  const getSafeLatePolicy = (level, policyId) => {
+    const policy = getPolicyById(policyId) || currentLatePolicy || DEFAULT_LATE_POLICY;
+    const activeLevels = policy.levels || DEFAULT_LATE_POLICY.levels;
+    if (!level || typeof level !== "string" || !activeLevels[level]) {
+      return activeLevels.none;
     }
+    return activeLevels[level];
   };
 
   useEffect(() => {
@@ -472,6 +471,11 @@ const GradingTemplate = () => {
       }
 
       if (savedData) {
+        const activeLevels = currentLatePolicy?.levels || DEFAULT_LATE_POLICY.levels;
+        const validLevels = Object.keys(activeLevels);
+        if (savedData.latePolicy && !validLevels.includes(savedData.latePolicy.level)) {
+          savedData.latePolicy.level = "none";
+        }
         console.log('✅ Successfully loaded saved grade data');
         setLocalGradingData(prevData => ({
           ...savedData,
@@ -488,6 +492,21 @@ const GradingTemplate = () => {
       }
     }
   }, [currentStudent, getGradeStatus, loadDraft, loadFinalGrade]);
+useEffect(() => {
+  const activeLevels = currentLatePolicy?.levels || DEFAULT_LATE_POLICY.levels;
+  if (gradingData.latePolicy && !activeLevels[gradingData.latePolicy.level]) {
+    console.warn("Invalid late policy level detected:", gradingData.latePolicy.level);
+    console.warn("Valid levels are:", Object.keys(activeLevels));
+    setGradingData(prevData => ({
+      ...prevData,
+      latePolicy: {
+        ...prevData.latePolicy,
+        level: "none"
+      }
+    }));
+  }
+}, [gradingData.latePolicy, currentLatePolicy]);
+
 
 
   const calculateTotalScore = () => {
@@ -504,7 +523,8 @@ const GradingTemplate = () => {
         return total;
       }, 0);
     }
-    const latePolicyLevel = latePolicyLevels[gradingData.latePolicy.level];
+    const policyId = gradingData.latePolicy?.policyId;
+    const latePolicyLevel = getSafeLatePolicy(gradingData.latePolicy?.level, policyId);
     const finalScore = rawScore * latePolicyLevel.multiplier;
     return {
       rawScore: rawScore,
@@ -512,14 +532,21 @@ const GradingTemplate = () => {
       penaltyApplied: gradingData.latePolicy.level !== 'none',
       latePolicyDescription: latePolicyLevel.description
     };
-  };
+  }; 
+
+  const [scoreSummary, setScoreSummary] = useState(calculateTotalScore());
+
+  useEffect(() => {
+    setScoreSummary(calculateTotalScore());
+  }, [gradingData.rubricGrading, gradingData.latePolicy, currentLatePolicy, customLatePolicies]);
 
   const updateLatePolicy = (level) => {
     setGradingData(prevData => ({
       ...prevData,
       latePolicy: {
         level: level,
-        penaltyApplied: level !== 'none'
+        penaltyApplied: level !== 'none',
+        policyId: currentLatePolicy?.id || DEFAULT_LATE_POLICY.id
       }
     }));
   };
@@ -721,12 +748,11 @@ const GradingTemplate = () => {
 
   // Helper function to generate the student report HTML. This avoids code duplication.
   const generateStudentReportHTML = () => {
-    const scoreCalculation = calculateTotalScore();
-    const totalScore = scoreCalculation.finalScore;
-    const rawScore = scoreCalculation.rawScore;
+    const totalScore = scoreSummary.finalScore;
+    const rawScore = scoreSummary.rawScore;
     const maxPoints = loadedRubric ? loadedRubric.assignmentInfo.totalPoints : gradingData.assignment.maxPoints;
     const percentage = ((totalScore / (maxPoints || 1)) * 100).toFixed(1);
-    const penaltyApplied = scoreCalculation.penaltyApplied;
+    const penaltyApplied = scoreSummary.penaltyApplied;
 
     const attachmentsHTML = gradingData.attachments.map((att, index) => {
       if (att.base64Data) {
@@ -763,7 +789,7 @@ const GradingTemplate = () => {
           <div style="background: #e8f5e8; border: 1px solid #4caf50; border-radius: 8px; padding: 15px; margin-top: 20px;"><h4 style="color: #2e7d32; margin-bottom: 10px;">📊 Rubric Score Summary</h4><div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;"><div><strong>Total Score:</strong> ${Math.round(totalScore * 10) / 10} / ${maxPoints}<br><strong>Percentage:</strong> ${percentage}%</div><div><strong>Grade Status:</strong><span style="color: ${percentage >= loadedRubric.assignmentInfo.passingThreshold ? '#4caf50' : '#f44336'}; font-weight: bold;">${percentage >= loadedRubric.assignmentInfo.passingThreshold ? '✓ PASSING' : '✗ NEEDS IMPROVEMENT'}</span></div>${penaltyApplied ? `<div style="color: #ff9800;"><strong>Late Penalty Applied:</strong><br>Raw Score: ${Math.round(rawScore * 10) / 10}</div>` : ''}</div></div>
       </div>` : '';
 
-    const htmlContent = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Grade Report - ${gradingData.student.name}</title><style>body{font-family:Arial,sans-serif;max-width:800px;margin:20px auto;padding:20px;line-height:1.6}.header{background:#f8f9fa;padding:20px;border-radius:8px;margin-bottom:30px}.score-summary{background:#e8f5e8;border:2px solid #4caf50;border-radius:8px;padding:20px;margin:20px 0;text-align:center}.late-policy-section{margin:30px 0;background:#fff5f5;border:1px solid #f87171;border-radius:8px;padding:20px}.feedback-section{margin:20px 0;padding:15px;background:#f9f9f9;border-radius:8px}.attachments{margin:30px 0}.attachment-item{display:inline-block;text-align:center;margin:1rem;padding:1rem;background:#fff;border:1px solid #ddd;border-radius:8px;box-shadow:0 2px 4px rgba(0,0,0,.1);max-width:250px;vertical-align:top}.clickable-image{cursor:pointer;transition:all .3s ease;position:relative}.clickable-image:hover{transform:scale(1.05);box-shadow:0 4px 8px rgba(0,0,0,.2)}.video-links{margin:30px 0}.video-link-item{margin-bottom:1rem}.video-link-item a{color:#007bff;text-decoration:none}.video-link-item a:hover{text-decoration:underline}h1,h2,h3{color:#333}.image-modal{display:none;position:fixed;z-index:1000;left:0;top:0;width:100%;height:100%;background-color:rgba(0,0,0,.9);animation:fadeIn .3s ease}.image-modal.show{display:flex;align-items:center;justify-content:center}.modal-content{max-width:95%;max-height:95%;object-fit:contain;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,.5);animation:zoomIn .3s ease}.close-modal{position:absolute;top:20px;right:30px;color:#fff;font-size:40px;font-weight:700;cursor:pointer;z-index:1001;background:rgba(0,0,0,.5);border-radius:50%;width:50px;height:50px;display:flex;align-items:center;justify-content:center;line-height:1}.close-modal:hover{background:rgba(0,0,0,.8)}.modal-caption{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);color:#fff;background:rgba(0,0,0,.7);padding:10px 20px;border-radius:6px;text-align:center;max-width:80%}@keyframes fadeIn{from{opacity:0}to{opacity:1}}@keyframes zoomIn{from{transform:scale(.5);opacity:0}to{transform:scale(1);opacity:1}}@media print{.attachment-item,.video-link-item{break-inside:avoid}.image-modal{display:none!important}}</style></head><body><div class="header"><h1>📋 Grade Report</h1><p><strong>Student:</strong> ${gradingData.student.name} (${gradingData.student.id})</p><p><strong>Course:</strong> ${gradingData.course.code} - ${gradingData.course.name}</p><p><strong>Assignment:</strong> ${gradingData.assignment.name}</p><p><strong>Instructor:</strong> ${gradingData.course.instructor}</p><p><strong>Term:</strong> ${gradingData.course.term}</p></div><div class="score-summary"><h2>📊 Final Score</h2><div style="font-size:2rem;font-weight:700;color:#2e7d32;margin:15px 0">${totalScore.toFixed(1)} / ${maxPoints} (${percentage}%)</div><p style="margin:10px 0;color:#555">${loadedRubric ? `Rubric: ${loadedRubric.assignmentInfo.title}` : ""}${penaltyApplied ? ` | Late Policy: ${latePolicyLevels[gradingData.latePolicy.level].name}` : ""}</p></div>${penaltyApplied ? `<div class="late-policy-section"><h3 style="color:#dc2626">📅 Late Submission Policy Applied</h3><p><strong>Policy Status:</strong> ${latePolicyLevels[gradingData.latePolicy.level].name}</p><p>${latePolicyLevels[gradingData.latePolicy.level].description}</p><p><strong>Raw Score:</strong> ${Math.round(rawScore * 10) / 10}/${maxPoints} → <strong>Final Score:</strong> ${Math.round(totalScore * 10) / 10}/${maxPoints}</p></div>` : ""}${rubricTableHTML}${Object.entries(gradingData.feedback).filter(([e, t]) => t).map(([e, t]) => `<div class="feedback-section"><h3>${e.charAt(0).toUpperCase() + e.slice(1)} Feedback</h3><p>${t.replace(/\n/g, "<br>")}</p></div>`).join("")}${attachmentsHTML ? `<div class="attachments"><h3>📎 File Attachments</h3><div style="display: flex; flex-wrap: wrap; justify-content: flex-start;">${attachmentsHTML}</div></div>` : ""}${videoLinksHTML ? `<div class="video-links"><h3>🎥 Video Review Links</h3>${videoLinksHTML}</div>` : ""}<p style="margin-top:40px;text-align:center;color:#666;font-size:.9rem">Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}</p><div id="imageModal" class="image-modal"><span class="close-modal" onclick="closeImageModal()">&times;</span><img class="modal-content" id="modalImage"><div class="modal-caption" id="modalCaption"></div></div><script>const attachmentData=${JSON.stringify(gradingData.attachments)};function openImageModal(e,t){const n=document.getElementById("imageModal"),o=document.getElementById("modalImage"),a=document.getElementById("modalCaption");n.classList.add("show"),o.src=e,a.textContent=t,document.body.style.overflow="hidden"}function closeImageModal(){document.getElementById("imageModal").classList.remove("show"),document.body.style.overflow="auto"}document.addEventListener("DOMContentLoaded",function(){document.querySelectorAll(".clickable-image").forEach(e=>{e.addEventListener("click",function(){const e=parseInt(this.getAttribute("data-index")),t=attachmentData[e];t&&t.base64Data&&openImageModal(t.base64Data,t.name)})}),document.getElementById("imageModal").addEventListener("click",function(e){e.target===this&&closeImageModal()}),document.addEventListener("keydown",function(e){"Escape"===e.key&&closeImageModal()})})</script></body></html>`;
+    const htmlContent = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Grade Report - ${gradingData.student.name}</title><style>body{font-family:Arial,sans-serif;max-width:800px;margin:20px auto;padding:20px;line-height:1.6}.header{background:#f8f9fa;padding:20px;border-radius:8px;margin-bottom:30px}.score-summary{background:#e8f5e8;border:2px solid #4caf50;border-radius:8px;padding:20px;margin:20px 0;text-align:center}.late-policy-section{margin:30px 0;background:#fff5f5;border:1px solid #f87171;border-radius:8px;padding:20px}.feedback-section{margin:20px 0;padding:15px;background:#f9f9f9;border-radius:8px}.attachments{margin:30px 0}.attachment-item{display:inline-block;text-align:center;margin:1rem;padding:1rem;background:#fff;border:1px solid #ddd;border-radius:8px;box-shadow:0 2px 4px rgba(0,0,0,.1);max-width:250px;vertical-align:top}.clickable-image{cursor:pointer;transition:all .3s ease;position:relative}.clickable-image:hover{transform:scale(1.05);box-shadow:0 4px 8px rgba(0,0,0,.2)}.video-links{margin:30px 0}.video-link-item{margin-bottom:1rem}.video-link-item a{color:#007bff;text-decoration:none}.video-link-item a:hover{text-decoration:underline}h1,h2,h3{color:#333}.image-modal{display:none;position:fixed;z-index:1000;left:0;top:0;width:100%;height:100%;background-color:rgba(0,0,0,.9);animation:fadeIn .3s ease}.image-modal.show{display:flex;align-items:center;justify-content:center}.modal-content{max-width:95%;max-height:95%;object-fit:contain;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,.5);animation:zoomIn .3s ease}.close-modal{position:absolute;top:20px;right:30px;color:#fff;font-size:40px;font-weight:700;cursor:pointer;z-index:1001;background:rgba(0,0,0,.5);border-radius:50%;width:50px;height:50px;display:flex;align-items:center;justify-content:center;line-height:1}.close-modal:hover{background:rgba(0,0,0,.8)}.modal-caption{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);color:#fff;background:rgba(0,0,0,.7);padding:10px 20px;border-radius:6px;text-align:center;max-width:80%}@keyframes fadeIn{from{opacity:0}to{opacity:1}}@keyframes zoomIn{from{transform:scale(.5);opacity:0}to{transform:scale(1);opacity:1}}@media print{.attachment-item,.video-link-item{break-inside:avoid}.image-modal{display:none!important}}</style></head><body><div class="header"><h1>📋 Grade Report</h1><p><strong>Student:</strong> ${gradingData.student.name} (${gradingData.student.id})</p><p><strong>Course:</strong> ${gradingData.course?.code ?? ''} - ${gradingData.course?.name ?? ''}</p><p><strong>Assignment:</strong> ${gradingData.assignment.name}</p><p><strong>Instructor:</strong> ${gradingData.course?.instructor ?? ''}</p><p><strong>Term:</strong> ${gradingData.course?.term ?? ''}</p></div><div class="score-summary"><h2>📊 Final Score</h2><div style="font-size:2rem;font-weight:700;color:#2e7d32;margin:15px 0">${totalScore.toFixed(1)} / ${maxPoints} (${percentage}%)</div><p style="margin:10px 0;color:#555">${loadedRubric ? `Rubric: ${loadedRubric.assignmentInfo.title}` : ""}${penaltyApplied ? ` | Late Policy: ${getSafeLatePolicy(gradingData.latePolicy?.level).name}` : ""}</p></div>${penaltyApplied ? `<div class="late-policy-section"><h3 style="color:#dc2626">📅 Late Submission Policy Applied</h3><p><strong>Policy Status:</strong> ${getSafeLatePolicy(gradingData.latePolicy?.level).name}</p><p>${getSafeLatePolicy(gradingData.latePolicy?.level).description}</p><p><strong>Raw Score:</strong> ${Math.round(rawScore * 10) / 10}/${maxPoints} → <strong>Final Score:</strong> ${Math.round(totalScore * 10) / 10}/${maxPoints}</p></div>` : ""}${rubricTableHTML}${Object.entries(gradingData.feedback).filter(([e, t]) => t).map(([e, t]) => `<div class="feedback-section"><h3>${e.charAt(0).toUpperCase() + e.slice(1)} Feedback</h3><p>${t.replace(/\n/g, "<br>")}</p></div>`).join("")}${attachmentsHTML ? `<div class="attachments"><h3>📎 File Attachments</h3><div style="display: flex; flex-wrap: wrap; justify-content: flex-start;">${attachmentsHTML}</div></div>` : ""}${videoLinksHTML ? `<div class="video-links"><h3>🎥 Video Review Links</h3>${videoLinksHTML}</div>` : ""}<p style="margin-top:40px;text-align:center;color:#666;font-size:.9rem">Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}</p><div id="imageModal" class="image-modal"><span class="close-modal" onclick="closeImageModal()">&times;</span><img class="modal-content" id="modalImage"><div class="modal-caption" id="modalCaption"></div></div><script>const attachmentData=${JSON.stringify(gradingData.attachments)};function openImageModal(e,t){const n=document.getElementById("imageModal"),o=document.getElementById("modalImage"),a=document.getElementById("modalCaption");n.classList.add("show"),o.src=e,a.textContent=t,document.body.style.overflow="hidden"}function closeImageModal(){document.getElementById("imageModal").classList.remove("show"),document.body.style.overflow="auto"}document.addEventListener("DOMContentLoaded",function(){document.querySelectorAll(".clickable-image").forEach(e=>{e.addEventListener("click",function(){const e=parseInt(this.getAttribute("data-index")),t=attachmentData[e];t&&t.base64Data&&openImageModal(t.base64Data,t.name)})}),document.getElementById("imageModal").addEventListener("click",function(e){e.target===this&&closeImageModal()}),document.addEventListener("keydown",function(e){"Escape"===e.key&&closeImageModal()})})</script></body></html>`;
 
     return htmlContent;
   };
@@ -776,9 +802,8 @@ const GradingTemplate = () => {
     }
 
     // Calculate scores
-    const scoreCalculation = calculateTotalScore();
     const maxPoints = loadedRubric ? loadedRubric.assignmentInfo.totalPoints : gradingData.assignment.maxPoints;
-    const percentage = maxPoints > 0 ? Math.round((scoreCalculation.finalScore / maxPoints) * 100) : 0;
+    const percentage = maxPoints > 0 ? Math.round((scoreSummary.finalScore / maxPoints) * 100) : 0;
 
     // Determine letter grade
     const getLetterGrade = (percentage) => {
@@ -837,13 +862,13 @@ const GradingTemplate = () => {
         dueDate: localGradingData.assignment.dueDate
       },
       gradeData: {
-        overallScore: Math.round(scoreCalculation.finalScore * 10) / 10,
-        rawScore: Math.round(scoreCalculation.rawScore * 10) / 10,
+        overallScore: Math.round(scoreSummary.finalScore * 10) / 10,
+        rawScore: Math.round(scoreSummary.rawScore * 10) / 10,
         overallPercentage: percentage,
         letterGrade: getLetterGrade(percentage),
         passed: percentage >= (loadedRubric?.assignmentInfo?.passingThreshold || 60),
-        latePenaltyApplied: scoreCalculation.penaltyApplied,
-        latePolicyDescription: scoreCalculation.latePolicyDescription,
+        latePenaltyApplied: scoreSummary.penaltyApplied,
+        latePolicyDescription: scoreSummary.latePolicyDescription,
         criteria: criteriaPerformance
       },
       existingFeedback: {
@@ -988,7 +1013,7 @@ Write the feedback now, making it sound personal and genuine while keeping it co
 
   // NEW HELPER FUNCTIONS FOR COURSE INFO
   const getEffectiveCourseData = () => {
-    const course = gradingData.course;
+    const course = gradingData?.course || {};
     const metadata = classList?.courseMetadata;
 
     return {
@@ -1019,14 +1044,16 @@ Write the feedback now, making it sound personal and genuine while keeping it co
       course: newCourseInfo
     }));
 
-    updateCourseInfo(newCourseInfo);
+    Object.entries(newCourseInfo).forEach(([field, value]) => {
+      updateCourseInfo(field, value);
+    });
 
     console.log('📥 Pulled course data from class list:', newCourseInfo);
     alert(`Course information updated!\n\nCode: ${newCourseInfo.code}\nName: ${newCourseInfo.name}\nInstructor: ${newCourseInfo.instructor}\nTerm: ${newCourseInfo.term}`);
   };
 
   const isCourseDataMissing = () => {
-    const course = gradingData.course;
+    const course = gradingData?.course || {};
     return !course.code && !course.name && !course.instructor && !course.term;
   };
 
@@ -1363,7 +1390,7 @@ Write the feedback now, making it sound personal and genuine while keeping it co
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <CheckCircle size={16} />
-                        <span>Course information loaded {gradingData.course.code ? 'from grading session' : 'from class list metadata'}</span>
+                        <span>Course information loaded {gradingData.course?.code ? 'from grading session' : 'from class list metadata'}</span>
                       </div>
                     </div>
                   );
@@ -1382,7 +1409,7 @@ Write the feedback now, making it sound personal and genuine while keeping it co
                       ...prevData,
                       course: { ...prevData.course, code: newValue }
                     }));
-                    updateCourseInfo({ code: newValue });
+                    updateCourseInfo('code', newValue);
                   }}
                   style={{
                     width: '100%',
@@ -1390,7 +1417,7 @@ Write the feedback now, making it sound personal and genuine while keeping it co
                     border: '1px solid #d1d5db',
                     borderRadius: '0.5rem',
                     fontSize: '0.875rem',
-                    backgroundColor: getEffectiveCourseData().code && !gradingData.course.code ? '#f9fafb' : 'white'
+                    backgroundColor: getEffectiveCourseData().code && !gradingData.course?.code ? '#f9fafb' : 'white'
                   }}
                 />
                 <input
@@ -1403,7 +1430,7 @@ Write the feedback now, making it sound personal and genuine while keeping it co
                       ...prevData,
                       course: { ...prevData.course, name: newValue }
                     }));
-                    updateCourseInfo({ name: newValue });
+                    updateCourseInfo('name', newValue);
                   }}
                   style={{
                     width: '100%',
@@ -1411,7 +1438,7 @@ Write the feedback now, making it sound personal and genuine while keeping it co
                     border: '1px solid #d1d5db',
                     borderRadius: '0.5rem',
                     fontSize: '0.875rem',
-                    backgroundColor: getEffectiveCourseData().name && !gradingData.course.name ? '#f9fafb' : 'white'
+                    backgroundColor: getEffectiveCourseData().name && !gradingData.course?.name ? '#f9fafb' : 'white'
                   }}
                 />
                 <input
@@ -1424,7 +1451,7 @@ Write the feedback now, making it sound personal and genuine while keeping it co
                       ...prevData,
                       course: { ...prevData.course, instructor: newValue }
                     }));
-                    updateCourseInfo({ instructor: newValue });
+                    updateCourseInfo('instructor', newValue);
                   }}
                   style={{
                     width: '100%',
@@ -1432,7 +1459,7 @@ Write the feedback now, making it sound personal and genuine while keeping it co
                     border: '1px solid #d1d5db',
                     borderRadius: '0.5rem',
                     fontSize: '0.875rem',
-                    backgroundColor: getEffectiveCourseData().instructor && !gradingData.course.instructor ? '#f9fafb' : 'white'
+                    backgroundColor: getEffectiveCourseData().instructor && !gradingData.course?.instructor ? '#f9fafb' : 'white'
                   }}
                 />
                 <input
@@ -1445,7 +1472,7 @@ Write the feedback now, making it sound personal and genuine while keeping it co
                       ...prevData,
                       course: { ...prevData.course, term: newValue }
                     }));
-                    updateCourseInfo({ term: newValue });
+                    updateCourseInfo('term', newValue);
                   }}
                   style={{
                     width: '100%',
@@ -1453,7 +1480,7 @@ Write the feedback now, making it sound personal and genuine while keeping it co
                     border: '1px solid #d1d5db',
                     borderRadius: '0.5rem',
                     fontSize: '0.875rem',
-                    backgroundColor: getEffectiveCourseData().term && !gradingData.course.term ? '#f9fafb' : 'white'
+                    backgroundColor: getEffectiveCourseData().term && !gradingData.course?.term ? '#f9fafb' : 'white'
                   }}
                 />
               </div>
@@ -1468,14 +1495,14 @@ Write the feedback now, making it sound personal and genuine while keeping it co
                 <input
                   type="text"
                   placeholder="Student Name"
-                  value={currentStudent?.name || gradingData.student.name}
+                  value={currentStudent?.name || gradingData.student?.name || ''}
                   onChange={(e) => {
                     const newValue = e.target.value;
                     setGradingData(prevData => ({
                       ...prevData,
                       student: { ...prevData.student, name: newValue }
                     }));
-                    updateStudentInfo({ name: newValue });
+                    updateStudentInfo('name', newValue);
                   }}
                   style={{
                     width: '100%',
@@ -1490,14 +1517,14 @@ Write the feedback now, making it sound personal and genuine while keeping it co
                 <input
                   type="text"
                   placeholder="Student ID"
-                  value={currentStudent?.id || gradingData.student.id}
+                  value={currentStudent?.id || gradingData.student?.id || ''}
                   onChange={(e) => {
                     const newValue = e.target.value;
                     setGradingData(prevData => ({
                       ...prevData,
                       student: { ...prevData.student, id: newValue }
                     }));
-                    updateStudentInfo({ id: newValue });
+                    updateStudentInfo('id', newValue);
                   }}
                   style={{
                     width: '100%',
@@ -1512,14 +1539,14 @@ Write the feedback now, making it sound personal and genuine while keeping it co
                 <input
                   type="email"
                   placeholder="Student Email"
-                  value={currentStudent?.email || gradingData.student.email}
+                  value={currentStudent?.email || gradingData.student?.email || ''}
                   onChange={(e) => {
                     const newValue = e.target.value;
                     setGradingData(prevData => ({
                       ...prevData,
                       student: { ...prevData.student, email: newValue }
                     }));
-                    updateStudentInfo({ email: newValue });
+                    updateStudentInfo('email', newValue);
                   }}
                   style={{
                     width: '100%',
@@ -1621,14 +1648,12 @@ Write the feedback now, making it sound personal and genuine while keeping it co
                 padding: '1rem',
                 marginBottom: '1.25rem'
               }}>
-                <p style={{ fontWeight: '500', marginBottom: '0.5rem', color: '#9a3412' }}>
-                  Institutional Late Assignment Policy:
+                <h4 style={{ fontWeight: '600', marginBottom: '0.5rem', color: '#9a3412' }}>
+                  Active Policy: {currentLatePolicy.name}
+                </h4>
+                <p style={{ fontSize: '0.875rem', color: '#7c2d12', margin: 0 }}>
+                  {currentLatePolicy.description}
                 </p>
-                <ul style={{ paddingLeft: '1.25rem', fontSize: '0.875rem', color: '#7c2d12' }}>
-                  <li>• <strong>On Time:</strong> Assignments submitted on or before due date and time are marked out of 100%</li>
-                  <li>• <strong>1-24 Hours Late:</strong> Assignments receive a 20% reduction and are marked out of 80%</li>
-                  <li>• <strong>After 24 Hours:</strong> Assignments receive a mark of zero (0)</li>
-                </ul>
               </div>
 
               <div style={{ marginBottom: '1rem' }}>
@@ -1636,21 +1661,21 @@ Write the feedback now, making it sound personal and genuine while keeping it co
                   Select submission status:
                 </h4>
 
-                {Object.entries(latePolicyLevels).map(([level, policy]) => (
+                {Object.entries(currentLatePolicy.levels).map(([levelKey, policy]) => (
                   <div
-                    key={level}
-                    onClick={() => updateLatePolicy(level)}
+                    key={levelKey}
+                    onClick={() => updateLatePolicy(levelKey)}
                     style={{
                       background: 'white',
-                      border: `2px solid ${gradingData.latePolicy.level === level ? policy.color : '#d1d5db'}`,
+                      border: `2px solid ${gradingData.latePolicy.level === levelKey ? policy.color : '#d1d5db'}`,
                       borderRadius: '0.75rem',
                       padding: '1rem',
                       marginBottom: '0.75rem',
                       cursor: 'pointer',
                       transition: 'all 0.3s ease',
-                      transform: gradingData.latePolicy.level === level ? 'translateY(-2px)' : 'none',
-                      boxShadow: gradingData.latePolicy.level === level ? '0 8px 25px rgba(0, 0, 0, 0.15)' : '0 1px 3px rgba(0, 0, 0, 0.1)',
-                      backgroundColor: gradingData.latePolicy.level === level ? `linear-gradient(135deg, ${policy.color}15 0%, ${policy.color}25 100%)` : 'white'
+                      transform: gradingData.latePolicy.level === levelKey ? 'translateY(-2px)' : 'none',
+                      boxShadow: gradingData.latePolicy.level === levelKey ? '0 8px 25px rgba(0, 0, 0, 0.15)' : '0 1px 3px rgba(0, 0, 0, 0.1)',
+                      backgroundColor: gradingData.latePolicy.level === levelKey ? `linear-gradient(135deg, ${policy.color}15 0%, ${policy.color}25 100%)` : 'white'
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
@@ -1670,7 +1695,7 @@ Write the feedback now, making it sound personal and genuine while keeping it co
                       }}>
                         {policy.name}
                       </h5>
-                      {level !== 'none' && (
+                      {levelKey !== 'none' && (
                         <span style={{
                           fontSize: '0.9rem',
                           opacity: 0.8,
@@ -1693,7 +1718,7 @@ Write the feedback now, making it sound personal and genuine while keeping it co
                 ))}
               </div>
 
-              {calculateTotalScore().penaltyApplied && (
+              {scoreSummary.penaltyApplied && (
                 <div style={{
                   background: '#fef2f2',
                   border: '1px solid #fecaca',
@@ -1705,13 +1730,13 @@ Write the feedback now, making it sound personal and genuine while keeping it co
                   </h5>
                   <div style={{ fontSize: '0.875rem', color: '#7f1d1d' }}>
                     <p style={{ marginBottom: '0.25rem' }}>
-                      <strong>Raw Score:</strong> {Math.round(calculateTotalScore().rawScore * 10) / 10} / {loadedRubric ? loadedRubric.assignmentInfo.totalPoints : gradingData.assignment.maxPoints}
+                      <strong>Raw Score:</strong> {Math.round(scoreSummary.rawScore * 10) / 10} / {loadedRubric ? loadedRubric.assignmentInfo.totalPoints : gradingData.assignment.maxPoints}
                     </p>
                     <p style={{ marginBottom: '0.25rem' }}>
-                      <strong>Late Penalty:</strong> ×{latePolicyLevels[gradingData.latePolicy.level].multiplier}
+                      <strong>Late Penalty:</strong> ×{getSafeLatePolicy(gradingData.latePolicy?.level).multiplier}
                     </p>
                     <p style={{ margin: 0 }}>
-                      <strong>Final Score:</strong> {Math.round(calculateTotalScore().finalScore * 10) / 10} / {loadedRubric ? loadedRubric.assignmentInfo.totalPoints : gradingData.assignment.maxPoints}
+                      <strong>Final Score:</strong> {Math.round(scoreSummary.finalScore * 10) / 10} / {loadedRubric ? loadedRubric.assignmentInfo.totalPoints : gradingData.assignment.maxPoints}
                     </p>
                   </div>
                 </div>
@@ -1731,13 +1756,13 @@ Write the feedback now, making it sound personal and genuine while keeping it co
                 📊 Final Score
               </h2>
               <div style={{ fontSize: '3rem', fontWeight: '700', color: '#16a34a', marginBottom: '1rem' }}>
-                {Math.round(calculateTotalScore().finalScore * 10) / 10}
+                {Math.round(scoreSummary.finalScore * 10) / 10}
                 <span style={{ fontSize: '1.5rem', color: '#6b7280' }}>
                   / {loadedRubric ? loadedRubric.assignmentInfo.totalPoints : gradingData.assignment.maxPoints}
                 </span>
               </div>
               <div style={{ fontSize: '1.25rem', color: '#6b7280', marginBottom: '1rem' }}>
-                ({Math.round((calculateTotalScore().finalScore / (loadedRubric ? (loadedRubric.assignmentInfo.totalPoints || 1) : (gradingData.assignment.maxPoints || 1))) * 1000) / 10}%)
+                ({Math.round((scoreSummary.finalScore / (loadedRubric ? (loadedRubric.assignmentInfo.totalPoints || 1) : (gradingData.assignment.maxPoints || 1))) * 1000) / 10}%)
               </div>
               <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', flexWrap: 'wrap' }}>
                 {loadedRubric && (
@@ -1751,7 +1776,7 @@ Write the feedback now, making it sound personal and genuine while keeping it co
                     📋 Rubric Assessment Active
                   </div>
                 )}
-                {calculateTotalScore().penaltyApplied && (
+                {scoreSummary.penaltyApplied && (
                   <div style={{
                     fontSize: '0.875rem',
                     background: '#fee2e2',
@@ -2109,23 +2134,23 @@ Write the feedback now, making it sound personal and genuine while keeping it co
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#3b82f6' }}>
-                        {Math.round(calculateTotalScore().finalScore * 10) / 10}/{loadedRubric.assignmentInfo.totalPoints}
+                        {Math.round(scoreSummary.finalScore * 10) / 10}/{loadedRubric.assignmentInfo.totalPoints}
                       </div>
                       <div style={{ fontSize: '1.125rem', color: '#6b7280' }}>
-                        ({Math.round((calculateTotalScore().finalScore / (loadedRubric.assignmentInfo.totalPoints || 1)) * 1000) / 10}%)
+                        ({Math.round((scoreSummary.finalScore / (loadedRubric.assignmentInfo.totalPoints || 1)) * 1000) / 10}%)
                       </div>
-                      {calculateTotalScore().penaltyApplied && (
+                      {scoreSummary.penaltyApplied && (
                         <div style={{ fontSize: '0.875rem', color: '#dc2626', marginTop: '0.25rem' }}>
-                          Raw: {Math.round(calculateTotalScore().rawScore * 10) / 10} (Late Penalty Applied)
+                          Raw: {Math.round(scoreSummary.rawScore * 10) / 10} (Late Penalty Applied)
                         </div>
                       )}
                       <div style={{
                         fontSize: '0.875rem',
                         fontWeight: '500',
-                        color: (calculateTotalScore().finalScore / (loadedRubric.assignmentInfo.totalPoints || 1)) * 100 >= loadedRubric.assignmentInfo.passingThreshold
+                        color: (scoreSummary.finalScore / (loadedRubric.assignmentInfo.totalPoints || 1)) * 100 >= loadedRubric.assignmentInfo.passingThreshold
                           ? '#16a34a' : '#dc2626'
                       }}>
-                        {(calculateTotalScore().finalScore / (loadedRubric.assignmentInfo.totalPoints || 1)) * 100 >= loadedRubric.assignmentInfo.passingThreshold
+                        {(scoreSummary.finalScore / (loadedRubric.assignmentInfo.totalPoints || 1)) * 100 >= loadedRubric.assignmentInfo.passingThreshold
                           ? '✓ PASSING' : '✗ NEEDS IMPROVEMENT'}
                       </div>
                     </div>

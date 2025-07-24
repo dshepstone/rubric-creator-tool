@@ -16,15 +16,29 @@ import {
     BookOpen,
     Save,
     X,
-    Copy
+    Copy,
+    Clock,
+    Info,
+    Check
 } from 'lucide-react';
 import gradingPolicyService from '../services/gradingPolicyService';
 import { useGradingPolicies, useGradeCalculation } from '../hooks/useGradingPolicies';
+import { useAssessment, DEFAULT_LATE_POLICY } from './SharedContext';
+// Simplified tooltip using the native title attribute to avoid extra dependencies
 
 const GradingPolicyManager = () => {
     // Use TanStack Query hooks instead of manual state
     const { data: policies = [], isLoading: loading } = useGradingPolicies();
     const gradeCalculation = useGradeCalculation();
+    const {
+        currentLatePolicy,
+        setCurrentLatePolicy,
+        customLatePolicies,
+        saveCustomLatePolicy,
+        updateCustomLatePolicy,
+        deleteCustomLatePolicy,
+        loadLatePoliciesFromStorage
+    } = useAssessment();
 
     // Local component state
     const [editingPolicy, setEditingPolicy] = useState(null);
@@ -32,6 +46,8 @@ const GradingPolicyManager = () => {
     const [selectedPolicy, setSelectedPolicy] = useState(null);
     const [testGrade, setTestGrade] = useState('');
     const [testResult, setTestResult] = useState(null);
+    const [editingLatePolicy, setEditingLatePolicy] = useState(null);
+    const [showLatePolicyForm, setShowLatePolicyForm] = useState(false);
 
     // Set initial selected policy when policies load
     useEffect(() => {
@@ -39,6 +55,11 @@ const GradingPolicyManager = () => {
             setSelectedPolicy(policies[0]);
         }
     }, [policies, selectedPolicy]);
+
+    // Load late policies from localStorage
+    useEffect(() => {
+        loadLatePoliciesFromStorage();
+    }, [loadLatePoliciesFromStorage]);
 
     const testGradeCalculation = async () => {
         if (!testGrade || !selectedPolicy) return;
@@ -106,7 +127,7 @@ const GradingPolicyManager = () => {
         </div>
     );
 
-    const PolicyPreview = ({ policy }) => {
+const PolicyPreview = ({ policy }) => {
         if (!policy) return null;
 
         return (
@@ -333,6 +354,11 @@ const GradingPolicyManager = () => {
                 </div>
             </div>
 
+            {/* Late Policy Manager Section */}
+            <div className="mt-12">
+                <LatePolicyManager />
+            </div>
+
             {/* Development Mode Notice */}
             {process.env.NODE_ENV === 'development' && (
                 <div className="mt-8 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
@@ -344,6 +370,258 @@ const GradingPolicyManager = () => {
                         Currently using local policies. When you deploy to Hostinger, this will connect to your policy management API.
                     </p>
                 </div>
+            )}
+        </div>
+    );
+};
+
+const LatePolicyForm = ({ policy, onSave, onCancel }) => {
+    const [formData, setFormData] = useState(policy);
+
+    const addLevel = () => {
+        const key = `level_${Date.now()}`;
+        setFormData(prev => ({
+            ...prev,
+            levels: { ...prev.levels, [key]: { name: '', multiplier: 1, description: '', color: '#ea580c' } }
+        }));
+    };
+
+    const updateLevel = (key, field, value) => {
+        setFormData(prev => ({
+            ...prev,
+            levels: {
+                ...prev.levels,
+                [key]: { ...prev.levels[key], [field]: field === 'multiplier' ? parseFloat(value) || 0 : value }
+            }
+        }));
+    };
+
+    const removeLevel = (key) => {
+        setFormData(prev => {
+            const updated = { ...prev.levels };
+            delete updated[key];
+            return { ...prev, levels: updated };
+        });
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-lg max-w-2xl w-full p-6 overflow-y-auto max-h-[90vh]">
+                {/* Header */}
+                <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-xl font-bold">{formData.id ? 'Edit Late Policy' : 'New Late Policy'}</h2>
+                    <button onClick={onCancel} className="p-1 text-gray-600 hover:text-gray-800">
+                        <X />
+                    </button>
+                </div>
+
+                {/* Help Panel */}
+                <div className="bg-blue-50 border border-blue-100 rounded p-4 mb-6 text-sm text-blue-800">
+                    <strong>How to fill this form:</strong>
+                    <ul className="list-disc ml-5 mt-2">
+                        <li><strong>Name:</strong> e.g. “Creative Industries.”</li>
+                        <li><strong>Description:</strong> Optional short note for your own reference.</li>
+                        <li><strong>Levels:</strong> These are your “On Time”, “24h Late” etc. slots.</li>
+                        <li><strong>Multiplier:</strong> Enter a decimal (0 – 1) to scale the grade.</li>
+                        <li><strong>Color:</strong> Pick a color to highlight this level in UI.</li>
+                    </ul>
+                </div>
+
+                {/* Basic fields */}
+                <div className="space-y-4 mb-6">
+                    {/* Name */}
+                    <label className="block text-sm font-medium">
+                        Policy Name{' '}
+                        <Info className="inline text-gray-400 cursor-pointer" size={14} title="Give your policy a clear, unique name" />
+                    </label>
+                    <input
+                        type="text"
+                        value={formData.name}
+                        onChange={e => setFormData({ ...formData, name: e.target.value })}
+                        placeholder="e.g. Creative Industries"
+                        className="w-full p-2 border rounded"
+                    />
+
+                    {/* Description */}
+                    <label className="block text-sm font-medium">
+                        Description{' '}
+                        <Info className="inline text-gray-400 cursor-pointer" size={14} title="Short note (optional)" />
+                    </label>
+                    <input
+                        type="text"
+                        value={formData.description}
+                        onChange={e => setFormData({ ...formData, description: e.target.value })}
+                        placeholder="Describe when this policy applies"
+                        className="w-full p-2 border rounded"
+                    />
+                </div>
+
+                {/* Levels */}
+                <div>
+                    <div className="flex justify-between items-center mb-2">
+                        <h3 className="font-medium">Levels</h3>
+                        <button onClick={addLevel} className="text-sm text-green-600 hover:underline">+ Add Level</button>
+                    </div>
+
+                    <div className="space-y-4">
+                        {Object.entries(formData.levels).map(([key, lvl]) => (
+                            <div key={key} className="border rounded-lg p-4 bg-gray-50">
+                                <div className="flex justify-between items-center mb-3">
+                                    <strong>Level: {lvl.name || 'Unnamed'}</strong>
+                                    <button onClick={() => removeLevel(key)} className="text-red-500 hover:underline text-sm">Remove</button>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                                    {/* Name */}
+                                    <div>
+                                            <label className="block text-xs font-medium">
+                                            Name{' '}
+                                            <Info className="inline text-gray-400 cursor-pointer" size={12} title="e.g. On Time, 24h Late" />
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={lvl.name}
+                                            onChange={e => updateLevel(key, 'name', e.target.value)}
+                                            placeholder="Level Name"
+                                            className="w-full p-1 border rounded text-sm"
+                                        />
+                                    </div>
+
+                                    {/* Multiplier */}
+                                    <div>
+                                        <label className="block text-xs font-medium">
+                                            Multiplier{' '}
+                                            <Info className="inline text-gray-400 cursor-pointer" size={12} title="Decimal between 0 (zero) and 1 (full credit)" />
+                                        </label>
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            min="0"
+                                            max="1"
+                                            value={lvl.multiplier}
+                                            onChange={e => updateLevel(key, 'multiplier', e.target.value)}
+                                            placeholder="e.g. 0.8"
+                                            className="w-full p-1 border rounded text-sm"
+                                        />
+                                    </div>
+
+                                    {/* Color Picker */}
+                                    <div>
+                                        <label className="block text-xs font-medium">
+                                            Color{' '}
+                                            <Info className="inline text-gray-400 cursor-pointer" size={12} title="Pick a highlight color" />
+                                        </label>
+                                        <input
+                                            type="color"
+                                            value={lvl.color}
+                                            onChange={e => updateLevel(key, 'color', e.target.value)}
+                                            className="w-full h-8 border-0 p-0 bg-transparent"
+                                        />
+                                    </div>
+
+                                    {/* Optional description */}
+                                    <div className="sm:col-span-4">
+                                        <label className="block text-xs font-medium">
+                                            Description{' '}
+                                            <Info className="inline text-gray-400 cursor-pointer" size={12} title="Explain what happens at this level" />
+                                        </label>
+                                        <textarea
+                                            rows={2}
+                                            value={lvl.description}
+                                            onChange={e => updateLevel(key, 'description', e.target.value)}
+                                            placeholder="Optional detail for instructors"
+                                            className="w-full p-1 border rounded text-sm"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex justify-end gap-2 mt-6">
+                    <button onClick={onCancel} className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700">Cancel</button>
+                    <button onClick={() => onSave(formData)} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center gap-1">
+                        <Check size={16} /> Save Policy
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const LatePolicyManager = () => {
+    const {
+        currentLatePolicy,
+        setCurrentLatePolicy,
+        customLatePolicies,
+        saveCustomLatePolicy,
+        updateCustomLatePolicy,
+        deleteCustomLatePolicy
+    } = useAssessment();
+
+    const [showForm, setShowForm] = useState(false);
+    const [formPolicy, setFormPolicy] = useState(null);
+
+    const allPolicies = [DEFAULT_LATE_POLICY, ...(customLatePolicies || [])].filter(Boolean);
+
+    const startCreate = () => {
+        setFormPolicy({ id: null, name: '', description: '', levels: { none: { name: 'On Time', multiplier: 1, description: '', color: '#16a34a' } } });
+        setShowForm(true);
+    };
+
+    const startEdit = (policy) => {
+        setFormPolicy({ ...policy });
+        setShowForm(true);
+    };
+
+    const handleSave = (policy) => {
+        if (policy.id) {
+            updateCustomLatePolicy(policy.id, policy);
+            if (currentLatePolicy?.id === policy.id) setCurrentLatePolicy(policy);
+        } else {
+            const saved = saveCustomLatePolicy(policy);
+            setCurrentLatePolicy(saved);
+        }
+        setShowForm(false);
+    };
+
+    return (
+        <div>
+            <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+                <Clock /> Late Policies
+            </h2>
+            <div className="space-y-3">
+                {allPolicies.map(policy => (
+                    <div key={policy.id} className="p-3 border rounded flex justify-between items-start">
+                        <div>
+                            <div className="font-medium">{policy.name}</div>
+                            <div className="text-sm text-gray-600">{policy.description}</div>
+                            {currentLatePolicy?.id === policy.id && (
+                                <span className="text-green-600 text-xs">Active</span>
+                            )}
+                        </div>
+                        <div className="flex gap-2 text-sm">
+                            <button onClick={() => setCurrentLatePolicy(policy)} className="text-blue-600">Set Active</button>
+                            {policy.id !== DEFAULT_LATE_POLICY.id && (
+                                <>
+                                    <button onClick={() => startEdit(policy)} className="text-indigo-600">Edit</button>
+                                    <button onClick={() => deleteCustomLatePolicy(policy.id)} className="text-red-600">Delete</button>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                ))}
+            </div>
+            <button onClick={startCreate} className="mt-4 px-4 py-2 bg-green-600 text-white rounded">New Late Policy</button>
+
+            {showForm && (
+                <LatePolicyForm
+                    policy={formPolicy}
+                    onSave={handleSave}
+                    onCancel={() => setShowForm(false)}
+                />
             )}
         </div>
     );
