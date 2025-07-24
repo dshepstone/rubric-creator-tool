@@ -15,7 +15,7 @@ import {
     FileSpreadsheet,
     Settings  // Add this for policy management
 } from 'lucide-react';
-import { useAssessment } from './SharedContext';
+import { useAssessment, DEFAULT_LATE_POLICY } from './SharedContext';
 import { parseExcelFile, validateStudentData } from '../utils/excelParser';
 
 // Add new imports for grading policy management
@@ -129,6 +129,7 @@ const ClassListManager = () => {
         loadFinalGrade,
         finalGrades,
         rubricFormData,
+        currentLatePolicy,
     } = useAssessment();
 
     // Load current program type from class metadata and update policy
@@ -717,32 +718,13 @@ const ClassListManager = () => {
             return;
         }
 
-        // 4. Late Policy Levels (same as in GradingTemplate.js)
-        const latePolicyLevels = {
-            none: {
-                name: 'On Time',
-                multiplier: 1.0,
-                description: 'Assignment submitted on or before due date and time - marked out of 100%',
-                color: '#16a34a'
-            },
-            within24: {
-                name: '1-24 Hours Late',
-                multiplier: 0.8,
-                description: 'Assignment received within 24 hours of due date - 20% reduction (marked out of 80%)',
-                color: '#ea580c'
-            },
-            after24: {
-                name: 'More than 24 Hours Late',
-                multiplier: 0.0,
-                description: 'Assignment received after 24 hours from due date - mark of zero (0)',
-                color: '#dc2626'
-            }
-        };
+        // 4. Access active late policy levels
+        const activeLevels = currentLatePolicy?.levels || DEFAULT_LATE_POLICY.levels;
         const getSafeLatePolicy = (level) => {
-            if (!level || typeof level !== "string" || !latePolicyLevels[level]) {
-                return latePolicyLevels.none;
+            if (!level || typeof level !== "string" || !activeLevels[level]) {
+                return activeLevels.none;
             }
-            return latePolicyLevels[level];
+            return activeLevels[level];
         };
 
         // 5. Calculate scores (replicated from GradingTemplate.js)

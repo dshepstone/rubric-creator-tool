@@ -4,7 +4,7 @@ import {
   ChevronDown, ChevronUp, ArrowLeft, ArrowRight, Users, PlayCircle,
   CheckCircle, Clock, SkipForward, SkipBack, Pause, RotateCcw
 } from 'lucide-react';
-import { useAssessment } from './SharedContext';
+import { useAssessment, DEFAULT_LATE_POLICY } from './SharedContext';
 
 // Sample comprehensive rubric from the PDF
 const sampleRubric = {
@@ -232,7 +232,8 @@ const GradingTemplate = () => {
     saveFinalGrade,
     loadFinalGrade,
     finalGrades,
-    getGradeStatus
+    getGradeStatus,
+    currentLatePolicy
   } = useAssessment();
 
   // Helper function to convert HTML content to readable text format
@@ -410,32 +411,13 @@ const GradingTemplate = () => {
   }, [currentStudent, getGradeStatus, loadDraft, loadFinalGrade]);
 
 
-  // Late Policy Levels
-  const latePolicyLevels = {
-    none: {
-      name: 'On Time',
-      multiplier: 1.0,
-      description: 'Assignment submitted on or before due date and time - marked out of 100%',
-      color: '#16a34a'
-    },
-    within24: {
-      name: '1-24 Hours Late',
-      multiplier: 0.8,
-      description: 'Assignment received within 24 hours of due date - 20% reduction (marked out of 80%)',
-      color: '#ea580c'
-    },
-    after24: {
-      name: 'More than 24 Hours Late',
-      multiplier: 0.0,
-      description: 'Assignment received after 24 hours from due date - mark of zero (0)',
-      color: '#dc2626'
-    }
-  };
+  // Safely access the active late policy levels
   const getSafeLatePolicy = (level) => {
-    if (!level || typeof level !== "string" || !latePolicyLevels[level]) {
-      return latePolicyLevels.none;
+    const activeLevels = currentLatePolicy?.levels || DEFAULT_LATE_POLICY.levels;
+    if (!level || typeof level !== "string" || !activeLevels[level]) {
+      return activeLevels.none;
     }
-    return latePolicyLevels[level];
+    return activeLevels[level];
   };
 
   useEffect(() => {
@@ -481,7 +463,8 @@ const GradingTemplate = () => {
       }
 
       if (savedData) {
-        const validLevels = ["none", "within24", "after24"];
+        const activeLevels = currentLatePolicy?.levels || DEFAULT_LATE_POLICY.levels;
+        const validLevels = Object.keys(activeLevels);
         if (savedData.latePolicy && !validLevels.includes(savedData.latePolicy.level)) {
           savedData.latePolicy.level = "none";
         }
@@ -502,9 +485,10 @@ const GradingTemplate = () => {
     }
   }, [currentStudent, getGradeStatus, loadDraft, loadFinalGrade]);
 useEffect(() => {
-  if (gradingData.latePolicy && !latePolicyLevels[gradingData.latePolicy.level]) {
+  const activeLevels = currentLatePolicy?.levels || DEFAULT_LATE_POLICY.levels;
+  if (gradingData.latePolicy && !activeLevels[gradingData.latePolicy.level]) {
     console.warn("Invalid late policy level detected:", gradingData.latePolicy.level);
-    console.warn("Valid levels are:", Object.keys(latePolicyLevels));
+    console.warn("Valid levels are:", Object.keys(activeLevels));
     setGradingData(prevData => ({
       ...prevData,
       latePolicy: {
@@ -513,7 +497,7 @@ useEffect(() => {
       }
     }));
   }
-}, [gradingData.latePolicy]);
+}, [gradingData.latePolicy, currentLatePolicy]);
 
 
 
@@ -546,7 +530,8 @@ useEffect(() => {
       ...prevData,
       latePolicy: {
         level: level,
-        penaltyApplied: level !== 'none'
+        penaltyApplied: level !== 'none',
+        policyId: currentLatePolicy?.id || DEFAULT_LATE_POLICY.id
       }
     }));
   };
@@ -1650,14 +1635,12 @@ Write the feedback now, making it sound personal and genuine while keeping it co
                 padding: '1rem',
                 marginBottom: '1.25rem'
               }}>
-                <p style={{ fontWeight: '500', marginBottom: '0.5rem', color: '#9a3412' }}>
-                  Institutional Late Assignment Policy:
+                <h4 style={{ fontWeight: '600', marginBottom: '0.5rem', color: '#9a3412' }}>
+                  Active Policy: {currentLatePolicy.name}
+                </h4>
+                <p style={{ fontSize: '0.875rem', color: '#7c2d12', margin: 0 }}>
+                  {currentLatePolicy.description}
                 </p>
-                <ul style={{ paddingLeft: '1.25rem', fontSize: '0.875rem', color: '#7c2d12' }}>
-                  <li>• <strong>On Time:</strong> Assignments submitted on or before due date and time are marked out of 100%</li>
-                  <li>• <strong>1-24 Hours Late:</strong> Assignments receive a 20% reduction and are marked out of 80%</li>
-                  <li>• <strong>After 24 Hours:</strong> Assignments receive a mark of zero (0)</li>
-                </ul>
               </div>
 
               <div style={{ marginBottom: '1rem' }}>
@@ -1665,21 +1648,21 @@ Write the feedback now, making it sound personal and genuine while keeping it co
                   Select submission status:
                 </h4>
 
-                {Object.entries(latePolicyLevels).map(([level, policy]) => (
+                {Object.entries(currentLatePolicy.levels).map(([levelKey, policy]) => (
                   <div
-                    key={level}
-                    onClick={() => updateLatePolicy(level)}
+                    key={levelKey}
+                    onClick={() => updateLatePolicy(levelKey)}
                     style={{
                       background: 'white',
-                      border: `2px solid ${gradingData.latePolicy.level === level ? policy.color : '#d1d5db'}`,
+                      border: `2px solid ${gradingData.latePolicy.level === levelKey ? policy.color : '#d1d5db'}`,
                       borderRadius: '0.75rem',
                       padding: '1rem',
                       marginBottom: '0.75rem',
                       cursor: 'pointer',
                       transition: 'all 0.3s ease',
-                      transform: gradingData.latePolicy.level === level ? 'translateY(-2px)' : 'none',
-                      boxShadow: gradingData.latePolicy.level === level ? '0 8px 25px rgba(0, 0, 0, 0.15)' : '0 1px 3px rgba(0, 0, 0, 0.1)',
-                      backgroundColor: gradingData.latePolicy.level === level ? `linear-gradient(135deg, ${policy.color}15 0%, ${policy.color}25 100%)` : 'white'
+                      transform: gradingData.latePolicy.level === levelKey ? 'translateY(-2px)' : 'none',
+                      boxShadow: gradingData.latePolicy.level === levelKey ? '0 8px 25px rgba(0, 0, 0, 0.15)' : '0 1px 3px rgba(0, 0, 0, 0.1)',
+                      backgroundColor: gradingData.latePolicy.level === levelKey ? `linear-gradient(135deg, ${policy.color}15 0%, ${policy.color}25 100%)` : 'white'
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
