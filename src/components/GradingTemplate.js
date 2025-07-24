@@ -1682,7 +1682,7 @@ Write the feedback now, making it sound personal and genuine while keeping it co
                       }}>
                         {policy.name}
                       </h5>
-                      {level !== 'none' && (
+                      {levelKey !== 'none' && (
                         <span style={{
                           fontSize: '0.9rem',
                           opacity: 0.8,
