@@ -67,6 +67,12 @@ const TabNavigation = () => {
             description: 'Import and manage class lists'
         },
         {
+            id: 'policy-manager',
+            name: 'Policy Manager',
+            icon: Settings,
+            description: 'Manage dynamic grading policies and scales'
+        },
+        {
             id: 'grading-tool',
             name: 'Grading Tool',
             icon: GraduationCap,
@@ -77,12 +83,6 @@ const TabNavigation = () => {
             name: 'Grade Book',
             description: 'Comprehensive gradebook with multiple assignments',
             icon: BookOpen
-        },
-        {
-            id: 'policy-manager',
-            name: 'Policy Manager',
-            icon: Settings,
-            description: 'Manage dynamic grading policies and scales'
         },
         {
             id: 'help',

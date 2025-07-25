@@ -2582,3 +2582,466 @@ button.p-3.rounded-lg.border-2 {
     grid-template-columns: 1fr;
   }
 }
+/* Updated index.css - With GradeBook Styles */
+
+/* === CSS VARIABLES =========================================== */
+:root {
+  /* Primary colors */
+  --primary-blue: #3b82f6;
+  --primary-blue-dark: #1d4ed8;
+  --primary-blue-light: #60a5fa;
+
+  /* Secondary colors */
+  --secondary-purple: #8b5cf6;
+  --secondary-green: #10b981;
+  --secondary-orange: #f59e0b;
+
+  /* Neutral colors */
+  --gray-50: #f9fafb;
+  --gray-100: #f3f4f6;
+  --gray-200: #e5e7eb;
+  --gray-300: #d1d5db;
+  --gray-400: #9ca3af;
+  --gray-500: #6b7280;
+  --gray-600: #4b5563;
+  --gray-700: #374151;
+  --gray-800: #1f2937;
+  --gray-900: #111827;
+
+  /* Status colors */
+  --green-50: #ecfdf5;
+  --green-100: #d1fae5;
+  --green-200: #a7f3d0;
+  --green-600: #059669;
+  --green-700: #047857;
+
+  --blue-50: #eff6ff;
+  --blue-100: #dbeafe;
+  --blue-200: #bfdbfe;
+  --blue-600: #2563eb;
+  --blue-700: #1d4ed8;
+
+  --purple-50: #faf5ff;
+  --purple-100: #f3e8ff;
+  --purple-200: #e9d5ff;
+  --purple-600: #9333ea;
+  --purple-700: #7c3aed;
+
+  --orange-50: #fff7ed;
+  --orange-100: #ffedd5;
+  --orange-200: #fed7aa;
+  --orange-600: #ea580c;
+  --orange-700: #c2410c;
+
+  --yellow-50: #fefce8;
+  --yellow-100: #fef3c7;
+  --yellow-200: #fde68a;
+  --yellow-600: #d97706;
+  --yellow-700: #b45309;
+
+  --red-50: #fef2f2;
+  --red-100: #fee2e2;
+  --red-200: #fecaca;
+  --red-600: #dc2626;
+  --red-700: #b91c1c;
+
+  --teal-50: #f0fdfa;
+  --teal-100: #ccfbf1;
+  --teal-200: #99f6e4;
+  --teal-600: #0d9488;
+  --teal-700: #0f766e;
+
+  --indigo-50: #eef2ff;
+  --indigo-100: #e0e7ff;
+  --indigo-200: #c7d2fe;
+  --indigo-600: #4f46e5;
+  --indigo-700: #4338ca;
+}
+
+/* === GLOBAL STYLES =========================================== */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--gray-50);
+  color: var(--gray-900);
+  line-height: 1.5;
+}
+
+code {
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', source-code-pro, Consolas, monospace;
+}
+
+/* === TAILWIND BASE OVERRIDES ================================= */
+.bg-gray-50 {
+  background-color: var(--gray-50);
+}
+
+.bg-gray-100 {
+  background-color: var(--gray-100);
+  color: var(--gray-800);
+}
+
+/* ensure the disabled state still has dark text */
+.bg-gray-100:disabled {
+  color: var(--gray-800);
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.bg-green-100 {
+  background-color: var(--green-100);
+}
+
+.bg-orange-100 {
+  background-color: var(--orange-100);
+  border: 1px solid #fb923c;
+}
+
+.bg-red-50 {
+  background-color: var(--red-50);
+}
+
+.bg-red-100 {
+  background-color: var(--red-100);
+}
+
+.bg-blue-900 {
+  background: linear-gradient(135deg, var(--primary-blue-dark) 0%, var(--primary-blue) 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+.bg-blue-50 {
+  background: linear-gradient(135deg, var(--blue-50) 0%, #dbeafe 100%);
+  border: 1px solid var(--blue-200);
+}
+
+.bg-yellow-50 {
+  background: linear-gradient(135deg, var(--yellow-50) 0%, #fef3c7 100%);
+  border: 1px solid var(--yellow-200);
+}
+
+.bg-purple-50 {
+  background: linear-gradient(135deg, var(--purple-50) 0%, #f3e8ff 100%);
+  border: 1px solid var(--purple-200);
+}
+
+.bg-orange-50 {
+  background: linear-gradient(135deg, var(--orange-50) 0%, #ffedd5 100%);
+  border: 1px solid var(--orange-200);
+}
+
+/* Enhanced Green Gradient for Rubric Section */
+.bg-gradient-to-r {
+  background: linear-gradient(135deg, var(--green-50) 0%, #d1fae5 100%);
+}
+
+/* === ACTIVE-TAB BACKGROUNDS ======================================= */
+.active-assignment-prompt {
+  background: linear-gradient(135deg, #fff7ed 0%, #fed7aa 100%);
+  border-color: #ea580c;
+  color: #ea580c;
+}
+
+.active-ai {
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  border-color: #3b82f6;
+  color: #1d4ed8;
+}
+
+.active-rubric {
+  background: linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%);
+  border-color: #8b5cf6;
+  color: #7c3aed;
+}
+
+.active-class {
+  background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%);
+  border-color: #4f46e5;
+  color: #4338ca;
+}
+
+.active-policy {
+  background: linear-gradient(135deg, #f0fdfa 0%, #ccfbf1 100%);
+  border-color: #0d9488;
+  color: #0f766e;
+}
+
+.active-grading {
+  background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+  border-color: #10b981;
+  color: #047857;
+}
+
+/* NEW: GradeBook Active Tab Style */
+.active-gradebook {
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  border-color: #2563eb;
+  color: #1d4ed8;
+}
+
+.active-help {
+  background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
+  border-color: #6b7280;
+  color: #374151;
+}
+
+.from-green-50 {
+  background: linear-gradient(135deg, var(--green-50) 0%, #d1fae5 100%);
+}
+
+/* TAB SYSTEM STYLING */
+.tab-content {
+  min-height: calc(100vh - 140px);
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+.tab-navigation {
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+}
+
+.tab-content>* {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+/* === GRADEBOOK SPECIFIC STYLES =============================== */
+.gradebook-table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.gradebook-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: white;
+  border-bottom: 2px solid var(--gray-200);
+}
+
+.gradebook-table tbody tr:hover {
+  background-color: var(--blue-50);
+}
+
+.gradebook-cell {
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.gradebook-cell:hover {
+  background-color: var(--blue-100);
+  transform: scale(1.02);
+}
+
+.gradebook-cell.editing {
+  background-color: var(--blue-200);
+  border: 2px solid var(--blue-500);
+}
+
+.gradebook-grade-passing {
+  background-color: var(--green-50);
+  color: var(--green-800);
+  border: 1px solid var(--green-200);
+}
+
+.gradebook-grade-failing {
+  background-color: var(--red-50);
+  color: var(--red-800);
+  border: 1px solid var(--red-200);
+}
+
+.gradebook-statistics-card {
+  background: linear-gradient(135deg, white 0%, var(--gray-50) 100%);
+  border: 1px solid var(--gray-200);
+  transition: all 0.3s ease;
+}
+
+.gradebook-statistics-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.gradebook-project-header {
+  position: relative;
+  background: var(--gray-50);
+  border-bottom: 1px solid var(--gray-200);
+}
+
+.gradebook-project-header:hover .gradebook-project-actions {
+  opacity: 1;
+}
+
+.gradebook-project-actions {
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.gradebook-final-grade-column {
+  background: linear-gradient(135deg, var(--blue-50) 0%, var(--blue-100) 100%);
+  border-left: 2px solid var(--blue-200);
+  font-weight: 600;
+}
+
+/* === LATE POLICY STYLING ===================================== */
+.late-policy-container {
+  background: linear-gradient(135deg, var(--orange-50) 0%, #ffedd5 100%);
+  border: 1px solid var(--orange-200);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+}
+
+.late-policy-info-box {
+  background: white;
+  border: 1px solid var(--orange-200);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.late-policy-calculation {
+  background: var(--red-50);
+  border: 1px solid var(--red-200);
+  border-radius: 8px;
+  padding: 16px;
+  margin-top: 16px;
+}
+
+/* Main Late Policy Card */
+.late-policy-card {
+  background: white;
+  border: 2px solid #d1d5db;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 16px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  position: relative;
+}
+
+.late-policy-card:hover {
+  border-color: #6b7280;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+.late-policy-card.selected {
+  border-color: var(--primary-blue);
+  box-shadow: 0 8px 25px rgba(59, 130, 246, 0.15);
+  background: linear-gradient(135deg, #eff6ff 0%, white 100%);
+}
+
+/* === ANIMATION KEYFRAMES ==================================== */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes pulse {
+
+  0%,
+  100% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+/* === RESPONSIVE DESIGN ====================================== */
+@media (max-width: 768px) {
+  .tab-navigation {
+    padding: 0 1rem;
+  }
+
+  .tab-navigation nav {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 0.5rem;
+  }
+
+  .gradebook-table {
+    font-size: 0.875rem;
+  }
+
+  .gradebook-statistics-card {
+    margin-bottom: 1rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .gradebook-project-header {
+    min-width: 100px;
+    font-size: 0.75rem;
+  }
+
+  .gradebook-cell {
+    padding: 0.25rem;
+    font-size: 0.75rem;
+  }
+}
+
+/* === UTILITY CLASSES ======================================== */
+.transition-smooth {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.shadow-hover:hover {
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+}
+
+.border-hover:hover {
+  border-color: var(--primary-blue);
+}
+
+.scale-hover:hover {
+  transform: scale(1.02);
+}
+
+/* === FOCUS STATES =========================================== */
+.focus-ring:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  border-color: var(--primary-blue);
+}
+
+/* === PRINT STYLES =========================================== */
+@media print {
+  .gradebook-table {
+    font-size: 0.75rem;
+  }
+
+  .gradebook-project-actions,
+  .tab-navigation,
+  button {
+    display: none !important;
+  }
+}
