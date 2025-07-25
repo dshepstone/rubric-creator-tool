@@ -1,4 +1,4 @@
-// src/App.js
+// src/App.js - Updated with GradeBook Integration (Preserving ALL Original Features)
 import React, { useState, useEffect } from 'react';
 import { AssessmentProvider, useAssessment } from './components/SharedContext';
 import TabNavigation from './components/TabNavigation';
@@ -7,6 +7,7 @@ import AssignmentPromptGenerator from './components/AssignmentPromptGenerator';
 import RubricCreator from './components/RubricCreator';
 import ClassListManager from './components/ClassListManager';
 import GradingTemplate from './components/GradingTemplate';
+import GradeBook from './components/GradeBook';
 import ExcelImportTest from './components/ExcelImportTest';
 import HelpPage from './components/HelpPage';
 import GradingPolicyManager from './components/GradingPolicyManager';
@@ -17,7 +18,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { queryClient } from './lib/queryClient';
 
-// Scroll to Top Button Component
+// Scroll to Top Button Component - PRESERVING ALL ORIGINAL FEATURES
 const ScrollToTopButton = () => {
   const [isVisible, setIsVisible] = useState(false);
   const [isScrolling, setIsScrolling] = useState(false);
@@ -232,6 +233,7 @@ const AppContent = () => {
         {activeTab === 'class-manager' && <ClassListManager />}
         {activeTab === 'policy-manager' && <GradingPolicyManager />}
         {activeTab === 'grading-tool' && <GradingTemplate />}
+        {activeTab === 'gradebook' && <GradeBook />}
         {activeTab === 'excel-import-test' && <ExcelImportTest />}
         {activeTab === 'help' && <HelpPage />}
       </div>
@@ -261,7 +263,7 @@ const App = () => {
     </QueryClientProvider>
 
 
-);
+  );
 };
 
 export default App;

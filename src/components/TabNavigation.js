@@ -1,8 +1,10 @@
+// TabNavigation.js - Updated with GradeBook Tab (Preserving ALL Original Features)
 import React, { useRef } from 'react';
 import { useAssessment } from './SharedContext';
 import {
     FileText, GraduationCap, Users, ArrowRight, Database,
-    PlayCircle, Clock, CheckCircle, AlertTriangle, Save, Upload, Sparkles, BookOpen, HelpCircle, Settings // ADDED Settings
+    PlayCircle, Clock, CheckCircle, AlertTriangle, Save, Upload,
+    Sparkles, BookOpen, HelpCircle, Settings
 } from 'lucide-react';
 
 // Add grading policy hooks
@@ -65,16 +67,22 @@ const TabNavigation = () => {
             description: 'Import and manage class lists'
         },
         {
-            id: 'policy-manager',
-            name: 'Policy Manager',
-            icon: Settings,
-            description: 'Manage dynamic grading policies and scales'
-        },
-        {
             id: 'grading-tool',
             name: 'Grading Tool',
             icon: GraduationCap,
             description: 'Grade assignments using rubrics'
+        },
+        {
+            id: 'gradebook',
+            name: 'Grade Book',
+            description: 'Comprehensive gradebook with multiple assignments',
+            icon: BookOpen
+        },
+        {
+            id: 'policy-manager',
+            name: 'Policy Manager',
+            icon: Settings,
+            description: 'Manage dynamic grading policies and scales'
         },
         {
             id: 'help',
@@ -91,6 +99,7 @@ const TabNavigation = () => {
         'class-manager': 'active-class border-indigo-500 text-indigo-700',
         'policy-manager': 'active-policy border-teal-500 text-teal-700',
         'grading-tool': 'active-grading border-green-500 text-green-700',
+        'gradebook': 'active-gradebook border-blue-600 text-blue-800',
         'help': 'active-help border-gray-500 text-gray-700',
     };
 
@@ -122,6 +131,20 @@ const TabNavigation = () => {
     };
 
     const progress = getGradingProgress();
+
+    // Calculate gradebook statistics
+    const getGradebookStats = () => {
+        if (!hasClassListData) return { students: 0, projects: 0 };
+
+        // This would need to be enhanced based on actual gradebook data structure
+        // For now, we'll show basic class stats
+        return {
+            students: classList.students.length,
+            projects: 0 // This would be calculated from gradebook data
+        };
+    };
+
+    const gradebookStats = getGradebookStats();
 
     return (
         <div className="tab-navigation border-b border-gray-200 shadow-sm">
@@ -242,6 +265,24 @@ const TabNavigation = () => {
                                         </div>
                                     )}
 
+                                    {/* GradeBook indicators */}
+                                    {tab.id === 'gradebook' && (
+                                        <div className="flex flex-col gap-1">
+                                            {hasClassListData && (
+                                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 whitespace-nowrap">
+                                                    <Users size={10} className="mr-1 flex-shrink-0" />
+                                                    {gradebookStats.students} Students
+                                                </span>
+                                            )}
+                                            {gradebookStats.projects > 0 && (
+                                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 whitespace-nowrap">
+                                                    <FileText size={10} className="mr-1 flex-shrink-0" />
+                                                    {gradebookStats.projects} Projects
+                                                </span>
+                                            )}
+                                        </div>
+                                    )}
+
                                     {/* Help tab indicator */}
                                     {tab.id === 'help' && (
                                         <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 whitespace-nowrap">
@@ -312,7 +353,7 @@ const TabNavigation = () => {
                             )}
                         </div>
 
-                        {/* Smart workflow navigation buttons */}
+                        {/* Smart workflow navigation buttons - PRESERVING ALL ORIGINAL LOGIC */}
                         <div className="flex items-center gap-2">
                             {activeTab === 'ai-prompt-generator' && hasRubricData && (
                                 <button
@@ -411,12 +452,46 @@ const TabNavigation = () => {
                                     Manage Class
                                 </button>
                             )}
+
+                            {/* GradeBook Quick Actions */}
+                            {activeTab === 'gradebook' && !hasClassListData && (
+                                <div className="flex items-center gap-2">
+                                    <span className="text-xs text-gray-600">Get Started:</span>
+                                    <button
+                                        onClick={() => setActiveTab('class-manager')}
+                                        className="flex items-center gap-2 text-indigo-700 hover:text-indigo-800 text-sm font-medium bg-white px-3 py-1.5 rounded-lg border border-indigo-200 hover:border-indigo-300 transition-all duration-200 shadow-sm hover:shadow"
+                                    >
+                                        <Users size={14} />
+                                        Import Class List
+                                    </button>
+                                </div>
+                            )}
+
+                            {activeTab === 'gradebook' && hasClassListData && (
+                                <div className="flex items-center gap-2">
+                                    <span className="text-xs text-gray-600">Quick Actions:</span>
+                                    <button
+                                        onClick={() => setActiveTab('class-manager')}
+                                        className="flex items-center gap-2 text-indigo-700 hover:text-indigo-800 text-sm font-medium bg-white px-3 py-1.5 rounded-lg border border-indigo-200 hover:border-indigo-300 transition-all duration-200 shadow-sm hover:shadow"
+                                    >
+                                        <Users size={14} />
+                                        Manage Students
+                                    </button>
+                                    <button
+                                        onClick={() => setActiveTab('policy-manager')}
+                                        className="flex items-center gap-2 text-teal-700 hover:text-teal-800 text-sm font-medium bg-white px-3 py-1.5 rounded-lg border border-teal-200 hover:border-teal-300 transition-all duration-200 shadow-sm hover:shadow"
+                                    >
+                                        <Settings size={14} />
+                                        Grading Policies
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
             </div>
         </div>
-   
+
 
     );
 };
