@@ -305,7 +305,7 @@ Please generate a complete, ready-to-import, downloadable JSON file that matches
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-4xl mx-auto bg-white rounded-lg shadow-lg">
+      <div className="max-w-7xl mx-auto bg-white rounded-lg shadow-lg">
         {/* UPDATED Header with Import Button */}
         <div className="bg-blue-900 text-white p-6 rounded-t-lg">
           <div className="flex items-center justify-between">

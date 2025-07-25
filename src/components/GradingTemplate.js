@@ -1018,7 +1018,7 @@ Write the feedback now, making it sound personal and genuine while keeping it co
     return (
       <div style={{
         padding: '2rem',
-        maxWidth: '1200px',
+        maxWidth: '1440px',
         margin: '0 auto',
         fontFamily: 'system-ui, -apple-system, sans-serif'
       }}>
@@ -1064,7 +1064,7 @@ Write the feedback now, making it sound personal and genuine while keeping it co
   return (
     <div style={{
       padding: '2rem',
-      maxWidth: '1200px',
+      maxWidth: '1340px',
       margin: '0 auto',
       fontFamily: 'system-ui, -apple-system, sans-serif'
     }}>
