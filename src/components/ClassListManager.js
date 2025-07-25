@@ -13,7 +13,8 @@ import {
     FileText,
     ExternalLink,
     FileSpreadsheet,
-    Settings  // Add this for policy management
+    CheckCircle2,
+    Settings
 } from 'lucide-react';
 import { useAssessment, DEFAULT_LATE_POLICY } from './SharedContext';
 import { parseExcelFile, validateStudentData } from '../utils/excelParser';
@@ -1219,7 +1220,7 @@ const ClassListManager = () => {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50">
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
             <div className="max-w-7xl mx-auto">
                 {/* Header (preserved exactly from original) */}
                 <div className="bg-gradient-to-r text-gray-800 p-6 rounded-t-lg shadow-lg">
@@ -1250,53 +1251,188 @@ const ClassListManager = () => {
                     {/* Import Section (preserved exactly from original) */}
                     {!classList && (
                         <div className="p-8">
-                            <div className="max-w-2xl mx-auto text-center">
-                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-8 mb-6">
-                                    <FileSpreadsheet size={48} className="mx-auto text-blue-600 mb-4" />
-                                    <h2 className="text-2xl font-bold text-gray-800 mb-4">
-                                        Import Student List
-                                    </h2>
-                                    <p className="text-gray-600 mb-6">
-                                        Upload an Excel file (.xls or .xlsx) containing your student roster to begin class management.
-                                    </p>
+                            <div className="grid lg:grid-cols-3 gap-8">
 
-                                    <input
-                                        ref={fileInputRef}
-                                        type="file"
-                                        accept=".xls,.xlsx"
-                                        onChange={handleFileUpload}
-                                        className="hidden"
-                                    />
+                                {/* Left Column - Upload Area */}
+                                <div className="lg:col-span-2">
+                                    <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+                                        {/* Upload Header */}
+                                        <div className="bg-gradient-to-r from-blue-700 to-indigo-700 px-8 py-6 relative">
+                                            {/* Semi-transparent overlay for better text contrast */}
+                                            <div className="absolute inset-0 bg-black/20"></div>
 
-                                    <button
-                                        onClick={() => fileInputRef.current?.click()}
-                                        disabled={importStatus === 'processing'}
-                                        className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-lg font-medium transition-colors inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                        <FileSpreadsheet size={20} />
-                                        {importStatus === 'processing' ? 'Processing...' : 'Choose Excel File'}
-                                    </button>
-
-                                    {importStatus === 'success' && (
-                                        <div className="mt-4 text-green-600 font-medium">
-                                            ✓ Excel file imported successfully!
+                                            <div className="flex items-center space-x-3 relative z-10">
+                                                <div className="bg-white/30 rounded-lg p-3 backdrop-blur-sm">
+                                                    <FileSpreadsheet size={32} className="text-white" />
+                                                </div>
+                                                <div>
+                                                    <h2 className="text-3xl font-bold text-white drop-shadow-lg">Import Student List</h2>
+                                                    <p className="text-gray-100 font-semibold text-lg drop-shadow-md">Upload your Excel file to get started</p>
+                                                </div>
+                                            </div>
                                         </div>
-                                    )}
 
-                                    {importStatus === 'error' && (
-                                        <div className="mt-4 text-red-600 font-medium">
-                                            ✗ Error importing Excel file. Please check format and try again.
+                                        {/* Drag and Drop Area */}
+                                        <div className="p-8">
+                                            <div className="relative border-2 border-dashed border-gray-300 hover:border-blue-400 hover:bg-gray-50 rounded-xl p-12 text-center transition-all duration-300">
+                                                <input
+                                                    type="file"
+                                                    accept=".xls,.xlsx"
+                                                    onChange={handleFileUpload}
+                                                    className="hidden"
+                                                    id="excel-upload"
+                                                    ref={fileInputRef}
+                                                />
+
+                                                <div className="space-y-4">
+                                                    <div className="mx-auto w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center">
+                                                        <Upload size={32} className="text-gray-400" />
+                                                    </div>
+
+                                                    <div>
+                                                        <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                                                            Drop your Excel file here
+                                                        </h3>
+                                                        <p className="text-gray-600 mb-6">
+                                                            or click to browse and select your student roster
+                                                        </p>
+                                                    </div>
+
+                                                    <button
+                                                        onClick={() => fileInputRef.current?.click()}
+                                                        className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-8 rounded-lg transition-colors duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                                                    >
+                                                        Choose Excel File
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {/* Status Messages */}
+                                            {importStatus === 'loading' && (
+                                                <div className="mt-6 flex items-center space-x-3 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                                                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+                                                    <span className="text-blue-800 font-medium">
+                                                        📊 Processing Excel file...
+                                                    </span>
+                                                </div>
+                                            )}
+
+                                            {importStatus === 'success' && (
+                                                <div className="mt-6 flex items-center space-x-3 p-4 bg-green-50 border border-green-200 rounded-lg">
+                                                    <CheckCircle2 size={20} className="text-green-600" />
+                                                    <span className="text-green-800 font-medium">
+                                                        ✅ Excel file imported successfully!
+                                                    </span>
+                                                </div>
+                                            )}
+
+                                            {importStatus === 'error' && (
+                                                <div className="mt-6 flex items-center space-x-3 p-4 bg-red-50 border border-red-200 rounded-lg">
+                                                    <AlertCircle size={20} className="text-red-600" />
+                                                    <span className="text-red-800 font-medium">
+                                                        ✗ Error importing Excel file. Please check format and try again.
+                                                    </span>
+                                                </div>
+                                            )}
                                         </div>
-                                    )}
+                                    </div>
                                 </div>
 
-                                <div className="bg-gray-50 rounded-lg p-6 text-left">
-                                    <h3 className="font-semibold text-gray-800 mb-3">Expected Excel Format:</h3>
-                                    <div className="text-sm text-gray-600 space-y-2">
-                                        <div><strong>Required columns:</strong> ID, Name, Email</div>
-                                        <div><strong>Optional columns:</strong> Program, Campus, Level, Status</div>
-                                        <div><strong>File types:</strong> .xls or .xlsx</div>
-                                        <div><strong>Note:</strong> First row should contain column headers</div>
+                                {/* Right Column - Format Requirements */}
+                                <div className="space-y-6">
+
+                                    {/* Format Requirements Card */}
+                                    <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
+                                        <div className="bg-gray-50 px-6 py-4 border-b border-gray-100">
+                                            <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                                                <FileText size={20} className="mr-2 text-blue-600" />
+                                                Excel Format Requirements
+                                            </h3>
+                                        </div>
+
+                                        <div className="p-6 space-y-4">
+                                            <div>
+                                                <h4 className="font-medium text-gray-900 mb-2">Required Columns</h4>
+                                                <div className="space-y-1">
+                                                    {['ID', 'Name', 'Email'].map((col) => (
+                                                        <div key={col} className="flex items-center space-x-2">
+                                                            <div className="w-2 h-2 bg-red-400 rounded-full"></div>
+                                                            <span className="text-sm text-gray-700">{col}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <h4 className="font-medium text-gray-900 mb-2">Optional Columns</h4>
+                                                <div className="space-y-1">
+                                                    {['Program', 'Campus', 'Level', 'Status'].map((col) => (
+                                                        <div key={col} className="flex items-center space-x-2">
+                                                            <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+                                                            <span className="text-sm text-gray-700">{col}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            <div className="pt-4 border-t border-gray-100">
+                                                <div className="space-y-2 text-sm text-gray-600">
+                                                    <div className="flex items-start space-x-2">
+                                                        <span className="font-medium">File types:</span>
+                                                        <span>.xls or .xlsx</span>
+                                                    </div>
+                                                    <div className="flex items-start space-x-2">
+                                                        <span className="font-medium">Headers:</span>
+                                                        <span>First row should contain column names</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Tips Card */}
+                                    <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-100">
+                                        <h3 className="text-lg font-semibold text-blue-900 mb-3 flex items-center">
+                                            <BookOpen size={20} className="mr-2" />
+                                            Pro Tips
+                                        </h3>
+                                        <ul className="space-y-2 text-sm text-blue-800">
+                                            <li className="flex items-start space-x-2">
+                                                <span className="w-1.5 h-1.5 bg-blue-600 rounded-full mt-2 flex-shrink-0"></span>
+                                                <span>Include all required columns for best results</span>
+                                            </li>
+                                            <li className="flex items-start space-x-2">
+                                                <span className="w-1.5 h-1.5 bg-blue-600 rounded-full mt-2 flex-shrink-0"></span>
+                                                <span>Ensure email addresses are properly formatted</span>
+                                            </li>
+                                            <li className="flex items-start space-x-2">
+                                                <span className="w-1.5 h-1.5 bg-blue-600 rounded-full mt-2 flex-shrink-0"></span>
+                                                <span>Remove any empty rows or columns</span>
+                                            </li>
+                                        </ul>
+                                    </div>
+
+                                    {/* Sample Template Download */}
+                                    <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-6">
+                                        <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
+                                            <Download size={20} className="mr-2 text-green-600" />
+                                            Need Help?
+                                        </h3>
+                                        <p className="text-sm text-gray-600 mb-4">
+                                            Download our sample template to ensure your Excel file is formatted correctly.
+                                        </p>
+                                        <button
+                                            onClick={() => {
+                                                const link = document.createElement('a');
+                                                link.href = '/Example-Class-List.xlsx';
+                                                link.download = 'Example-Class-List.xlsx';
+                                                link.click();
+                                            }}
+                                            className="w-full bg-green-100 hover:bg-green-200 text-green-800 font-medium py-3 px-4 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
+                                        >
+                                            <Download size={16} />
+                                            Download Sample Template
+                                        </button>
                                     </div>
                                 </div>
                             </div>
