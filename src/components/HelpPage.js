@@ -506,7 +506,7 @@ Campus: Waterloo`,
                     {
                         title: 'Automatic Policy Selection',
                         description: 'System selects appropriate grading policy based on program type',
-                        example: 'Program Type: "diploma" detected\nSelected Policy: Conestoga College - Diploma Programs\nGrade Scale: A+ (95-100), A (90-94), A- (85-89)...',
+                        example: 'Program Type: "diploma" detected\nSelected Policy: School - Diploma Programs\nGrade Scale: A+ (95-100), A (90-94), A- (85-89)...',
                         tip: 'Verify the selected policy matches your institutional requirements'
                     },
                     {
@@ -518,7 +518,7 @@ Campus: Waterloo`,
                     {
                         title: 'Custom Policy Override',
                         description: 'Override default policy selection if needed',
-                        example: 'Default: Conestoga Diploma\nOverride Options:\n- Conestoga Degree Programs\n- Custom University Standards\n- K-12 Educational Standards\n- Create New Policy',
+                        example: 'Default: School Diploma\nOverride Options:\n- School Degree Programs\n- Custom University Standards\n- K-12 Educational Standards\n- Create New Policy',
                         tip: 'Create custom policies in the Policy Manager for specialized programs'
                     }
                 ]
@@ -676,7 +676,7 @@ CONESTOGA COLLEGE POLICIES (Pre-loaded):
                     {
                         title: 'Initialize Batch Grading Session',
                         description: 'Set up grading session with class roster and rubric',
-                        example: 'Class: COMP-2100 Advanced Programming (28 students)\nRubric: Database Project Rubric (5 criteria)\nPolicy: Conestoga Diploma Programs\nSession Timeout: 60 minutes',
+                        example: 'Class: COMP-2100 Advanced Programming (28 students)\nRubric: Database Project Rubric (5 criteria)\nPolicy: School Diploma Programs\nSession Timeout: 60 minutes',
                         tip: 'Ensure you have exported your rubric from Rubric Creator before starting'
                     },
                     {
@@ -709,7 +709,7 @@ REAL-TIME GRADE CALCULATION EXAMPLE:
 
 Assignment: Database Project (Total: 100 points)
 Student: Sarah Johnson
-Policy: Conestoga College - Diploma Programs
+Policy: School - Diploma Programs
 
 ┌─────────────────────────────────────────────────────────────┐
 │  CRITERION GRADES:                                         │
@@ -724,7 +724,7 @@ Policy: Conestoga College - Diploma Programs
 │  Weighted Average: (27.6 + 20.5 + 14.0 + 13.8 + 10.0)     │
 │                  = 85.9/100 = 85.9%                       │
 │                                                             │
-│  Policy Application: Conestoga Diploma                     │
+│  Policy Application: School Diploma                     │
 │  85.9% → A- (3.7 GPA) "Excellent Achievement"             │
 │                                                             │
 │  FINAL GRADE: 85.9% (A-)                                  │
@@ -1035,13 +1035,13 @@ MAINTENANCE SCHEDULE (Minimal Effort Required):
                             {
                                 title: 'Configure Grading Policy',
                                 description: 'Set up or verify grading policies for your program',
-                                example: 'Navigate to Policy Manager\n→ Review available policies (Conestoga Diploma, Degree, etc.)\n→ Test calculations with sample grades (85% → A-, 76% → B)\n→ Create custom policy if needed\n→ Verify policy matches institutional requirements',
+                                example: 'Navigate to Policy Manager\n→ Review available policies (School Diploma, Degree, etc.)\n→ Test calculations with sample grades (85% → A-, 76% → B)\n→ Create custom policy if needed\n→ Verify policy matches institutional requirements',
                                 tip: 'Test edge cases like 84.9% vs 85.0% to ensure proper grade boundaries'
                             },
                             {
                                 title: 'Import Class Roster',
                                 description: 'Load students with privacy protection and validation',
-                                example: 'Navigate to Class Manager\n→ Upload Excel file (.xlsx)\n→ Review validation results (28 students found, 2 missing emails)\n→ Verify course metadata auto-detection\n→ Confirm grading policy selection (Conestoga Diploma)\n→ Note session expiry time (60 minutes)',
+                                example: 'Navigate to Class Manager\n→ Upload Excel file (.xlsx)\n→ Review validation results (28 students found, 2 missing emails)\n→ Verify course metadata auto-detection\n→ Confirm grading policy selection (School Diploma)\n→ Note session expiry time (60 minutes)',
                                 tip: 'Address validation warnings before proceeding - they may indicate data issues'
                             },
                             {

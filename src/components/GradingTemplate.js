@@ -1230,26 +1230,26 @@ Write the feedback now, making it sound personal and genuine while keeping it co
                 Batch Grading Session Active
               </h3>
               <p style={{ color: '#047857', margin: 0, fontSize: '0.9rem' }}>
-                Student {gradingSession.currentIndex + 1} of {gradingSession.classListData.students.length || 0}:
-                <strong> {gradingSession.classListData.students[gradingSession.currentIndex]?.name || 'Unknown'}</strong>
+                Student {gradingSession.currentStudentIndex + 1} of {gradingSession.classListData.students.length || 0}:
+                <strong> {gradingSession.classListData.students[gradingSession.currentStudentIndex]?.name || 'Unknown'}</strong>
               </p>
             </div>
 
             <div style={{ display: 'flex', gap: '0.5rem' }}>
               <button
                 onClick={handlePreviousStudent}
-                disabled={gradingSession.currentIndex === 0}
+                disabled={gradingSession.currentStudentIndex === 0}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.25rem',
                   padding: '0.5rem 1rem',
-                  background: gradingSession.currentIndex === 0 ? '#f3f4f6' : '#10b981',
-                  color: gradingSession.currentIndex === 0 ? '#9ca3af' : 'white',
+                  background: gradingSession.currentStudentIndex === 0 ? '#f3f4f6' : '#10b981',
+                  color: gradingSession.currentStudentIndex === 0 ? '#9ca3af' : 'white',
                   border: 'none',
                   borderRadius: '0.5rem',
                   fontSize: '0.875rem',
-                  cursor: gradingSession.currentIndex === 0 ? 'not-allowed' : 'pointer',
+                  cursor: gradingSession.currentStudentIndex === 0 ? 'not-allowed' : 'pointer',
                   fontWeight: '500'
                 }}
               >
@@ -1282,18 +1282,18 @@ Write the feedback now, making it sound personal and genuine while keeping it co
 
               <button
                 onClick={handleNextStudent}
-                disabled={gradingSession.currentIndex >= (gradingSession.classListData.students.length || 0) - 1}
+                disabled={gradingSession.currentStudentIndex >= (gradingSession.classListData.students.length || 0) - 1}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.25rem',
                   padding: '0.5rem 1rem',
-                  background: gradingSession.currentIndex >= (gradingSession.classListData.students.length || 0) - 1 ? '#f3f4f6' : '#10b981',
-                  color: gradingSession.currentIndex >= (gradingSession.classListData.students.length || 0) - 1 ? '#9ca3af' : 'white',
+                  background: gradingSession.currentStudentIndex >= (gradingSession.classListData.students.length || 0) - 1 ? '#f3f4f6' : '#10b981',
+                  color: gradingSession.currentStudentIndex >= (gradingSession.classListData.students.length || 0) - 1 ? '#9ca3af' : 'white',
                   border: 'none',
                   borderRadius: '0.5rem',
                   fontSize: '0.875rem',
-                  cursor: gradingSession.currentIndex >= (gradingSession.classListData.students.length || 0) - 1 ? 'not-allowed' : 'pointer',
+                  cursor: gradingSession.currentStudentIndex >= (gradingSession.classListData.students.length || 0) - 1 ? 'not-allowed' : 'pointer',
                   fontWeight: '500'
                 }}
               >
@@ -2367,13 +2367,13 @@ Write the feedback now, making it sound personal and genuine while keeping it co
                       padding: '1.5rem',
                       textAlign: 'center'
                     }}>
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        multiple
-                        onChange={(e) => handleFileUpload(e.target.files)}
-                        style={{ display: 'none' }}
-                      />
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      multiple
+                      onChange={handleFileUpload} // Pass the function directly
+                      style={{ display: 'none' }}
+                    />
                       <button
                         onClick={() => fileInputRef.current?.click()}
                         style={{

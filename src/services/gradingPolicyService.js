@@ -18,16 +18,16 @@ class GradingPolicyService {
             });
         }
 
-        // Conestoga policies for local development
+        // policies for local development
         this.localPolicies = this.initializeLocalPolicies();
     }
 
     // Initialize local policies for development
     initializeLocalPolicies() {
         return {
-            'conestoga-standard-2024': {
-                id: 'conestoga-standard-2024',
-                name: 'Conestoga Standard (Current)',
+            'standard-2024': {
+                id: 'standard-2024',
+                name: 'Standard (Current)',
                 description: 'Standard grading policy for degree, diploma, certificate, and graduate certificate programs',
                 programTypes: ['degree', 'diploma', 'certificate', 'graduateCertificate'],
                 gradeScale: [
@@ -43,9 +43,9 @@ class GradingPolicyService {
                 isActive: true,
                 isDefault: true
             },
-            'conestoga-apprenticeship-2024': {
-                id: 'conestoga-apprenticeship-2024',
-                name: 'Conestoga Apprenticeship (Current)',
+            'apprenticeship-2024': {
+                id: 'apprenticeship-2024',
+                name: 'Apprenticeship (Current)',
                 description: 'Apprenticeship programs with higher passing requirements (70%)',
                 programTypes: ['apprenticeship'],
                 gradeScale: [
@@ -58,9 +58,9 @@ class GradingPolicyService {
                 isActive: true,
                 isDefault: false
             },
-            'conestoga-health-science-2024': {
-                id: 'conestoga-health-science-2024',
-                name: 'Conestoga Health Science (Current)',
+            'health-science-2024': {
+                id: 'health-science-2024',
+                name: 'Health Science (Current)',
                 description: 'Health science programs with higher passing requirements (65%)',
                 programTypes: ['healthScience'],
                 gradeScale: [
@@ -74,9 +74,9 @@ class GradingPolicyService {
                 isActive: true,
                 isDefault: false
             },
-            'conestoga-gas-technician-2024': {
-                id: 'conestoga-gas-technician-2024',
-                name: 'Conestoga GAS Technician (Current)',
+            'gas-technician-2024': {
+                id: 'gas-technician-2024',
+                name: 'GAS Technician (Current)',
                 description: 'GAS technician programs with highest passing requirements (75%)',
                 programTypes: ['gasTechnician'],
                 gradeScale: [
@@ -178,7 +178,7 @@ class GradingPolicyService {
 
             // Fallback to standard policy
             if (!policy) {
-                policy = this.localPolicies['conestoga-standard-2024'];
+                policy = this.localPolicies['standard-2024'];
             }
 
             // Find the appropriate grade
