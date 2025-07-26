@@ -1,10 +1,26 @@
-// Enhanced RubricCreator.js with complete class list integration and batch grading functionality
+// Enhanced RubricCreator.js with complete class‑list integration and batch‑grading functionality
 import React, { useState, useEffect, useRef } from 'react';
 import { useAssessment } from './SharedContext';
+import { ensureUniqueCriterionIds } from '../utils/ensureUniqueCriterionIds';
+
+
 import {
-    Plus, X, Save, Upload, Download, FileText, RotateCcw, Minimize2,
-    ChevronUp, ChevronDown, Maximize2, ArrowRight, AlertTriangle, CheckCircle
+    Plus,
+    X,
+    Save,
+    Upload,
+    Download,
+    FileText,
+    RotateCcw,
+    Minimize2,
+    ChevronUp,
+    ChevronDown,
+    Maximize2,
+    ArrowRight,
+    AlertTriangle,
+    CheckCircle
 } from 'lucide-react';
+
 
 // SimpleRichTextEditor component (assuming it exists)
 const SimpleRichTextEditor = React.forwardRef(({ value, onChange, placeholder }, ref) => {

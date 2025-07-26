@@ -141,6 +141,63 @@ class GradingPolicyService {
         }
     }
 
+    // Create a new policy
+    async createPolicy(policyData) {
+        if (this.useLocalData) {
+            const id = `custom_${Date.now()}`;
+            const newPolicy = { ...policyData, id, isDefault: false };
+            this.localPolicies[id] = newPolicy;
+            return { data: newPolicy, success: true };
+        }
+        // This is where you would make an API call, e.g.:
+        try {
+            const response = await this.client.post('/grading-policies', policyData);
+            return { data: response.data, success: true };
+        } catch (error) {
+            console.error('Error creating policy:', error);
+            return { data: null, success: false, error: error.message };
+        }
+    }
+
+    // Update an existing policy
+    async updatePolicy(policyId, policyData) {
+        if (this.useLocalData) {
+            if (!this.localPolicies[policyId]) {
+                return { data: null, success: false, error: 'Policy not found' };
+            }
+            const updatedPolicy = { ...this.localPolicies[policyId], ...policyData };
+            this.localPolicies[policyId] = updatedPolicy;
+            return { data: updatedPolicy, success: true };
+        }
+        // This is where you would make an API call, e.g.:
+        try {
+            const response = await this.client.put(`/grading-policies/${policyId}`, policyData);
+            return { data: response.data, success: true };
+        } catch (error) {
+            console.error('Error updating policy:', error);
+            return { data: null, success: false, error: error.message };
+        }
+    }
+
+    // Delete a policy
+    async deletePolicy(policyId) {
+        if (this.useLocalData) {
+            if (!this.localPolicies[policyId]) {
+                return { data: null, success: false, error: 'Policy not found' };
+            }
+            delete this.localPolicies[policyId];
+            return { data: { message: 'Policy deleted' }, success: true };
+        }
+        // This is where you would make an API call, e.g.:
+        try {
+            const response = await this.client.delete(`/grading-policies/${policyId}`);
+            return { data: response.data, success: true };
+        } catch (error) {
+            console.error('Error deleting policy:', error);
+            return { data: null, success: false, error: error.message };
+        }
+    }
+
     // Calculate letter grade from percentage
     async calculateGrade(percentage, policyId = null, programType = 'degree', customProgramId = null) {
         if (this.useLocalData) {
@@ -189,8 +246,8 @@ class GradingPolicyService {
             if (grade) {
                 return {
                     data: {
-                        letter: grade.letter,
-                        gpa: grade.gpa,
+                        letterGrade: grade.letter,
+                        gpaPoints: grade.gpa,
                         passingGrade: grade.passingGrade,
                         percentage: percentage,
                         policy: {
@@ -205,8 +262,8 @@ class GradingPolicyService {
             // Fallback for invalid percentage
             return {
                 data: {
-                    letter: 'F',
-                    gpa: 0.0,
+                    letterGrade: 'F',
+                    gpaPoints: 0.0,
                     passingGrade: false,
                     percentage: percentage,
                     policy: {
@@ -221,8 +278,8 @@ class GradingPolicyService {
             console.error('Local grade calculation failed:', error);
             return {
                 data: {
-                    letter: 'F',
-                    gpa: 0.0,
+                    letterGrade: 'F',
+                    gpaPoints: 0.0,
                     passingGrade: false,
                     percentage: percentage,
                     error: 'Calculation failed'

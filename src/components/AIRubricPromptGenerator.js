@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Download, Sparkles, FileText, ArrowRight, Lightbulb, Upload } from 'lucide-react';
 import { useAssessment } from './SharedContext';
+import gradingPolicyService from '../services/gradingPolicyService';
 
 const AIRubricPromptGenerator = () => {
   const {
@@ -371,10 +372,11 @@ Please generate a complete, ready-to-import, downloadable JSON file that matches
                         className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                       >
                         <option value="">Select program type...</option>
-                        <option value="Degree">Degree</option>
-                        <option value="Diploma">Diploma</option>
-                        <option value="Graduate Certificate">Graduate Certificate</option>
-                        <option value="Certificate">Certificate</option>
+                        {gradingPolicyService.getSupportedProgramTypes().map(policy => (
+                          <option key={policy.value} value={policy.value}>
+                            {policy.label}
+                          </option>
+                        ))}
                       </select>
                     </div>
 

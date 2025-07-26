@@ -1,10 +1,30 @@
 import React, { useState, useRef, useEffect } from 'react';
+
+// lucide‑react icons
 import {
-  Download, Upload, FileText, Video, Plus, X, Save, FileDown, Bot,
-  ArrowLeft, ArrowRight, Users, SkipForward, SkipBack, Pause,
-  CheckCircle, AlertTriangle, Settings
+  ArrowLeft,
+  ArrowRight,
+  Bot,
+  CheckCircle,
+  Download,
+  FileDown,
+  FileText,
+  Pause,
+  Plus,
+  Save,
+  Settings,
+  SkipBack,
+  SkipForward,
+  Upload,
+  Users,
+  Video,
+  X,
+  AlertTriangle
 } from 'lucide-react';
+
+// app‑specific hooks / helpers
 import { useAssessment, DEFAULT_LATE_POLICY } from './SharedContext';
+import { ensureUniqueCriterionIds } from '../utils/ensureUniqueCriterionIds';
 
 // NO SAMPLE RUBRIC - START WITH EMPTY STATE
 // This forces users to create or load a rubric before grading
