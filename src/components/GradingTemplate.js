@@ -19,18 +19,23 @@ import {
   Users,
   Video,
   X,
-  AlertTriangle
+  AlertTriangle,
+  Shield,
+  Timer,
+  Lock
 } from 'lucide-react';
 
 // app‑specific hooks / helpers
 import { useAssessment, DEFAULT_LATE_POLICY } from './SharedContext';
 import { ensureUniqueCriterionIds } from '../utils/ensureUniqueCriterionIds';
 
-// NO SAMPLE RUBRIC - START WITH EMPTY STATE
-// This forces users to create or load a rubric before grading
+/**
+ * PRIVACY-FOCUSED GradingTemplate - Session-Only Storage
+ * PRESERVES ALL ORIGINAL FUNCTIONALITY while implementing privacy controls
+ */
 
 const GradingTemplate = () => {
-  // Get shared context - ENHANCED with new functions
+  // Get shared context - ENHANCED with session management
   const {
     sharedRubric,
     setSharedRubric,
@@ -51,8 +56,16 @@ const GradingTemplate = () => {
     loadFinalGrade,
     getGradeStatus,
     currentLatePolicy,
-    customLatePolicies
+    customLatePolicies,
+    // PRIVACY: Session management
+    sessionActive,
+    sessionManager,
+    extendSession
   } = useAssessment();
+
+  // PRIVACY: Session monitoring state
+  const [sessionWarning, setSessionWarning] = useState(false);
+  const [timeRemaining, setTimeRemaining] = useState(null);
 
   // Helper function to convert HTML content to readable text format
   const renderFormattedContent = (htmlContent) => {
@@ -120,21 +133,46 @@ const GradingTemplate = () => {
   const gradingData = localGradingData;
   const setGradingData = setLocalGradingData;
 
-  // Rubric-specific state - MODIFIED: Default to null instead of sampleRubric
-  
+  // Rubric-specific state
   const [showRubricComments, setShowRubricComments] = useState({});
 
-
   const fileInputRef = useRef(null);
-  
   const rubricInputRef = useRef(null);
 
   // Video link management
   const [videoLinkInput, setVideoLinkInput] = useState('');
   const [videoTitle, setVideoTitle] = useState('');
 
-  // Additional state for comments display
-  
+  // PRIVACY: Session monitoring effect
+  useEffect(() => {
+    if (!sessionActive) {
+      setSessionWarning(true);
+      return;
+    }
+
+    if (sessionManager) {
+      // Update time remaining every minute
+      const interval = setInterval(() => {
+        const remaining = sessionManager.getTimeRemaining();
+        setTimeRemaining(remaining);
+
+        // Show warning at 5 minutes
+        if (remaining <= 5 * 60 * 1000 && remaining > 0) {
+          setSessionWarning(true);
+        }
+      }, 60000);
+
+      // Initial check
+      const remaining = sessionManager.getTimeRemaining();
+      setTimeRemaining(remaining);
+      if (remaining <= 5 * 60 * 1000 && remaining > 0) {
+        setSessionWarning(true);
+      }
+
+      return () => clearInterval(interval);
+    }
+  }, [sessionActive, sessionManager]);
+
   // Safely access the active late policy levels
   const getPolicyById = (policyId) => {
     if (!policyId) return null;
@@ -183,8 +221,6 @@ const GradingTemplate = () => {
     }
   }, [sharedGradingData, localGradingData.course.code, localGradingData.course.name, localGradingData.course.instructor, localGradingData.course.term]);
 
-  
-
   // Auto-populate assignment info when rubric is loaded
   useEffect(() => {
     if (sharedRubric) {
@@ -213,8 +249,10 @@ const GradingTemplate = () => {
     }
   }, [sharedRubric]);
 
-  // Auto-save to shared context whenever gradingData changes (with debounce)
+  // PRIVACY: Auto-save to shared context whenever gradingData changes (with debounce) - SESSION ONLY
   useEffect(() => {
+    if (!sessionActive) return; // Don't save if session is expired
+
     const timeoutId = setTimeout(() => {
       setSharedGradingData(gradingData);
       setSharedCourseDetails({
@@ -225,41 +263,39 @@ const GradingTemplate = () => {
     }, 1000);
 
     return () => clearTimeout(timeoutId);
-  }, [gradingData, setSharedGradingData, setSharedCourseDetails]);
-
- 
+  }, [gradingData, setSharedGradingData, setSharedCourseDetails, sessionActive]);
 
   // When student changes, load any saved draft/final but keep course+assignment
-useEffect(() => {
-  if (!currentStudent?.id) return;
+  useEffect(() => {
+    if (!currentStudent?.id) return;
 
-  const status = getGradeStatus(currentStudent.id);
-  let saved = null;
-  if (status === 'final' && loadFinalGrade) {
-    saved = loadFinalGrade(currentStudent.id);
-  } else if (status === 'draft') {
-    saved = loadDraft(currentStudent.id);
-  }
+    const status = getGradeStatus(currentStudent.id);
+    let saved = null;
+    if (status === 'final' && loadFinalGrade) {
+      saved = loadFinalGrade(currentStudent.id);
+    } else if (status === 'draft') {
+      saved = loadDraft(currentStudent.id);
+    }
 
-  if (saved) {
-    setLocalGradingData(prev => ({
-      ...saved, // Use saved data
-      course: prev.course, // Keep current course info
-      assignment: prev.assignment // Keep current assignment info
-    }));
-  } else {
-    // Fresh slate for this student, but keep course/assignment
-    setLocalGradingData(prev => ({
-      ...prev,
-      student: currentStudent,
-      feedback: { general: '', strengths: '', improvements: '' },
-      attachments: [],
-      videoLinks: [],
-      latePolicy: { level: 'none', penaltyApplied: false },
-      rubricGrading: {}
-    }));
-  }
-}, [currentStudent?.id, getGradeStatus, loadFinalGrade, loadDraft, currentStudent]);
+    if (saved) {
+      setLocalGradingData(prev => ({
+        ...saved, // Use saved data
+        course: prev.course, // Keep current course info
+        assignment: prev.assignment // Keep current assignment info
+      }));
+    } else {
+      // Fresh slate for this student, but keep course/assignment
+      setLocalGradingData(prev => ({
+        ...prev,
+        student: currentStudent,
+        feedback: { general: '', strengths: '', improvements: '' },
+        attachments: [],
+        videoLinks: [],
+        latePolicy: { level: 'none', penaltyApplied: false },
+        rubricGrading: {}
+      }));
+    }
+  }, [currentStudent?.id, getGradeStatus, loadFinalGrade, loadDraft, currentStudent]);
 
   // Enhanced calculation function
   const calculateTotalScore = () => {
@@ -789,6 +825,11 @@ Write the feedback now, making it sound personal and genuine while keeping it co
 
   // GRADING SESSION HANDLERS
   const handlePreviousStudent = () => {
+    if (!sessionActive) {
+      alert('Session has expired. Please refresh the page to start a new session.');
+      return;
+    }
+
     if (currentStudent?.id) {
       saveDraft(currentStudent.id, localGradingData);
     }
@@ -799,6 +840,11 @@ Write the feedback now, making it sound personal and genuine while keeping it co
   };
 
   const handleNextStudent = () => {
+    if (!sessionActive) {
+      alert('Session has expired. Please refresh the page to start a new session.');
+      return;
+    }
+
     if (currentStudent?.id) {
       saveDraft(currentStudent.id, localGradingData);
     }
@@ -808,8 +854,13 @@ Write the feedback now, making it sound personal and genuine while keeping it co
     }
   };
 
-  // SAVING HANDLERS
+  // PRIVACY: Enhanced saving handlers with session checks
   const handleSaveDraft = () => {
+    if (!sessionActive) {
+      alert('Session has expired. Cannot save data. Please refresh the page to start a new session.');
+      return;
+    }
+
     if (!currentStudent?.id) {
       alert('No student selected for saving draft');
       return;
@@ -820,6 +871,11 @@ Write the feedback now, making it sound personal and genuine while keeping it co
   };
 
   const handleNextStudentAsDraft = () => {
+    if (!sessionActive) {
+      alert('Session has expired. Please refresh the page to start a new session.');
+      return;
+    }
+
     if (currentStudent?.id) {
       console.log('💾 Saving as draft for student:', currentStudent.name);
       saveDraft(currentStudent.id, localGradingData);
@@ -853,6 +909,11 @@ Write the feedback now, making it sound personal and genuine while keeping it co
   const currentStudentInfo = getCurrentStudentInfo();
 
   const handleNextStudentAsFinal = () => {
+    if (!sessionActive) {
+      alert('Session has expired. Please refresh the page to start a new session.');
+      return;
+    }
+
     if (currentStudent?.id) {
       console.log('✅ Finalizing grade for student:', currentStudent.name);
       const finalGradeData = {
@@ -900,7 +961,75 @@ Write the feedback now, making it sound personal and genuine while keeping it co
     }));
   };
 
-  // NEW: No Rubric UI Component
+  // PRIVACY: Session warning modal component
+  const SessionWarningModal = () => {
+    if (!sessionWarning) return null;
+
+    const formatTime = (ms) => {
+      const minutes = Math.floor(ms / 60000);
+      const seconds = Math.floor((ms % 60000) / 1000);
+      return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    };
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg p-6 max-w-md w-mx-4">
+          <div className="flex items-center mb-4">
+            <Timer className="w-6 h-6 text-orange-500 mr-2" />
+            <h3 className="text-lg font-semibold text-gray-900">
+              Session Warning
+            </h3>
+          </div>
+
+          <div className="mb-4">
+            <p className="text-gray-700 mb-2">
+              {sessionActive
+                ? `Your session will expire in ${timeRemaining ? formatTime(timeRemaining) : 'less than 5 minutes'}.`
+                : 'Your session has expired for privacy protection.'
+              }
+            </p>
+            <p className="text-sm text-gray-600">
+              {sessionActive
+                ? 'All data will be automatically cleared when the session expires. Export any work you want to keep.'
+                : 'All data has been cleared. Please refresh the page to start a new session.'
+              }
+            </p>
+          </div>
+
+          <div className="flex gap-2">
+            {sessionActive ? (
+              <>
+                <button
+                  onClick={() => {
+                    extendSession();
+                    setSessionWarning(false);
+                  }}
+                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                >
+                  Extend Session
+                </button>
+                <button
+                  onClick={() => setSessionWarning(false)}
+                  className="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+                >
+                  Continue
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => window.location.reload()}
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+              >
+                Start New Session
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // NEW: No Rubric UI Component with privacy awareness
   const NoRubricUI = () => (
     <div style={{
       display: 'flex',
@@ -1023,6 +1152,22 @@ Write the feedback now, making it sound personal and genuine while keeping it co
         <strong>💡 Tip:</strong> You can also use the AI Rubric Prompt Generator to create rubric prompts for AI tools, or generate assignment prompts before creating your rubric.
       </div>
 
+      {/* PRIVACY: Session notice */}
+      {!sessionActive && (
+        <div style={{
+          marginTop: '1rem',
+          padding: '1rem',
+          background: 'rgba(248, 113, 113, 0.1)',
+          border: '1px solid #f87171',
+          borderRadius: '0.5rem',
+          fontSize: '0.9rem',
+          color: '#dc2626',
+          maxWidth: '500px'
+        }}>
+          <strong>⚠️ Session Expired:</strong> Your privacy session has ended. Please refresh the page to start a new session.
+        </div>
+      )}
+
       <input
         ref={rubricInputRef}
         type="file"
@@ -1036,12 +1181,85 @@ Write the feedback now, making it sound personal and genuine while keeping it co
   // If no rubric is loaded, show the No Rubric UI
   if (!sharedRubric) {
     return (
+      <>
+        <SessionWarningModal />
+        <div style={{
+          padding: '2rem',
+          maxWidth: '1440px',
+          margin: '0 auto',
+          fontFamily: 'system-ui, -apple-system, sans-serif'
+        }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '1rem',
+            marginBottom: '2rem',
+            padding: '1rem',
+            background: 'linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%)',
+            borderRadius: '0.75rem',
+            border: '1px solid #d1d5db'
+          }}>
+            <Settings size={32} style={{ color: '#6b7280' }} />
+            <div style={{ flex: 1 }}>
+              <h1 style={{
+                fontSize: '2rem',
+                fontWeight: '700',
+                color: '#1f2937',
+                margin: 0
+              }}>
+                🎯 Grading Tool
+              </h1>
+              <p style={{
+                color: '#6b7280',
+                margin: 0,
+                fontSize: '1rem'
+              }}>
+                Assessment and feedback management system
+              </p>
+            </div>
+            {/* PRIVACY: Session indicator */}
+            <div style={{ textAlign: 'right' }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                fontSize: '0.875rem',
+                color: sessionActive ? '#10b981' : '#ef4444',
+                fontWeight: '600'
+              }}>
+                <Shield size={16} />
+                {sessionActive ? 'Privacy Session Active' : 'Session Expired'}
+              </div>
+              {timeRemaining && sessionActive && (
+                <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                  {Math.floor(timeRemaining / 60000)}min remaining
+                </div>
+              )}
+            </div>
+          </div>
+
+          <NoRubricUI />
+        </div>
+      </>
+    );
+  }
+
+  // Regular grading interface when rubric is loaded
+  const totalScore = getTotalScore();
+  const gradeStatus = currentStudent?.id ? getGradeStatus(currentStudent.id) : 'none';
+
+  return (
+    <>
+      {/* PRIVACY: Session warning modal */}
+      <SessionWarningModal />
+
       <div style={{
         padding: '2rem',
-        maxWidth: '1440px',
+        maxWidth: '1340px',
         margin: '0 auto',
         fontFamily: 'system-ui, -apple-system, sans-serif'
       }}>
+        {/* Header with session status */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
@@ -1053,7 +1271,7 @@ Write the feedback now, making it sound personal and genuine while keeping it co
           border: '1px solid #d1d5db'
         }}>
           <Settings size={32} style={{ color: '#6b7280' }} />
-          <div>
+          <div style={{ flex: 1 }}>
             <h1 style={{
               fontSize: '2rem',
               fontWeight: '700',
@@ -1069,1249 +1287,549 @@ Write the feedback now, making it sound personal and genuine while keeping it co
             }}>
               Assessment and feedback management system
             </p>
-          </div>
-        </div>
-
-        <NoRubricUI />
-      </div>
-    );
-  }
-
-  // Regular grading interface when rubric is loaded
-  const totalScore = getTotalScore();
-  const gradeStatus = currentStudent?.id ? getGradeStatus(currentStudent.id) : 'none';
-
-  return (
-    <div style={{
-      padding: '2rem',
-      maxWidth: '1340px',
-      margin: '0 auto',
-      fontFamily: 'system-ui, -apple-system, sans-serif'
-    }}>
-      {/* Header */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '1rem',
-        marginBottom: '2rem',
-        padding: '1rem',
-        background: 'linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%)',
-        borderRadius: '0.75rem',
-        border: '1px solid #d1d5db'
-      }}>
-        <Settings size={32} style={{ color: '#6b7280' }} />
-        <div style={{ flex: 1 }}>
-          <h1 style={{
-            fontSize: '2rem',
-            fontWeight: '700',
-            color: '#1f2937',
-            margin: 0
-          }}>
-            🎯 Grading Tool
-          </h1>
-          <p style={{
-            color: '#6b7280',
-            margin: 0,
-            fontSize: '1rem'
-          }}>
-            Assessment and feedback management system
-          </p>
-        </div>
-
-        <div style={{ display: 'flex', gap: '0.75rem' }}>
-          <button
-            onClick={exportToHTML}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              background: '#16a34a',
-              color: 'white',
-              padding: '0.5rem 1rem',
-              borderRadius: '0.5rem',
-              border: 'none',
-              cursor: 'pointer',
-              fontSize: '0.875rem'
-            }}
-          >
-            <FileDown size={16} />
-            Export HTML
-          </button>
-          <button
-            type="button"
-            onClick={exportToPDF}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              backgroundColor: '#dc2626',
-              color: '#ffffff',
-              padding: '0.5rem 1rem',
-              borderRadius: '0.5rem',
-              border: 'none',
-              cursor: 'pointer',
-              fontSize: '0.875rem'
-            }}
-          >
-            <FileText size={16} />
-            Export PDF
-          </button>
-          <button
-            onClick={exportForAIFeedback}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              background: '#7c3aed',
-              color: 'white',
-              padding: '0.5rem 1rem',
-              borderRadius: '0.5rem',
-              border: 'none',
-              cursor: 'pointer',
-              fontSize: '0.875rem'
-            }}
-            title="Export grade data and AI prompt for generating personalized feedback"
-          >
-            <Bot size={16} />
-            Export for AI Feedback
-          </button>
-        </div>
-      </div>
-
-      <input
-        ref={rubricInputRef}
-        type="file"
-        accept=".json"
-        style={{ display: 'none' }}
-        onChange={handleRubricUpload}
-      />
-     
-
-      {/* Current Rubric Info */}
-      {sharedRubric && (
-        <div style={{
-          background: 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)',
-          border: '1px solid #93c5fd',
-          borderRadius: '0.75rem',
-          padding: '1.5rem',
-          marginBottom: '2rem'
-        }}>
-          <h2 style={{
-            fontSize: '1.25rem',
-            fontWeight: '600',
-            color: '#1e40af',
-            margin: '0 0 0.5rem 0',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem'
-          }}>
-            <FileText size={20} />
-            Current Rubric: {sharedRubric.assignmentInfo.title}
-          </h2>
-          <p style={{ color: '#1e40af', margin: 0, fontSize: '0.9rem' }}>
-            {sharedRubric.assignmentInfo.description || 'No description provided'}
-          </p>
-          <div style={{
-            display: 'flex',
-            gap: '2rem',
-            marginTop: '0.75rem',
-            fontSize: '0.875rem',
-            color: '#1d4ed8'
-          }}>
-            <span><strong>Weight:</strong> {sharedRubric.assignmentInfo?.weight || 0}%</span>
-            <span><strong>Total Points:</strong> {sharedRubric.assignmentInfo?.totalPoints || 0}</span>
-            <span><strong>Passing:</strong> {sharedRubric.assignmentInfo?.passingThreshold || 0}%</span>
-            <span><strong>Criteria:</strong> {sharedRubric.criteria?.length || 0}</span>
-          </div>
-        </div>
-      )}
-
-      {/* Grading Session Status */}
-      {gradingSession && gradingSession.classListData?.students && (
-        <div style={{
-          background: 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)',
-          border: '1px solid #6ee7b7',
-          borderRadius: '0.75rem',
-          padding: '1.5rem',
-          marginBottom: '2rem'
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <h3 style={{
-                fontSize: '1.125rem',
-                fontWeight: '600',
-                color: '#047857',
-                margin: '0 0 0.5rem 0',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem'
-              }}>
-                <Users size={18} />
-                Batch Grading Session Active
-              </h3>
-              <p style={{ color: '#047857', margin: 0, fontSize: '0.9rem' }}>
-                Student {gradingSession.currentStudentIndex + 1} of {gradingSession.classListData.students.length || 0}:
-                <strong> {gradingSession.classListData.students[gradingSession.currentStudentIndex]?.name || 'Unknown'}</strong>
-              </p>
-            </div>
-
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <button
-                onClick={handlePreviousStudent}
-                disabled={gradingSession.currentStudentIndex === 0}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.25rem',
-                  padding: '0.5rem 1rem',
-                  background: gradingSession.currentStudentIndex === 0 ? '#f3f4f6' : '#10b981',
-                  color: gradingSession.currentStudentIndex === 0 ? '#9ca3af' : 'white',
-                  border: 'none',
-                  borderRadius: '0.5rem',
-                  fontSize: '0.875rem',
-                  cursor: gradingSession.currentStudentIndex === 0 ? 'not-allowed' : 'pointer',
-                  fontWeight: '500'
-                }}
-              >
-                <SkipBack size={16} />
-                Previous
-              </button>
-
-              <button
-                onClick={() => {
-                  updateGradingSession({ active: false });
-                  setActiveTab('class-manager');
-                }}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.25rem',
-                  padding: '0.5rem 1rem',
-                  background: '#f59e0b',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '0.5rem',
-                  fontSize: '0.875rem',
-                  cursor: 'pointer',
-                  fontWeight: '500'
-                }}
-              >
-                <Pause size={16} />
-                Pause Session
-              </button>
-
-              <button
-                onClick={handleNextStudent}
-                disabled={gradingSession.currentStudentIndex >= (gradingSession.classListData.students.length || 0) - 1}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.25rem',
-                  padding: '0.5rem 1rem',
-                  background: gradingSession.currentStudentIndex >= (gradingSession.classListData.students.length || 0) - 1 ? '#f3f4f6' : '#10b981',
-                  color: gradingSession.currentStudentIndex >= (gradingSession.classListData.students.length || 0) - 1 ? '#9ca3af' : 'white',
-                  border: 'none',
-                  borderRadius: '0.5rem',
-                  fontSize: '0.875rem',
-                  cursor: gradingSession.currentStudentIndex >= (gradingSession.classListData.students.length || 0) - 1 ? 'not-allowed' : 'pointer',
-                  fontWeight: '500'
-                }}
-              >
-                Next
-                <SkipForward size={16} />
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Student Information */}
-      <div style={{ marginBottom: '2rem' }}>
-        <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '1rem', color: '#374151' }}>
-          👤 Student Information
-        </h3>
-        <div style={{
-          background: 'linear-gradient(135deg, #fafaff 0%, #f3f4f6 100%)',
-          border: '1px solid #d1d5db',
-          borderRadius: '0.75rem',
-          padding: '1.5rem'
-        }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-            <div>
-              <label style={{
-                display: 'block',
-                fontSize: '0.875rem',
-                fontWeight: '500',
-                color: '#374151',
-                marginBottom: '0.5rem'
-              }}>
-                Student Name
-              </label>
-              <input
-                type="text"
-                value={gradingData.student.name}
-                onChange={(e) => setGradingData(prevData => ({
-                  ...prevData,
-                  student: { ...prevData.student, name: e.target.value }
-                }))}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '0.5rem',
-                  fontSize: '0.875rem'
-                }}
-                placeholder="Enter student name"
-              />
-            </div>
-
-            <div>
-              <label style={{
-                display: 'block',
-                fontSize: '0.875rem',
-                fontWeight: '500',
-                color: '#374151',
-                marginBottom: '0.5rem'
-              }}>
-                Student ID
-              </label>
-              <input
-                type="text"
-                value={gradingData.student.id}
-                onChange={(e) => setGradingData(prevData => ({
-                  ...prevData,
-                  student: { ...prevData.student, id: e.target.value }
-                }))}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '0.5rem',
-                  fontSize: '0.875rem'
-                }}
-                placeholder="Enter student ID"
-              />
-            </div>
-
-            <div>
-              <label style={{
-                display: 'block',
-                fontSize: '0.875rem',
-                fontWeight: '500',
-                color: '#374151',
-                marginBottom: '0.5rem'
-              }}>
-                Email
-              </label>
-              <input
-                type="email"
-                value={gradingData.student.email}
-                onChange={(e) => setGradingData(prevData => ({
-                  ...prevData,
-                  student: { ...prevData.student, email: e.target.value }
-                }))}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '0.5rem',
-                  fontSize: '0.875rem'
-                }}
-                placeholder="Enter email address"
-              />
-            </div>
-          </div>
-
-          {gradeStatus !== 'none' && (
+            {/* PRIVACY: Session status display */}
             <div style={{
-              marginTop: '1rem',
-              padding: '0.75rem',
-              background: gradeStatus === 'final' ? '#dcfce7' : '#fef3c7',
-              border: `1px solid ${gradeStatus === 'final' ? '#86efac' : '#fde047'}`,
-              borderRadius: '0.5rem',
-              fontSize: '0.875rem',
-              color: gradeStatus === 'final' ? '#047857' : '#a16207'
+              marginTop: '0.5rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '1rem',
+              fontSize: '0.875rem'
             }}>
-              <strong>
-                {gradeStatus === 'final' ? '✅ Final Grade Saved' : '📝 Draft Saved'}
-              </strong>
-              {gradeStatus === 'final' && ' - This student has been fully graded'}
-              {gradeStatus === 'draft' && ' - You can continue editing this draft'}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Course Information */}
-      <div style={{ marginBottom: '2rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
-          <h3 style={{ fontSize: '1.125rem', fontWeight: '600', margin: 0, color: '#374151' }}>
-            🏫 Course Information
-          </h3>
-          {classList && classList.courseMetadata && (
-            <button
-              onClick={pullCourseDataFromClassList}
-              style={{
+              <div style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: '0.25rem',
-                padding: '0.375rem 0.75rem',
-                background: '#3b82f6',
-                color: 'white',
-                border: 'none',
-                borderRadius: '0.375rem',
-                fontSize: '0.75rem',
-                cursor: 'pointer',
-                fontWeight: '500'
-              }}
-            >
-              <Download size={14} />
-              Pull Course Data
-            </button>
-          )}
-        </div>
-
-        <div style={{
-          background: 'linear-gradient(135deg, #fafaff 0%, #f3f4f6 100%)',
-          border: '1px solid #d1d5db',
-          borderRadius: '0.75rem',
-          padding: '1.5rem'
-        }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-            <div>
-              <label style={{
-                display: 'block',
-                fontSize: '0.875rem',
-                fontWeight: '500',
-                color: '#374151',
-                marginBottom: '0.5rem'
+                color: sessionActive ? '#10b981' : '#ef4444'
               }}>
-                Course Code
-              </label>
-              <input
-                type="text"
-                value={gradingData.course.code}
-                onChange={(e) => setGradingData(prevData => ({
-                  ...prevData,
-                  course: { ...prevData.course, code: e.target.value }
-                }))}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '0.5rem',
-                  fontSize: '0.875rem'
-                }}
-                placeholder="e.g., CS 101"
-              />
-            </div>
-
-            <div>
-              <label style={{
-                display: 'block',
-                fontSize: '0.875rem',
-                fontWeight: '500',
-                color: '#374151',
-                marginBottom: '0.5rem'
-              }}>
-                Course Name
-              </label>
-              <input
-                type="text"
-                value={gradingData.course.name}
-                onChange={(e) => setGradingData(prevData => ({
-                  ...prevData,
-                  course: { ...prevData.course, name: e.target.value }
-                }))}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '0.5rem',
-                  fontSize: '0.875rem'
-                }}
-                placeholder="e.g., Introduction to Computer Science"
-              />
-            </div>
-
-            <div>
-              <label style={{
-                display: 'block',
-                fontSize: '0.875rem',
-                fontWeight: '500',
-                color: '#374151',
-                marginBottom: '0.5rem'
-              }}>
-                Instructor
-              </label>
-              <input
-                type="text"
-                value={gradingData.course.instructor}
-                onChange={(e) => setGradingData(prevData => ({
-                  ...prevData,
-                  course: { ...prevData.course, instructor: e.target.value }
-                }))}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '0.5rem',
-                  fontSize: '0.875rem'
-                }}
-                placeholder="Instructor name"
-              />
-            </div>
-
-            <div>
-              <label style={{
-                display: 'block',
-                fontSize: '0.875rem',
-                fontWeight: '500',
-                color: '#374151',
-                marginBottom: '0.5rem'
-              }}>
-                Term
-              </label>
-              <input
-                type="text"
-                value={gradingData.course.term}
-                onChange={(e) => setGradingData(prevData => ({
-                  ...prevData,
-                  course: { ...prevData.course, term: e.target.value }
-                }))}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '0.5rem',
-                  fontSize: '0.875rem'
-                }}
-                placeholder="e.g., Fall 2024"
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Assignment Information */}
-      <div style={{ marginBottom: '2rem' }}>
-        <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '1rem', color: '#374151' }}>
-          📋 Assignment Information
-        </h3>
-        <div style={{
-          background: 'linear-gradient(135deg, #fafaff 0%, #f3f4f6 100%)',
-          border: '1px solid #d1d5db',
-          borderRadius: '0.75rem',
-          padding: '1.5rem'
-        }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-            <div>
-              <label style={{
-                display: 'block',
-                fontSize: '0.875rem',
-                fontWeight: '500',
-                color: '#374151',
-                marginBottom: '0.5rem'
-              }}>
-                Assignment Name
-              </label>
-              <input
-                type="text"
-                value={gradingData.assignment.name}
-                onChange={(e) => setGradingData(prevData => ({
-                  ...prevData,
-                  assignment: { ...prevData.assignment, name: e.target.value }
-                }))}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '0.5rem',
-                  fontSize: '0.875rem'
-                }}
-                placeholder="Assignment title"
-              />
-            </div>
-
-            <div>
-              <label style={{
-                display: 'block',
-                fontSize: '0.875rem',
-                fontWeight: '500',
-                color: '#374151',
-                marginBottom: '0.5rem'
-              }}>
-                Due Date
-              </label>
-              <input
-                type="date"
-                value={gradingData.assignment.dueDate}
-                onChange={(e) => setGradingData(prevData => ({
-                  ...prevData,
-                  assignment: { ...prevData.assignment, dueDate: e.target.value }
-                }))}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '0.5rem',
-                  fontSize: '0.875rem'
-                }}
-              />
-            </div>
-
-            <div>
-              <label style={{
-                display: 'block',
-                fontSize: '0.875rem',
-                fontWeight: '500',
-                color: '#374151',
-                marginBottom: '0.5rem'
-              }}>
-                Max Points
-              </label>
-              <input
-                type="number"
-                value={gradingData.assignment.maxPoints}
-                onChange={(e) => setGradingData(prevData => ({
-                  ...prevData,
-                  assignment: { ...prevData.assignment, maxPoints: parseInt(e.target.value) || 100 }
-                }))}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '0.5rem',
-                  fontSize: '0.875rem'
-                }}
-                min="1"
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Late Policy */}
-      <div style={{ marginBottom: '2rem' }}>
-        <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '1rem', color: '#374151' }}>
-          ⏰ Late Policy
-        </h3>
-        <div style={{
-          background: 'linear-gradient(135deg, #fafaff 0%, #f3f4f6 100%)',
-          border: '1px solid #d1d5db',
-          borderRadius: '0.75rem',
-          padding: '1.5rem'
-        }}>
-          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-            {Object.entries((currentLatePolicy || DEFAULT_LATE_POLICY).levels).map(([levelKey, levelData]) => (
-              <label
-                key={levelKey}
-                style={{
+                <Shield size={14} />
+                {sessionActive ? 'Privacy Session Active' : 'Session Expired'}
+              </div>
+              {timeRemaining && sessionActive && (
+                <div style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '0.5rem',
-                  padding: '0.75rem 1rem',
-                  background: gradingData.latePolicy.level === levelKey ? levelData.color : '#f9fafb',
-                  color: gradingData.latePolicy.level === levelKey ? 'white' : '#374151',
-                  borderRadius: '0.5rem',
-                  cursor: 'pointer',
-                  fontSize: '0.875rem',
-                  fontWeight: '500',
-                  border: `2px solid ${gradingData.latePolicy.level === levelKey ? levelData.color : '#e5e7eb'}`,
-                  transition: 'all 0.2s ease'
-                }}
-              >
-                <input
-                  type="radio"
-                  name="latePolicy"
-                  value={levelKey}
-                  checked={gradingData.latePolicy.level === levelKey}
-                  onChange={(e) => updateLatePolicy(e.target.value)}
-                  style={{ margin: 0 }}
-                />
-                {levelData.name}
-                <span style={{ fontSize: '0.75rem', opacity: 0.8 }}>
-                  ({Math.round(levelData.multiplier * 100)}%)
-                </span>
-              </label>
-            ))}
-          </div>
-
-          {gradingData.latePolicy.level !== 'none' && (
-            <div style={{
-              marginTop: '1rem',
-              padding: '0.75rem',
-              background: '#fef3c7',
-              border: '1px solid #fde047',
-              borderRadius: '0.5rem',
-              fontSize: '0.875rem',
-              color: '#a16207'
-            }}>
-              <strong>Late Policy Applied:</strong> {(currentLatePolicy || DEFAULT_LATE_POLICY).levels[gradingData.latePolicy.level]?.description}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Rubric Grading */}
-      
-      {sharedRubric && (
-        <div style={{
-          background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-          border: '1px solid #bbf7d0',
-          borderRadius: '0.75rem',
-          padding: '1.5rem',
-          marginBottom: '2rem'
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
-            <div>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: '700', color: '#15803d', marginBottom: '0.5rem' }}>
-                📋 Active Assignment Rubric
-              </h3>
-              <p style={{ color: '#16a34a', fontWeight: '600', fontSize: '1.1rem' }}>
-                {sharedRubric.assignmentInfo.title}
-              </p>
-              <p style={{ fontSize: '0.875rem', color: '#059669' }}>
-                {renderFormattedContent(sharedRubric.assignmentInfo.description)}
-              </p>
-            </div>
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: '0.875rem', color: '#059669' }}>
-                <p style={{ margin: '0.25rem 0' }}>
-                  <strong>Weight:</strong> {sharedRubric.assignmentInfo.weight}% of Final Grade
-                </p>
-                <p style={{ margin: '0.25rem 0' }}>
-                  <strong>Passing:</strong> {sharedRubric.assignmentInfo.passingThreshold}%
-                </p>
-                <p style={{ margin: '0.25rem 0' }}>
-                  <strong>Total Points:</strong> {sharedRubric.assignmentInfo.totalPoints}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Rubric Grading Interface */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-            {sharedRubric.criteria.map((criterion) => {
-              const currentGrading = gradingData.rubricGrading && gradingData.rubricGrading[criterion.id];
-              const showComments = showRubricComments[criterion.id];
-
-              return (
-                <div key={criterion.id} style={{
-                  background: 'white',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '0.5rem',
-                  padding: '1.25rem',
-                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+                  gap: '0.25rem',
+                  color: '#f59e0b'
                 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
-                    <div style={{ flex: 1 }}>
-                      <h4 style={{ fontSize: '1.125rem', fontWeight: '600', color: '#374151' }}>
-                        {criterion.name}
-                        <span style={{ color: '#3b82f6', marginLeft: '0.5rem' }}>
-                          ({criterion.maxPoints} pts)
-                        </span>
-                      </h4>
-                      <p style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.25rem' }}>
-                        {renderFormattedContent(criterion.description)}
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => setShowRubricComments(prev => ({
-                        ...prev,
-                        [criterion.id]: !prev[criterion.id]
-                      }))}
-                      style={{
-                        color: '#3b82f6',
-                        background: 'none',
-                        border: 'none',
-                        fontSize: '0.875rem',
-                        textDecoration: 'underline',
-                        cursor: 'pointer',
-                        marginLeft: '1rem'
-                      }}
-                    >
-                      {showComments ? 'Hide' : 'Show'} Level Details
-                    </button>
-                  </div>
-
-                  {/* Level Selection */}
-                  <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
-                    gap: '0.5rem',
-                    marginBottom: '1rem'
-                  }}>
-                    {sharedRubric.rubricLevels.map((level) => {
-                      const isSelected = currentGrading?.selectedLevel === level.level;
-                      const points = Math.round(criterion.maxPoints * level.multiplier);
-
-                      return (
-                        <button
-                          key={level.level}
-                          onClick={() => updateRubricGrading(criterion.id, level.level)}
-                          style={{
-                            padding: '0.75rem',
-                            borderRadius: '0.5rem',
-                            border: `2px solid ${isSelected ? level.color : '#d1d5db'}`,
-                            fontSize: '0.875rem',
-                            fontWeight: '500',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s ease',
-                            backgroundColor: isSelected ? level.color : 'white',
-                            color: isSelected ? 'white' : '#374151',
-                            transform: isSelected ? 'scale(1.05)' : 'none',
-                            textAlign: 'center'
-                          }}
-                        >
-                          <div style={{ fontWeight: '600' }}>{level.name}</div>
-                          <div style={{ fontSize: '0.75rem', marginTop: '0.25rem' }}>
-                            {level.level === 'incomplete' ? '0' : points} pts
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {/* Level Descriptions */}
-                  {showComments && (
-                    <div style={{
-                      background: '#f9fafb',
-                      borderRadius: '0.5rem',
-                      padding: '1rem',
-                      marginBottom: '1rem'
-                    }}>
-                      <h5 style={{ fontWeight: '600', color: '#374151', marginBottom: '0.75rem' }}>
-                        Level Descriptions:
-                      </h5>
-                      <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-                        gap: '0.75rem'
-                      }}>
-                        {sharedRubric.rubricLevels.map((level) => (
-                          <div
-                            key={level.level}
-                            style={{
-                              background: 'white',
-                              borderRadius: '0.25rem',
-                              border: '1px solid #d1d5db',
-                              borderLeft: `4px solid ${level.color}`,
-                              padding: '0.75rem'
-                            }}
-                          >
-                            <div style={{ fontWeight: '500', fontSize: '0.875rem', color: level.color }}>
-                              {level.name}
-                            </div>
-                            <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.5rem' }}>
-                              {criterion.levels[level.level]?.pointRange} pts
-                            </div>
-                            <div style={{ fontSize: '0.75rem', color: '#374151' }}>
-                              {renderFormattedContent(criterion.levels[level.level]?.description)}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Custom Comments */}
-                  <div>
-                    <label style={{
-                      display: 'block',
-                      fontSize: '0.875rem',
-                      fontWeight: '500',
-                      color: '#374151',
-                      marginBottom: '0.5rem'
-                    }}>
-                      Additional Comments:
-                    </label>
-
-                    {/* Quick Feedback Dropdowns */}
-                    {criterion.feedbackLibrary && (
-                      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
-                        {Object.entries(criterion.feedbackLibrary).map(([category, comments]) => (
-                          <select
-                            key={category}
-                            onChange={(e) => {
-                              if (e.target.value) {
-                                addCriterionFeedback(criterion.id, e.target.value);
-                                e.target.value = '';
-                              }
-                            }}
-                            defaultValue=""
-                            style={{
-                              padding: '0.5rem',
-                              border: '1px solid #d1d5db',
-                              borderRadius: '0.25rem',
-                              fontSize: '0.75rem',
-                              cursor: 'pointer'
-                            }}
-                          >
-                            <option value="">Add {category}...</option>
-                            {comments.map((comment, idx) => (
-                              <option key={idx} value={comment}>{renderFormattedContent(comment)}</option>
-                            ))}
-                          </select>
-                        ))}
-                      </div>
-                    )}
-
-                    <textarea
-                      value={currentGrading?.customComments || ''}
-                      onChange={(e) => updateRubricGrading(criterion.id, currentGrading?.selectedLevel, e.target.value)}
-                      style={{
-                        width: '100%',
-                        padding: '0.75rem',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '0.5rem',
-                        fontSize: '0.875rem',
-                        resize: 'none',
-                        minHeight: '80px'
-                      }}
-                      rows="3"
-                      placeholder="Add specific feedback for this criterion..."
-                    />
-                  </div>
-
-                  {/* Selected Level Feedback */}
-                  {currentGrading?.selectedLevel && (
-                    <div style={{
-                      marginTop: '0.75rem',
-                      padding: '0.75rem',
-                      background: '#eff6ff',
-                      borderRadius: '0.25rem',
-                      border: '1px solid #bfdbfe'
-                    }}>
-                      <div style={{ fontSize: '0.875rem' }}>
-                        <strong>Selected Level:</strong> {sharedRubric.rubricLevels.find(l => l.level === currentGrading.selectedLevel)?.name}
-                        {' '}({criterion.levels[currentGrading.selectedLevel]?.pointRange} pts)
-                      </div>
-                      <div style={{ fontSize: '0.875rem', color: '#374151', marginTop: '0.25rem' }}>
-                        {renderFormattedContent(criterion.levels[currentGrading.selectedLevel]?.description)}
-                      </div>
-                    </div>
-                  )}
+                  <Timer size={14} />
+                  {Math.floor(timeRemaining / 60000)}min remaining
                 </div>
-              );
-            })}
+              )}
+            </div>
           </div>
 
-          {/* Rubric Summary */}
+          <div style={{ display: 'flex', gap: '0.75rem' }}>
+            <button
+              onClick={exportToHTML}
+              disabled={!sessionActive}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                background: sessionActive ? '#16a34a' : '#9ca3af',
+                color: 'white',
+                padding: '0.5rem 1rem',
+                borderRadius: '0.5rem',
+                border: 'none',
+                cursor: sessionActive ? 'pointer' : 'not-allowed',
+                fontSize: '0.875rem'
+              }}
+            >
+              <FileDown size={16} />
+              Export HTML
+            </button>
+            <button
+              type="button"
+              onClick={exportToPDF}
+              disabled={!sessionActive}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                backgroundColor: sessionActive ? '#dc2626' : '#9ca3af',
+                color: '#ffffff',
+                padding: '0.5rem 1rem',
+                borderRadius: '0.5rem',
+                border: 'none',
+                cursor: sessionActive ? 'pointer' : 'not-allowed',
+                fontSize: '0.875rem'
+              }}
+            >
+              <FileText size={16} />
+              Export PDF
+            </button>
+            <button
+              onClick={exportForAIFeedback}
+              disabled={!sessionActive}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                background: sessionActive ? '#7c3aed' : '#9ca3af',
+                color: 'white',
+                padding: '0.5rem 1rem',
+                borderRadius: '0.5rem',
+                border: 'none',
+                cursor: sessionActive ? 'pointer' : 'not-allowed',
+                fontSize: '0.875rem'
+              }}
+              title="Export grade data and AI prompt for generating personalized feedback"
+            >
+              <Bot size={16} />
+              Export for AI Feedback
+            </button>
+          </div>
+        </div>
+
+        <input
+          ref={rubricInputRef}
+          type="file"
+          accept=".json"
+          style={{ display: 'none' }}
+          onChange={handleRubricUpload}
+        />
+
+        {/* Current Rubric Info */}
+        {sharedRubric && (
           <div style={{
-            marginTop: '1.5rem',
-            background: 'white',
-            border: '1px solid #d1d5db',
-            borderRadius: '0.5rem',
-            padding: '1rem'
+            background: 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)',
+            border: '1px solid #93c5fd',
+            borderRadius: '0.75rem',
+            padding: '1.5rem',
+            marginBottom: '2rem'
+          }}>
+            <h2 style={{
+              fontSize: '1.25rem',
+              fontWeight: '600',
+              color: '#1e40af',
+              margin: '0 0 0.5rem 0',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}>
+              <FileText size={20} />
+              Current Rubric: {sharedRubric.assignmentInfo.title}
+            </h2>
+            <p style={{ color: '#1e40af', margin: 0, fontSize: '0.9rem' }}>
+              {sharedRubric.assignmentInfo.description || 'No description provided'}
+            </p>
+            <div style={{
+              display: 'flex',
+              gap: '2rem',
+              marginTop: '0.75rem',
+              fontSize: '0.875rem',
+              color: '#1d4ed8'
+            }}>
+              <span><strong>Weight:</strong> {sharedRubric.assignmentInfo?.weight || 0}%</span>
+              <span><strong>Total Points:</strong> {sharedRubric.assignmentInfo?.totalPoints || 0}</span>
+              <span><strong>Passing:</strong> {sharedRubric.assignmentInfo?.passingThreshold || 0}%</span>
+              <span><strong>Criteria:</strong> {sharedRubric.criteria?.length || 0}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Grading Session Status */}
+        {gradingSession && gradingSession.classListData?.students && (
+          <div style={{
+            background: 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)',
+            border: '1px solid #6ee7b7',
+            borderRadius: '0.75rem',
+            padding: '1.5rem',
+            marginBottom: '2rem'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <h4 style={{ fontSize: '1.125rem', fontWeight: '600', color: '#374151' }}>
-                  Rubric Score Summary
-                </h4>
-                <p style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-                  Based on selected levels across all criteria
+                <h3 style={{
+                  fontSize: '1.125rem',
+                  fontWeight: '600',
+                  color: '#047857',
+                  margin: '0 0 0.5rem 0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}>
+                  <Users size={18} />
+                  Batch Grading Session Active
+                </h3>
+                <p style={{ color: '#047857', margin: 0, fontSize: '0.9rem' }}>
+                  Student {gradingSession.currentStudentIndex + 1} of {gradingSession.classListData.students.length || 0}:
+                  <strong> {gradingSession.classListData.students[gradingSession.currentStudentIndex]?.name || 'Unknown'}</strong>
                 </p>
               </div>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#3b82f6' }}>
-                  {Math.round(scoreSummary.finalScore * 10) / 10}/{sharedRubric.assignmentInfo.totalPoints}
-                </div>
-                <div style={{ fontSize: '1.125rem', color: '#6b7280' }}>
-                  ({Math.round((scoreSummary.finalScore / (sharedRubric.assignmentInfo.totalPoints || 1)) * 1000) / 10}%)
-                </div>
-                {scoreSummary.penaltyApplied && (
-                  <div style={{ fontSize: '0.875rem', color: '#dc2626', marginTop: '0.25rem' }}>
-                    Raw: {Math.round(scoreSummary.rawScore * 10) / 10} (Late Penalty Applied)
-                  </div>
-                )}
-                <div style={{
-                  fontSize: '0.875rem',
-                  fontWeight: '500',
-                  color: (scoreSummary.finalScore / (sharedRubric.assignmentInfo.totalPoints || 1)) * 100 >= sharedRubric.assignmentInfo.passingThreshold
-                    ? '#16a34a' : '#dc2626'
-                }}>
-                  {(scoreSummary.finalScore / (sharedRubric.assignmentInfo.totalPoints || 1)) * 100 >= sharedRubric.assignmentInfo.passingThreshold
-                    ? '✓ PASSING' : '✗ NEEDS IMPROVEMENT'}
-                </div>
+
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button
+                  onClick={handlePreviousStudent}
+                  disabled={gradingSession.currentStudentIndex === 0 || !sessionActive}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.25rem',
+                    padding: '0.5rem 1rem',
+                    background: (gradingSession.currentStudentIndex === 0 || !sessionActive) ? '#f3f4f6' : '#10b981',
+                    color: (gradingSession.currentStudentIndex === 0 || !sessionActive) ? '#9ca3af' : 'white',
+                    border: 'none',
+                    borderRadius: '0.5rem',
+                    fontSize: '0.875rem',
+                    cursor: (gradingSession.currentStudentIndex === 0 || !sessionActive) ? 'not-allowed' : 'pointer',
+                    fontWeight: '500'
+                  }}
+                >
+                  <SkipBack size={16} />
+                  Previous
+                </button>
+
+                <button
+                  onClick={() => {
+                    updateGradingSession({ active: false });
+                    setActiveTab('class-manager');
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.25rem',
+                    padding: '0.5rem 1rem',
+                    background: '#f59e0b',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '0.5rem',
+                    fontSize: '0.875rem',
+                    cursor: 'pointer',
+                    fontWeight: '500'
+                  }}
+                >
+                  <Pause size={16} />
+                  Pause Session
+                </button>
+
+                <button
+                  onClick={handleNextStudent}
+                  disabled={gradingSession.currentStudentIndex >= (gradingSession.classListData.students.length || 0) - 1 || !sessionActive}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.25rem',
+                    padding: '0.5rem 1rem',
+                    background: (gradingSession.currentStudentIndex >= (gradingSession.classListData.students.length || 0) - 1 || !sessionActive) ? '#f3f4f6' : '#10b981',
+                    color: (gradingSession.currentStudentIndex >= (gradingSession.classListData.students.length || 0) - 1 || !sessionActive) ? '#9ca3af' : 'white',
+                    border: 'none',
+                    borderRadius: '0.5rem',
+                    fontSize: '0.875rem',
+                    cursor: (gradingSession.currentStudentIndex >= (gradingSession.classListData.students.length || 0) - 1 || !sessionActive) ? 'not-allowed' : 'pointer',
+                    fontWeight: '500'
+                  }}
+                >
+                  Next
+                  <SkipForward size={16} />
+                </button>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-    
-
-      {/* Enhanced Complete and Grade Next Section */}
-      {sharedRubric && (gradingData.student?.name || currentStudent) && (
-        <div style={{
-          background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)',
-          border: '2px solid #10b981',
-          borderRadius: '0.75rem',
-          padding: '1.5rem',
-          marginBottom: '2rem',
-          textAlign: 'center'
-        }}>
-          <h3 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#047857', marginBottom: '1rem' }}>
-            Ready to move to the next student?
+        {/* Continue with rest of the grading interface... */}
+        {/* Student Information */}
+        <div style={{ marginBottom: '2rem' }}>
+          <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '1rem', color: '#374151' }}>
+            👤 Student Information
           </h3>
-          <p style={{ color: '#065f46', marginBottom: '1.5rem', fontSize: '0.875rem' }}>
-            Choose how to save the current grading before proceeding.
-          </p>
+          <div style={{
+            background: 'linear-gradient(135deg, #fafaff 0%, #f3f4f6 100%)',
+            border: '1px solid #d1d5db',
+            borderRadius: '0.75rem',
+            padding: '1.5rem'
+          }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  color: '#374151',
+                  marginBottom: '0.5rem'
+                }}>
+                  Student Name
+                </label>
+                <input
+                  type="text"
+                  value={gradingData.student.name}
+                  onChange={(e) => setGradingData(prevData => ({
+                    ...prevData,
+                    student: { ...prevData.student, name: e.target.value }
+                  }))}
+                  disabled={!sessionActive}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '0.5rem',
+                    fontSize: '0.875rem',
+                    backgroundColor: sessionActive ? 'white' : '#f3f4f6',
+                    cursor: sessionActive ? 'text' : 'not-allowed'
+                  }}
+                  placeholder="Enter student name"
+                />
+              </div>
 
-          <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
-            {/* Save as Draft Button */}
-            <button
-              onClick={handleNextStudentAsDraft}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
-                color: 'white',
-                padding: '0.75rem 1.5rem',
-                borderRadius: '0.5rem',
-                border: 'none',
-                cursor: 'pointer',
-                fontSize: '0.875rem',
-                fontWeight: '600',
-                boxShadow: '0 2px 8px rgba(251, 191, 36, 0.4)',
-                transition: 'all 0.2s ease'
-              }}
-              onMouseOver={(e) => {
-                e.target.style.transform = 'translateY(-2px)';
-                e.target.style.boxShadow = '0 4px 12px rgba(251, 191, 36, 0.5)';
-              }}
-              onMouseOut={(e) => {
-                e.target.style.transform = 'translateY(0)';
-                e.target.style.boxShadow = '0 2px 8px rgba(251, 191, 36, 0.4)';
-              }}
-            >
-              <span style={{ fontSize: '1.1rem' }}>📝</span>
-              Save & Grade Next Student
-            </button>
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  color: '#374151',
+                  marginBottom: '0.5rem'
+                }}>
+                  Student ID
+                </label>
+                <input
+                  type="text"
+                  value={gradingData.student.id}
+                  onChange={(e) => setGradingData(prevData => ({
+                    ...prevData,
+                    student: { ...prevData.student, id: e.target.value }
+                  }))}
+                  disabled={!sessionActive}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '0.5rem',
+                    fontSize: '0.875rem',
+                    backgroundColor: sessionActive ? 'white' : '#f3f4f6',
+                    cursor: sessionActive ? 'text' : 'not-allowed'
+                  }}
+                  placeholder="Enter student ID"
+                />
+              </div>
 
-            {/* Finalize & Grade Next Button */}
-            <button
-              onClick={handleNextStudentAsFinal}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                color: 'white',
-                padding: '0.75rem 1.5rem',
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  color: '#374151',
+                  marginBottom: '0.5rem'
+                }}>
+                  Email
+                </label>
+                <input
+                  type="email"
+                  value={gradingData.student.email}
+                  onChange={(e) => setGradingData(prevData => ({
+                    ...prevData,
+                    student: { ...prevData.student, email: e.target.value }
+                  }))}
+                  disabled={!sessionActive}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '0.5rem',
+                    fontSize: '0.875rem',
+                    backgroundColor: sessionActive ? 'white' : '#f3f4f6',
+                    cursor: sessionActive ? 'text' : 'not-allowed'
+                  }}
+                  placeholder="Enter email address"
+                />
+              </div>
+            </div>
+
+            {gradeStatus !== 'none' && (
+              <div style={{
+                marginTop: '1rem',
+                padding: '0.75rem',
+                background: gradeStatus === 'final' ? '#dcfce7' : '#fef3c7',
+                border: `1px solid ${gradeStatus === 'final' ? '#86efac' : '#fde047'}`,
                 borderRadius: '0.5rem',
-                border: 'none',
-                cursor: 'pointer',
                 fontSize: '0.875rem',
-                fontWeight: '600',
-                boxShadow: '0 2px 8px rgba(16, 185, 129, 0.4)',
-                transition: 'all 0.2s ease'
-              }}
-              onMouseOver={(e) => {
-                e.target.style.transform = 'translateY(-2px)';
-                e.target.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.5)';
-              }}
-              onMouseOut={(e) => {
-                e.target.style.transform = 'translateY(0)';
-                e.target.style.boxShadow = '0 2px 8px rgba(16, 185, 129, 0.4)';
-              }}
-            >
-              <span style={{ fontSize: '1.1rem' }}>✅</span>
-              Finalize & Grade Next Student
-            </button>
+                color: gradeStatus === 'final' ? '#047857' : '#a16207'
+              }}>
+                <strong>
+                  {gradeStatus === 'final' ? '✅ Final Grade Saved' : '📝 Draft Saved'}
+                </strong>
+                {gradeStatus === 'final' && ' - This student has been fully graded'}
+                {gradeStatus === 'draft' && ' - You can continue editing this draft'}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Course Information */}
+        <div style={{ marginBottom: '2rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
+            <h3 style={{ fontSize: '1.125rem', fontWeight: '600', margin: 0, color: '#374151' }}>
+              🏫 Course Information
+            </h3>
+            {classList && classList.courseMetadata && (
+              <button
+                onClick={pullCourseDataFromClassList}
+                disabled={!sessionActive}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.25rem',
+                  padding: '0.375rem 0.75rem',
+                  background: sessionActive ? '#3b82f6' : '#9ca3af',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '0.375rem',
+                  fontSize: '0.75rem',
+                  cursor: sessionActive ? 'pointer' : 'not-allowed',
+                  fontWeight: '500'
+                }}
+              >
+                <Download size={14} />
+                Pull Course Data
+              </button>
+            )}
           </div>
 
           <div style={{
-            marginTop: '1rem',
-            padding: '0.75rem',
-            background: 'rgba(255, 255, 255, 0.6)',
-            borderRadius: '0.375rem',
-            fontSize: '0.75rem',
-            color: '#065f46'
+            background: 'linear-gradient(135deg, #fafaff 0%, #f3f4f6 100%)',
+            border: '1px solid #d1d5db',
+            borderRadius: '0.75rem',
+            padding: '1.5rem'
           }}>
-            <strong>Draft:</strong> Save progress, can edit later • <strong>Finalize:</strong> Complete grading, ready for student/LMS
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  color: '#374151',
+                  marginBottom: '0.5rem'
+                }}>
+                  Course Code
+                </label>
+                <input
+                  type="text"
+                  value={gradingData.course.code}
+                  onChange={(e) => setGradingData(prevData => ({
+                    ...prevData,
+                    course: { ...prevData.course, code: e.target.value }
+                  }))}
+                  disabled={!sessionActive}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '0.5rem',
+                    fontSize: '0.875rem',
+                    backgroundColor: sessionActive ? 'white' : '#f3f4f6',
+                    cursor: sessionActive ? 'text' : 'not-allowed'
+                  }}
+                  placeholder="e.g., CS 101"
+                />
+              </div>
+
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  color: '#374151',
+                  marginBottom: '0.5rem'
+                }}>
+                  Course Name
+                </label>
+                <input
+                  type="text"
+                  value={gradingData.course.name}
+                  onChange={(e) => setGradingData(prevData => ({
+                    ...prevData,
+                    course: { ...prevData.course, name: e.target.value }
+                  }))}
+                  disabled={!sessionActive}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '0.5rem',
+                    fontSize: '0.875rem',
+                    backgroundColor: sessionActive ? 'white' : '#f3f4f6',
+                    cursor: sessionActive ? 'text' : 'not-allowed'
+                  }}
+                  placeholder="e.g., Introduction to Computer Science"
+                />
+              </div>
+
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  color: '#374151',
+                  marginBottom: '0.5rem'
+                }}>
+                  Instructor
+                </label>
+                <input
+                  type="text"
+                  value={gradingData.course.instructor}
+                  onChange={(e) => setGradingData(prevData => ({
+                    ...prevData,
+                    course: { ...prevData.course, instructor: e.target.value }
+                  }))}
+                  disabled={!sessionActive}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '0.5rem',
+                    fontSize: '0.875rem',
+                    backgroundColor: sessionActive ? 'white' : '#f3f4f6',
+                    cursor: sessionActive ? 'text' : 'not-allowed'
+                  }}
+                  placeholder="Instructor name"
+                />
+              </div>
+
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  color: '#374151',
+                  marginBottom: '0.5rem'
+                }}>
+                  Term
+                </label>
+                <input
+                  type="text"
+                  value={gradingData.course.term}
+                  onChange={(e) => setGradingData(prevData => ({
+                    ...prevData,
+                    course: { ...prevData.course, term: e.target.value }
+                  }))}
+                  disabled={!sessionActive}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '0.5rem',
+                    fontSize: '0.875rem',
+                    backgroundColor: sessionActive ? 'white' : '#f3f4f6',
+                    cursor: sessionActive ? 'text' : 'not-allowed'
+                  }}
+                  placeholder="e.g., Fall 2024"
+                />
+              </div>
+            </div>
           </div>
         </div>
-      )}
 
-      {/* Score Summary */}
-      <div style={{
-        textAlign: 'center',
-        background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-        border: '1px solid #bbf7d0',
-        borderRadius: '0.75rem',
-        padding: '1.5rem',
-        marginBottom: '2rem'
-      }}>
-        <h2 style={{ fontSize: '1.5rem', fontWeight: '700', color: '#15803d', marginBottom: '1rem' }}>
-          📊 Final Score
-        </h2>
-        <div style={{ fontSize: '3rem', fontWeight: '700', color: '#16a34a', marginBottom: '1rem' }}>
-          {Math.round(scoreSummary.finalScore * 10) / 10}
-          <span style={{ fontSize: '1.5rem', color: '#6b7280' }}>
-            / {sharedRubric ? sharedRubric.assignmentInfo.totalPoints : gradingData.assignment.maxPoints}
-          </span>
-        </div>
-        <div style={{ fontSize: '1.25rem', color: '#6b7280', marginBottom: '1rem' }}>
-          ({Math.round((scoreSummary.finalScore / (sharedRubric ? (sharedRubric.assignmentInfo.totalPoints || 1) : (gradingData.assignment.maxPoints || 1))) * 1000) / 10}%)
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-          {sharedRubric && (
-            <div style={{
-              fontSize: '0.875rem',
-              background: '#dcfce7',
-              color: '#15803d',
-              padding: '0.25rem 0.75rem',
-              borderRadius: '1rem'
-            }}>
-              📋 Rubric Assessment Active
-            </div>
-          )}
-          {scoreSummary.penaltyApplied && (
-            <div style={{
-              fontSize: '0.875rem',
-              background: '#fee2e2',
-              color: '#dc2626',
-              padding: '0.25rem 0.75rem',
-              borderRadius: '1rem'
-            }}>
-              ⏰ Late Penalty Applied
-            </div>
-          )}
-          {gradingSession && gradingSession.classListData?.students && (
-            <div style={{
-              fontSize: '0.875rem',
-              background: '#dbeafe',
-              color: '#2563eb',
-              padding: '0.25rem 0.75rem',
-              borderRadius: '1rem'
-            }}>
-              👥 Batch Session Active
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Save Draft Section */}
-      {currentStudent && (
-        <div style={{
-          background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
-          border: '1px solid #f59e0b',
-          borderRadius: '0.75rem',
-          padding: '1.5rem',
-          marginBottom: '2rem',
-          textAlign: 'center'
-        }}>
-          <h3 style={{ fontSize: '1.125rem', fontWeight: '600', color: '#92400e', marginBottom: '0.75rem' }}>
-            💾 Save Your Progress
+        {/* Assignment Information */}
+        <div style={{ marginBottom: '2rem' }}>
+          <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '1rem', color: '#374151' }}>
+            📋 Assignment Information
           </h3>
-          <p style={{ color: '#a16207', marginBottom: '1.5rem', fontSize: '0.875rem' }}>
-            Saves your work on the current student without navigating away from the page.
-          </p>
-          <button
-            onClick={() => {
-              if (currentStudent?.id) {
-                saveDraft(currentStudent.id, localGradingData);
-                // Show success feedback
-                const button = document.activeElement;
-                const originalText = button.innerHTML;
-                const originalBg = button.style.background;
-                button.innerHTML = '<span style="display: flex; align-items: center; gap: 0.5rem;"><svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>Draft Saved!</span>';
-                button.style.background = 'linear-gradient(135deg, #059669 0%, #047857 100%)';
-                setTimeout(() => {
-                  button.innerHTML = originalText;
-                  button.style.background = originalBg;
-                }, 2000);
-              }
-            }}
-            disabled={!currentStudent?.id}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.75rem',
-              background: currentStudent?.id ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' : '#9ca3af',
-              color: 'white',
-              padding: '1rem 2rem',
-              borderRadius: '0.75rem',
-              border: 'none',
-              cursor: currentStudent?.id ? 'pointer' : 'not-allowed',
-              fontSize: '1rem',
-              fontWeight: '600',
-              boxShadow: currentStudent?.id ? '0 4px 12px rgba(245, 158, 11, 0.4)' : 'none',
-              transform: 'translateY(0)',
-              transition: 'all 0.2s ease'
-            }}
-            onMouseOver={(e) => {
-              if (currentStudent?.id) {
-                e.currentTarget.style.transform = 'translateY(-2px)';
-                e.currentTarget.style.boxShadow = '0 8px 20px rgba(245, 158, 11, 0.5)';
-              }
-            }}
-            onMouseOut={(e) => {
-              if (currentStudent?.id) {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 4px 12px rgba(245, 158, 11, 0.4)';
-              }
-            }}
-            title={currentStudent?.id ? 'Save current grading progress' : 'No student selected to save'}
-          >
-            <Save size={20} />
-            Save Draft
-          </button>
-          {!currentStudent?.id && (
-            <p style={{ marginTop: '0.75rem', fontSize: '0.75rem', color: '#6b7280' }}>
-              Select a student from the Class Manager to enable draft saving
-            </p>
-          )}
-        </div>
-      )}
-
-      {/* General Feedback Section */}
-      <div style={{ marginBottom: '2rem' }}>
-        <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '1rem', color: '#374151' }}>
-          📝 General Feedback
-        </h3>
-        <div style={{
-          background: 'linear-gradient(135deg, #fafaff 0%, #f3f4f6 100%)',
-          border: '1px solid #d1d5db',
-          borderRadius: '0.75rem',
-          padding: '1.5rem'
-        }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1.5rem' }}>
-            <div>
-              <label style={{
-                display: 'block',
-                fontSize: '0.875rem',
-                fontWeight: '500',
-                color: '#374151',
-                marginBottom: '0.5rem'
-              }}>
-                Overall Comments
-              </label>
-              <textarea
-                value={gradingData.feedback.general}
-                onChange={(e) => setGradingData(prevData => ({
-                  ...prevData,
-                  feedback: { ...prevData.feedback, general: e.target.value }
-                }))}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '0.5rem',
-                  fontSize: '0.875rem',
-                  resize: 'none',
-                  minHeight: '100px'
-                }}
-                rows="4"
-                placeholder="General comments about the assignment..."
-              />
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+          <div style={{
+            background: 'linear-gradient(135deg, #fafaff 0%, #f3f4f6 100%)',
+            border: '1px solid #d1d5db',
+            borderRadius: '0.75rem',
+            padding: '1.5rem'
+          }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
               <div>
                 <label style={{
                   display: 'block',
@@ -2320,25 +1838,26 @@ Write the feedback now, making it sound personal and genuine while keeping it co
                   color: '#374151',
                   marginBottom: '0.5rem'
                 }}>
-                  Strengths
+                  Assignment Name
                 </label>
-                <textarea
-                  value={gradingData.feedback.strengths}
+                <input
+                  type="text"
+                  value={gradingData.assignment.name}
                   onChange={(e) => setGradingData(prevData => ({
                     ...prevData,
-                    feedback: { ...prevData.feedback, strengths: e.target.value }
+                    assignment: { ...prevData.assignment, name: e.target.value }
                   }))}
+                  disabled={!sessionActive}
                   style={{
                     width: '100%',
                     padding: '0.75rem',
                     border: '1px solid #d1d5db',
                     borderRadius: '0.5rem',
                     fontSize: '0.875rem',
-                    resize: 'none',
-                    minHeight: '100px'
+                    backgroundColor: sessionActive ? 'white' : '#f3f4f6',
+                    cursor: sessionActive ? 'text' : 'not-allowed'
                   }}
-                  rows="4"
-                  placeholder="What the student did well..."
+                  placeholder="Assignment title"
                 />
               </div>
 
@@ -2350,277 +1869,1045 @@ Write the feedback now, making it sound personal and genuine while keeping it co
                   color: '#374151',
                   marginBottom: '0.5rem'
                 }}>
-                  Areas for Improvement
+                  Due Date
                 </label>
-                <textarea
-                  value={gradingData.feedback.improvements}
+                <input
+                  type="date"
+                  value={gradingData.assignment.dueDate}
                   onChange={(e) => setGradingData(prevData => ({
                     ...prevData,
-                    feedback: { ...prevData.feedback, improvements: e.target.value }
+                    assignment: { ...prevData.assignment, dueDate: e.target.value }
                   }))}
+                  disabled={!sessionActive}
                   style={{
                     width: '100%',
                     padding: '0.75rem',
                     border: '1px solid #d1d5db',
                     borderRadius: '0.5rem',
                     fontSize: '0.875rem',
-                    resize: 'none',
-                    minHeight: '100px'
+                    backgroundColor: sessionActive ? 'white' : '#f3f4f6',
+                    cursor: sessionActive ? 'text' : 'not-allowed'
                   }}
-                  rows="4"
-                  placeholder="Suggestions for improvement..."
+                />
+              </div>
+
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  color: '#374151',
+                  marginBottom: '0.5rem'
+                }}>
+                  Max Points
+                </label>
+                <input
+                  type="number"
+                  value={gradingData.assignment.maxPoints}
+                  onChange={(e) => setGradingData(prevData => ({
+                    ...prevData,
+                    assignment: { ...prevData.assignment, maxPoints: parseInt(e.target.value) || 100 }
+                  }))}
+                  disabled={!sessionActive}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '0.5rem',
+                    fontSize: '0.875rem',
+                    backgroundColor: sessionActive ? 'white' : '#f3f4f6',
+                    cursor: sessionActive ? 'text' : 'not-allowed'
+                  }}
+                  min="1"
                 />
               </div>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* File Attachments */}
-                  <div style={{ marginBottom: '2rem' }}>
-                    <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '1rem', color: '#374151' }}>
-                      📎 File Attachments
-                    </h3>
-                    <div style={{
-                      border: '2px dashed #d1d5db',
-                      borderRadius: '0.5rem',
-                      padding: '1.5rem',
-                      textAlign: 'center'
-                    }}>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      multiple
-                      onChange={handleFileUpload} // Pass the function directly
-                      style={{ display: 'none' }}
-                    />
+        {/* Late Policy */}
+        <div style={{ marginBottom: '2rem' }}>
+          <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '1rem', color: '#374151' }}>
+            ⏰ Late Policy
+          </h3>
+          <div style={{
+            background: 'linear-gradient(135deg, #fafaff 0%, #f3f4f6 100%)',
+            border: '1px solid #d1d5db',
+            borderRadius: '0.75rem',
+            padding: '1.5rem'
+          }}>
+            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+              {Object.entries((currentLatePolicy || DEFAULT_LATE_POLICY).levels).map(([levelKey, levelData]) => (
+                <label
+                  key={levelKey}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    padding: '0.75rem 1rem',
+                    background: gradingData.latePolicy.level === levelKey ? levelData.color : '#f9fafb',
+                    color: gradingData.latePolicy.level === levelKey ? 'white' : '#374151',
+                    borderRadius: '0.5rem',
+                    cursor: sessionActive ? 'pointer' : 'not-allowed',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    border: `2px solid ${gradingData.latePolicy.level === levelKey ? levelData.color : '#e5e7eb'}`,
+                    transition: 'all 0.2s ease',
+                    opacity: sessionActive ? 1 : 0.6
+                  }}
+                >
+                  <input
+                    type="radio"
+                    name="latePolicy"
+                    value={levelKey}
+                    checked={gradingData.latePolicy.level === levelKey}
+                    onChange={(e) => updateLatePolicy(e.target.value)}
+                    disabled={!sessionActive}
+                    style={{ margin: 0 }}
+                  />
+                  {levelData.name}
+                  <span style={{ fontSize: '0.75rem', opacity: 0.8 }}>
+                    ({Math.round(levelData.multiplier * 100)}%)
+                  </span>
+                </label>
+              ))}
+            </div>
+
+            {gradingData.latePolicy.level !== 'none' && (
+              <div style={{
+                marginTop: '1rem',
+                padding: '0.75rem',
+                background: '#fef3c7',
+                border: '1px solid #fde047',
+                borderRadius: '0.5rem',
+                fontSize: '0.875rem',
+                color: '#a16207'
+              }}>
+                <strong>Late Policy Applied:</strong> {(currentLatePolicy || DEFAULT_LATE_POLICY).levels[gradingData.latePolicy.level]?.description}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Rubric Grading */}
+        {sharedRubric && (
+          <div style={{
+            background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+            border: '1px solid #bbf7d0',
+            borderRadius: '0.75rem',
+            padding: '1.5rem',
+            marginBottom: '2rem'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+              <div>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: '700', color: '#15803d', marginBottom: '0.5rem' }}>
+                  📋 Active Assignment Rubric
+                </h3>
+                <p style={{ color: '#16a34a', fontWeight: '600', fontSize: '1.1rem' }}>
+                  {sharedRubric.assignmentInfo.title}
+                </p>
+                <p style={{ fontSize: '0.875rem', color: '#059669' }}>
+                  {renderFormattedContent(sharedRubric.assignmentInfo.description)}
+                </p>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: '0.875rem', color: '#059669' }}>
+                  <p style={{ margin: '0.25rem 0' }}>
+                    <strong>Weight:</strong> {sharedRubric.assignmentInfo.weight}% of Final Grade
+                  </p>
+                  <p style={{ margin: '0.25rem 0' }}>
+                    <strong>Passing:</strong> {sharedRubric.assignmentInfo.passingThreshold}%
+                  </p>
+                  <p style={{ margin: '0.25rem 0' }}>
+                    <strong>Total Points:</strong> {sharedRubric.assignmentInfo.totalPoints}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Rubric Grading Interface */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              {sharedRubric.criteria.map((criterion) => {
+                const currentGrading = gradingData.rubricGrading && gradingData.rubricGrading[criterion.id];
+                const showComments = showRubricComments[criterion.id];
+
+                return (
+                  <div key={criterion.id} style={{
+                    background: 'white',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '0.5rem',
+                    padding: '1.25rem',
+                    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+                    opacity: sessionActive ? 1 : 0.6
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                      <div style={{ flex: 1 }}>
+                        <h4 style={{ fontSize: '1.125rem', fontWeight: '600', color: '#374151' }}>
+                          {criterion.name}
+                          <span style={{ color: '#3b82f6', marginLeft: '0.5rem' }}>
+                            ({criterion.maxPoints} pts)
+                          </span>
+                        </h4>
+                        <p style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.25rem' }}>
+                          {renderFormattedContent(criterion.description)}
+                        </p>
+                      </div>
                       <button
-                        onClick={() => fileInputRef.current?.click()}
+                        onClick={() => setShowRubricComments(prev => ({
+                          ...prev,
+                          [criterion.id]: !prev[criterion.id]
+                        }))}
+                        disabled={!sessionActive}
                         style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.5rem',
-                          background: '#3b82f6',
-                          color: 'white',
-                          padding: '0.75rem 1.5rem',
-                          borderRadius: '0.5rem',
+                          color: sessionActive ? '#3b82f6' : '#9ca3af',
+                          background: 'none',
                           border: 'none',
-                          cursor: 'pointer',
-                          margin: '0 auto'
+                          fontSize: '0.875rem',
+                          textDecoration: 'underline',
+                          cursor: sessionActive ? 'pointer' : 'not-allowed',
+                          marginLeft: '1rem'
                         }}
                       >
-                        <Plus size={20} />
-                        Add Files
+                        {showComments ? 'Hide' : 'Show'} Level Details
                       </button>
-                      <p style={{ color: '#6b7280', marginTop: '0.5rem', fontSize: '0.875rem' }}>
-                        Upload images, documents, or other files relevant to the assignment
-                      </p>
                     </div>
-      
-                    {gradingData.attachments.length > 0 && (
-                      <div style={{ marginTop: '1rem' }}>
-                        <h4 style={{ fontWeight: '600', color: '#374151', marginBottom: '0.75rem' }}>
-                          Uploaded Files ({gradingData.attachments.length})
-                        </h4>
+
+                    {/* Level Selection */}
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+                      gap: '0.5rem',
+                      marginBottom: '1rem'
+                    }}>
+                      {sharedRubric.rubricLevels.map((level) => {
+                        const isSelected = currentGrading?.selectedLevel === level.level;
+                        const points = Math.round(criterion.maxPoints * level.multiplier);
+
+                        return (
+                          <button
+                            key={level.level}
+                            onClick={() => updateRubricGrading(criterion.id, level.level)}
+                            disabled={!sessionActive}
+                            style={{
+                              padding: '0.75rem',
+                              borderRadius: '0.5rem',
+                              border: `2px solid ${isSelected ? level.color : '#d1d5db'}`,
+                              fontSize: '0.875rem',
+                              fontWeight: '500',
+                              cursor: sessionActive ? 'pointer' : 'not-allowed',
+                              transition: 'all 0.2s ease',
+                              backgroundColor: isSelected ? level.color : 'white',
+                              color: isSelected ? 'white' : '#374151',
+                              transform: isSelected ? 'scale(1.05)' : 'none',
+                              textAlign: 'center',
+                              opacity: sessionActive ? 1 : 0.6
+                            }}
+                          >
+                            <div style={{ fontWeight: '600' }}>{level.name}</div>
+                            <div style={{ fontSize: '0.75rem', marginTop: '0.25rem' }}>
+                              {level.level === 'incomplete' ? '0' : points} pts
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Level Descriptions */}
+                    {showComments && (
+                      <div style={{
+                        background: '#f9fafb',
+                        borderRadius: '0.5rem',
+                        padding: '1rem',
+                        marginBottom: '1rem'
+                      }}>
+                        <h5 style={{ fontWeight: '600', color: '#374151', marginBottom: '0.75rem' }}>
+                          Level Descriptions:
+                        </h5>
                         <div style={{
                           display: 'grid',
-                          gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-                          gap: '1rem'
+                          gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                          gap: '0.75rem'
                         }}>
-                          {gradingData.attachments.map((file) => (
-                            <div key={file.id} style={{
-                              border: '1px solid #d1d5db',
-                              borderRadius: '0.5rem',
-                              overflow: 'hidden',
-                              background: 'white'
-                            }}>
-                              {file.type.startsWith('image/') ? (
-                                <div style={{ position: 'relative' }}>
-                                  <img
-                                    src={file.base64Data || URL.createObjectURL(file.file)}
-                                    alt={file.name}
-                                    style={{
-                                      width: '100%',
-                                      height: '150px',
-                                      objectFit: 'cover'
-                                    }}
-                                  />
-                                  <button
-                                    onClick={() => removeAttachment(file.id)}
-                                    style={{
-                                      position: 'absolute',
-                                      top: '0.5rem',
-                                      right: '0.5rem',
-                                      background: '#dc2626',
-                                      color: 'white',
-                                      borderRadius: '50%',
-                                      width: '24px',
-                                      height: '24px',
-                                      border: 'none',
-                                      cursor: 'pointer',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center'
-                                    }}
-                                  >
-                                    <X size={12} />
-                                  </button>
-                                </div>
-                              ) : (
-                                <div style={{ padding: '1rem' }}>
-                                  <FileText size={40} style={{ color: '#6b7280', margin: '0 auto 0.5rem auto', display: 'block' }} />
-                                </div>
-                              )}
-                              <div style={{ padding: '0.75rem' }}>
-                                <p style={{ fontWeight: '500', fontSize: '0.875rem', marginBottom: '0.25rem' }}>
-                                  {file.name}
-                                </p>
-                                <p style={{ fontSize: '0.75rem', color: '#6b7280' }}>
-                                  {(file.size / 1024).toFixed(1)} KB
-                                </p>
-                                {!file.type.startsWith('image/') && (
-                                  <button
-                                    onClick={() => removeAttachment(file.id)}
-                                    style={{
-                                      marginTop: '0.5rem',
-                                      color: '#dc2626',
-                                      background: 'none',
-                                      border: 'none',
-                                      fontSize: '0.75rem',
-                                      cursor: 'pointer'
-                                    }}
-                                  >
-                                    Remove
-                                  </button>
-                                )}
+                          {sharedRubric.rubricLevels.map((level) => (
+                            <div
+                              key={level.level}
+                              style={{
+                                background: 'white',
+                                borderRadius: '0.25rem',
+                                border: '1px solid #d1d5db',
+                                borderLeft: `4px solid ${level.color}`,
+                                padding: '0.75rem'
+                              }}
+                            >
+                              <div style={{ fontWeight: '500', fontSize: '0.875rem', color: level.color }}>
+                                {level.name}
+                              </div>
+                              <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.5rem' }}>
+                                {criterion.levels[level.level]?.pointRange} pts
+                              </div>
+                              <div style={{ fontSize: '0.75rem', color: '#374151' }}>
+                                {renderFormattedContent(criterion.levels[level.level]?.description)}
                               </div>
                             </div>
                           ))}
                         </div>
                       </div>
                     )}
-                  </div>
 
-      {/* Video Links */}
-      <div style={{ marginBottom: '2rem' }}>
-        <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '1rem', color: '#374151' }}>
-          🎥 Video Links
-        </h3>
+                    {/* Custom Comments */}
+                    <div>
+                      <label style={{
+                        display: 'block',
+                        fontSize: '0.875rem',
+                        fontWeight: '500',
+                        color: '#374151',
+                        marginBottom: '0.5rem'
+                      }}>
+                        Additional Comments:
+                      </label>
+
+                      {/* Quick Feedback Dropdowns */}
+                      {criterion.feedbackLibrary && sessionActive && (
+                        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
+                          {Object.entries(criterion.feedbackLibrary).map(([category, comments]) => (
+                            <select
+                              key={category}
+                              onChange={(e) => {
+                                if (e.target.value) {
+                                  addCriterionFeedback(criterion.id, e.target.value);
+                                  e.target.value = '';
+                                }
+                              }}
+                              defaultValue=""
+                              style={{
+                                padding: '0.5rem',
+                                border: '1px solid #d1d5db',
+                                borderRadius: '0.25rem',
+                                fontSize: '0.75rem',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              <option value="">Add {category}...</option>
+                              {comments.map((comment, idx) => (
+                                <option key={idx} value={comment}>{renderFormattedContent(comment)}</option>
+                              ))}
+                            </select>
+                          ))}
+                        </div>
+                      )}
+
+                      <textarea
+                        value={currentGrading?.customComments || ''}
+                        onChange={(e) => updateRubricGrading(criterion.id, currentGrading?.selectedLevel, e.target.value)}
+                        disabled={!sessionActive}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '0.5rem',
+                          fontSize: '0.875rem',
+                          resize: 'none',
+                          minHeight: '80px',
+                          backgroundColor: sessionActive ? 'white' : '#f3f4f6',
+                          cursor: sessionActive ? 'text' : 'not-allowed'
+                        }}
+                        rows="3"
+                        placeholder="Add specific feedback for this criterion..."
+                      />
+                    </div>
+
+                    {/* Selected Level Feedback */}
+                    {currentGrading?.selectedLevel && (
+                      <div style={{
+                        marginTop: '0.75rem',
+                        padding: '0.75rem',
+                        background: '#eff6ff',
+                        borderRadius: '0.25rem',
+                        border: '1px solid #bfdbfe'
+                      }}>
+                        <div style={{ fontSize: '0.875rem' }}>
+                          <strong>Selected Level:</strong> {sharedRubric.rubricLevels.find(l => l.level === currentGrading.selectedLevel)?.name}
+                          {' '}({criterion.levels[currentGrading.selectedLevel]?.pointRange} pts)
+                        </div>
+                        <div style={{ fontSize: '0.875rem', color: '#374151', marginTop: '0.25rem' }}>
+                          {renderFormattedContent(criterion.levels[currentGrading.selectedLevel]?.description)}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Rubric Summary */}
+            <div style={{
+              marginTop: '1.5rem',
+              background: 'white',
+              border: '1px solid #d1d5db',
+              borderRadius: '0.5rem',
+              padding: '1rem'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <h4 style={{ fontSize: '1.125rem', fontWeight: '600', color: '#374151' }}>
+                    Rubric Score Summary
+                  </h4>
+                  <p style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                    Based on selected levels across all criteria
+                  </p>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#3b82f6' }}>
+                    {Math.round(scoreSummary.finalScore * 10) / 10}/{sharedRubric.assignmentInfo.totalPoints}
+                  </div>
+                  <div style={{ fontSize: '1.125rem', color: '#6b7280' }}>
+                    ({Math.round((scoreSummary.finalScore / (sharedRubric.assignmentInfo.totalPoints || 1)) * 1000) / 10}%)
+                  </div>
+                  {scoreSummary.penaltyApplied && (
+                    <div style={{ fontSize: '0.875rem', color: '#dc2626', marginTop: '0.25rem' }}>
+                      Raw: {Math.round(scoreSummary.rawScore * 10) / 10} (Late Penalty Applied)
+                    </div>
+                  )}
+                  <div style={{
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    color: (scoreSummary.finalScore / (sharedRubric.assignmentInfo.totalPoints || 1)) * 100 >= sharedRubric.assignmentInfo.passingThreshold
+                      ? '#16a34a' : '#dc2626'
+                  }}>
+                    {(scoreSummary.finalScore / (sharedRubric.assignmentInfo.totalPoints || 1)) * 100 >= sharedRubric.assignmentInfo.passingThreshold
+                      ? '✓ PASSING' : '✗ NEEDS IMPROVEMENT'}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Enhanced Complete and Grade Next Section */}
+        {sharedRubric && (gradingData.student?.name || currentStudent) && sessionActive && (
+          <div style={{
+            background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)',
+            border: '2px solid #10b981',
+            borderRadius: '0.75rem',
+            padding: '1.5rem',
+            marginBottom: '2rem',
+            textAlign: 'center'
+          }}>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#047857', marginBottom: '1rem' }}>
+              Ready to move to the next student?
+            </h3>
+            <p style={{ color: '#065f46', marginBottom: '1.5rem', fontSize: '0.875rem' }}>
+              Choose how to save the current grading before proceeding.
+            </p>
+
+            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+              {/* Save as Draft Button */}
+              <button
+                onClick={handleNextStudentAsDraft}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
+                  color: 'white',
+                  padding: '0.75rem 1.5rem',
+                  borderRadius: '0.5rem',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  boxShadow: '0 2px 8px rgba(251, 191, 36, 0.4)',
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseOver={(e) => {
+                  e.target.style.transform = 'translateY(-2px)';
+                  e.target.style.boxShadow = '0 4px 12px rgba(251, 191, 36, 0.5)';
+                }}
+                onMouseOut={(e) => {
+                  e.target.style.transform = 'translateY(0)';
+                  e.target.style.boxShadow = '0 2px 8px rgba(251, 191, 36, 0.4)';
+                }}
+              >
+                <span style={{ fontSize: '1.1rem' }}>📝</span>
+                Save & Grade Next Student
+              </button>
+
+              {/* Finalize & Grade Next Button */}
+              <button
+                onClick={handleNextStudentAsFinal}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  color: 'white',
+                  padding: '0.75rem 1.5rem',
+                  borderRadius: '0.5rem',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  boxShadow: '0 2px 8px rgba(16, 185, 129, 0.4)',
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseOver={(e) => {
+                  e.target.style.transform = 'translateY(-2px)';
+                  e.target.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.5)';
+                }}
+                onMouseOut={(e) => {
+                  e.target.style.transform = 'translateY(0)';
+                  e.target.style.boxShadow = '0 2px 8px rgba(16, 185, 129, 0.4)';
+                }}
+              >
+                <span style={{ fontSize: '1.1rem' }}>✅</span>
+                Finalize & Grade Next Student
+              </button>
+            </div>
+
+            <div style={{
+              marginTop: '1rem',
+              padding: '0.75rem',
+              background: 'rgba(255, 255, 255, 0.6)',
+              borderRadius: '0.375rem',
+              fontSize: '0.75rem',
+              color: '#065f46'
+            }}>
+              <strong>Draft:</strong> Save progress, can edit later • <strong>Finalize:</strong> Complete grading, ready for student/LMS
+            </div>
+          </div>
+        )}
+
+        {/* Score Summary */}
         <div style={{
-          background: 'linear-gradient(135deg, #fafaff 0%, #f3f4f6 100%)',
-          border: '1px solid #d1d5db',
+          textAlign: 'center',
+          background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+          border: '1px solid #bbf7d0',
           borderRadius: '0.75rem',
-          padding: '1.5rem'
+          padding: '1.5rem',
+          marginBottom: '2rem'
         }}>
-          <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
-            <input
-              type="url"
-              value={videoLinkInput}
-              onChange={(e) => setVideoLinkInput(e.target.value)}
-              placeholder="Enter video URL (YouTube, Vimeo, etc.)"
-              style={{
-                flex: 1,
-                padding: '0.75rem',
-                border: '1px solid #d1d5db',
-                borderRadius: '0.5rem',
-                fontSize: '0.875rem'
+          <h2 style={{ fontSize: '1.5rem', fontWeight: '700', color: '#15803d', marginBottom: '1rem' }}>
+            📊 Final Score
+          </h2>
+          <div style={{ fontSize: '3rem', fontWeight: '700', color: '#16a34a', marginBottom: '1rem' }}>
+            {Math.round(scoreSummary.finalScore * 10) / 10}
+            <span style={{ fontSize: '1.5rem', color: '#6b7280' }}>
+              / {sharedRubric ? sharedRubric.assignmentInfo.totalPoints : gradingData.assignment.maxPoints}
+            </span>
+          </div>
+          <div style={{ fontSize: '1.25rem', color: '#6b7280', marginBottom: '1rem' }}>
+            ({Math.round((scoreSummary.finalScore / (sharedRubric ? (sharedRubric.assignmentInfo.totalPoints || 1) : (gradingData.assignment.maxPoints || 1))) * 1000) / 10}%)
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+            {sharedRubric && (
+              <div style={{
+                fontSize: '0.875rem',
+                background: '#dcfce7',
+                color: '#15803d',
+                padding: '0.25rem 0.75rem',
+                borderRadius: '1rem'
+              }}>
+                📋 Rubric Assessment Active
+              </div>
+            )}
+            {scoreSummary.penaltyApplied && (
+              <div style={{
+                fontSize: '0.875rem',
+                background: '#fee2e2',
+                color: '#dc2626',
+                padding: '0.25rem 0.75rem',
+                borderRadius: '1rem'
+              }}>
+                ⏰ Late Penalty Applied
+              </div>
+            )}
+            {gradingSession && gradingSession.classListData?.students && (
+              <div style={{
+                fontSize: '0.875rem',
+                background: '#dbeafe',
+                color: '#2563eb',
+                padding: '0.25rem 0.75rem',
+                borderRadius: '1rem'
+              }}>
+                👥 Batch Session Active
+              </div>
+            )}
+            {!sessionActive && (
+              <div style={{
+                fontSize: '0.875rem',
+                background: '#fee2e2',
+                color: '#dc2626',
+                padding: '0.25rem 0.75rem',
+                borderRadius: '1rem'
+              }}>
+                ⚠️ Session Expired
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Save Draft Section */}
+        {currentStudent && (
+          <div style={{
+            background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+            border: '1px solid #f59e0b',
+            borderRadius: '0.75rem',
+            padding: '1.5rem',
+            marginBottom: '2rem',
+            textAlign: 'center'
+          }}>
+            <h3 style={{ fontSize: '1.125rem', fontWeight: '600', color: '#92400e', marginBottom: '0.75rem' }}>
+              💾 Save Your Progress
+            </h3>
+            <p style={{ color: '#a16207', marginBottom: '1.5rem', fontSize: '0.875rem' }}>
+              Saves your work on the current student without navigating away from the page.
+            </p>
+            <button
+              onClick={() => {
+                if (currentStudent?.id && sessionActive) {
+                  saveDraft(currentStudent.id, localGradingData);
+                  // Show success feedback
+                  const button = document.activeElement;
+                  const originalText = button.innerHTML;
+                  const originalBg = button.style.background;
+                  button.innerHTML = '<span style="display: flex; align-items: center; gap: 0.5rem;"><svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>Draft Saved!</span>';
+                  button.style.background = 'linear-gradient(135deg, #059669 0%, #047857 100%)';
+                  setTimeout(() => {
+                    button.innerHTML = originalText;
+                    button.style.background = originalBg;
+                  }, 2000);
+                } else if (!sessionActive) {
+                  alert('Session has expired. Cannot save data. Please refresh the page to start a new session.');
+                }
               }}
-            />
-            <input
-              type="text"
-              value={videoTitle}
-              onChange={(e) => setVideoTitle(e.target.value)}
-              placeholder="Video title (optional)"
+              disabled={!currentStudent?.id || !sessionActive}
               style={{
-                width: '200px',
-                padding: '0.75rem',
-                border: '1px solid #d1d5db',
-                borderRadius: '0.5rem',
-                fontSize: '0.875rem'
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.75rem',
+                background: (currentStudent?.id && sessionActive) ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' : '#9ca3af',
+                color: 'white',
+                padding: '1rem 2rem',
+                borderRadius: '0.75rem',
+                border: 'none',
+                cursor: (currentStudent?.id && sessionActive) ? 'pointer' : 'not-allowed',
+                fontSize: '1rem',
+                fontWeight: '600',
+                boxShadow: (currentStudent?.id && sessionActive) ? '0 4px 12px rgba(245, 158, 11, 0.4)' : 'none',
+                transform: 'translateY(0)',
+                transition: 'all 0.2s ease'
               }}
+              onMouseOver={(e) => {
+                if (currentStudent?.id && sessionActive) {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 8px 20px rgba(245, 158, 11, 0.5)';
+                }
+              }}
+              onMouseOut={(e) => {
+                if (currentStudent?.id && sessionActive) {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(245, 158, 11, 0.4)';
+                }
+              }}
+              title={
+                !currentStudent?.id ? 'No student selected to save' :
+                  !sessionActive ? 'Session expired - cannot save' :
+                    'Save current grading progress'
+              }
+            >
+              <Save size={20} />
+              Save Draft
+            </button>
+            {!currentStudent?.id && (
+              <p style={{ marginTop: '0.75rem', fontSize: '0.75rem', color: '#6b7280' }}>
+                Select a student from the Class Manager to enable draft saving
+              </p>
+            )}
+            {!sessionActive && (
+              <p style={{ marginTop: '0.75rem', fontSize: '0.75rem', color: '#dc2626' }}>
+                Session expired - refresh page to start new session
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* General Feedback Section */}
+        <div style={{ marginBottom: '2rem' }}>
+          <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '1rem', color: '#374151' }}>
+            📝 General Feedback
+          </h3>
+          <div style={{
+            background: 'linear-gradient(135deg, #fafaff 0%, #f3f4f6 100%)',
+            border: '1px solid #d1d5db',
+            borderRadius: '0.75rem',
+            padding: '1.5rem',
+            opacity: sessionActive ? 1 : 0.6
+          }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1.5rem' }}>
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  color: '#374151',
+                  marginBottom: '0.5rem'
+                }}>
+                  Overall Comments
+                </label>
+                <textarea
+                  value={gradingData.feedback.general}
+                  onChange={(e) => setGradingData(prevData => ({
+                    ...prevData,
+                    feedback: { ...prevData.feedback, general: e.target.value }
+                  }))}
+                  disabled={!sessionActive}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '0.5rem',
+                    fontSize: '0.875rem',
+                    resize: 'none',
+                    minHeight: '100px',
+                    backgroundColor: sessionActive ? 'white' : '#f3f4f6',
+                    cursor: sessionActive ? 'text' : 'not-allowed'
+                  }}
+                  rows="4"
+                  placeholder="General comments about the assignment..."
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    color: '#374151',
+                    marginBottom: '0.5rem'
+                  }}>
+                    Strengths
+                  </label>
+                  <textarea
+                    value={gradingData.feedback.strengths}
+                    onChange={(e) => setGradingData(prevData => ({
+                      ...prevData,
+                      feedback: { ...prevData.feedback, strengths: e.target.value }
+                    }))}
+                    disabled={!sessionActive}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '0.5rem',
+                      fontSize: '0.875rem',
+                      resize: 'none',
+                      minHeight: '100px',
+                      backgroundColor: sessionActive ? 'white' : '#f3f4f6',
+                      cursor: sessionActive ? 'text' : 'not-allowed'
+                    }}
+                    rows="4"
+                    placeholder="What the student did well..."
+                  />
+                </div>
+
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    color: '#374151',
+                    marginBottom: '0.5rem'
+                  }}>
+                    Areas for Improvement
+                  </label>
+                  <textarea
+                    value={gradingData.feedback.improvements}
+                    onChange={(e) => setGradingData(prevData => ({
+                      ...prevData,
+                      feedback: { ...prevData.feedback, improvements: e.target.value }
+                    }))}
+                    disabled={!sessionActive}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '0.5rem',
+                      fontSize: '0.875rem',
+                      resize: 'none',
+                      minHeight: '100px',
+                      backgroundColor: sessionActive ? 'white' : '#f3f4f6',
+                      cursor: sessionActive ? 'text' : 'not-allowed'
+                    }}
+                    rows="4"
+                    placeholder="Suggestions for improvement..."
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* File Attachments */}
+        <div style={{ marginBottom: '2rem' }}>
+          <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '1rem', color: '#374151' }}>
+            📎 File Attachments
+          </h3>
+          <div style={{
+            border: '2px dashed #d1d5db',
+            borderRadius: '0.5rem',
+            padding: '1.5rem',
+            textAlign: 'center',
+            opacity: sessionActive ? 1 : 0.6
+          }}>
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              onChange={handleFileUpload}
+              disabled={!sessionActive}
+              style={{ display: 'none' }}
             />
             <button
-              onClick={addVideoLink}
-              disabled={!videoLinkInput.trim()}
+              onClick={() => sessionActive && fileInputRef.current?.click()}
+              disabled={!sessionActive}
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: '0.5rem',
-                padding: '0.75rem 1rem',
-                background: videoLinkInput.trim() ? '#10b981' : '#d1d5db',
+                background: sessionActive ? '#3b82f6' : '#9ca3af',
                 color: 'white',
-                border: 'none',
+                padding: '0.75rem 1.5rem',
                 borderRadius: '0.5rem',
-                cursor: videoLinkInput.trim() ? 'pointer' : 'not-allowed',
-                fontSize: '0.875rem',
-                fontWeight: '600'
+                border: 'none',
+                cursor: sessionActive ? 'pointer' : 'not-allowed',
+                margin: '0 auto'
               }}
             >
-              <Video size={16} />
-              Add
+              <Plus size={20} />
+              Add Files
             </button>
+            <p style={{ color: '#6b7280', marginTop: '0.5rem', fontSize: '0.875rem' }}>
+              Upload images, documents, or other files relevant to the assignment
+              {!sessionActive && ' (Session expired - refresh to enable)'}
+            </p>
           </div>
 
-          {gradingData.videoLinks.length > 0 && (
-            <div>
-              <h4 style={{ fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.5rem', color: '#374151' }}>
-                Video Links:
+          {gradingData.attachments.length > 0 && (
+            <div style={{ marginTop: '1rem' }}>
+              <h4 style={{ fontWeight: '600', color: '#374151', marginBottom: '0.75rem' }}>
+                Uploaded Files ({gradingData.attachments.length})
               </h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                {gradingData.videoLinks.map((link) => (
-                  <div
-                    key={link.id}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                      padding: '0.75rem',
-                      background: '#ffffff',
-                      border: '1px solid #e5e7eb',
-                      borderRadius: '0.5rem'
-                    }}
-                  >
-                    <Video size={16} style={{ color: '#6b7280' }} />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: '500', fontSize: '0.875rem', color: '#374151' }}>
-                        {link.title}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+                gap: '1rem'
+              }}>
+                {gradingData.attachments.map((file) => (
+                  <div key={file.id} style={{
+                    border: '1px solid #d1d5db',
+                    borderRadius: '0.5rem',
+                    overflow: 'hidden',
+                    background: 'white'
+                  }}>
+                    {file.type.startsWith('image/') ? (
+                      <div style={{ position: 'relative' }}>
+                        <img
+                          src={file.base64Data || URL.createObjectURL(file.file)}
+                          alt={file.name}
+                          style={{
+                            width: '100%',
+                            height: '150px',
+                            objectFit: 'cover'
+                          }}
+                        />
+                        <button
+                          onClick={() => removeAttachment(file.id)}
+                          disabled={!sessionActive}
+                          style={{
+                            position: 'absolute',
+                            top: '0.5rem',
+                            right: '0.5rem',
+                            background: sessionActive ? '#dc2626' : '#9ca3af',
+                            color: 'white',
+                            borderRadius: '50%',
+                            width: '24px',
+                            height: '24px',
+                            border: 'none',
+                            cursor: sessionActive ? 'pointer' : 'not-allowed',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}
+                        >
+                          <X size={12} />
+                        </button>
                       </div>
-                      <a
-                        href={link.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{
-                          fontSize: '0.75rem',
-                          color: '#3b82f6',
-                          textDecoration: 'none'
-                        }}
-                      >
-                        {link.url}
-                      </a>
+                    ) : (
+                      <div style={{ padding: '1rem' }}>
+                        <FileText size={40} style={{ color: '#6b7280', margin: '0 auto 0.5rem auto', display: 'block' }} />
+                      </div>
+                    )}
+                    <div style={{ padding: '0.75rem' }}>
+                      <p style={{ fontWeight: '500', fontSize: '0.875rem', marginBottom: '0.25rem' }}>
+                        {file.name}
+                      </p>
+                      <p style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                        {(file.size / 1024).toFixed(1)} KB
+                      </p>
+                      {!file.type.startsWith('image/') && (
+                        <button
+                          onClick={() => removeAttachment(file.id)}
+                          disabled={!sessionActive}
+                          style={{
+                            marginTop: '0.5rem',
+                            color: sessionActive ? '#dc2626' : '#9ca3af',
+                            background: 'none',
+                            border: 'none',
+                            fontSize: '0.75rem',
+                            cursor: sessionActive ? 'pointer' : 'not-allowed'
+                          }}
+                        >
+                          Remove
+                        </button>
+                      )}
                     </div>
-                    <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>
-                      {link.addedDate}
-                    </span>
-                    <button
-                      onClick={() => removeVideoLink(link.id)}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        color: '#ef4444',
-                        cursor: 'pointer',
-                        padding: '0.25rem'
-                      }}
-                    >
-                      <X size={16} />
-                    </button>
                   </div>
                 ))}
               </div>
             </div>
           )}
         </div>
+
+        {/* Video Links */}
+        <div style={{ marginBottom: '2rem' }}>
+          <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '1rem', color: '#374151' }}>
+            🎥 Video Links
+          </h3>
+          <div style={{
+            background: 'linear-gradient(135deg, #fafaff 0%, #f3f4f6 100%)',
+            border: '1px solid #d1d5db',
+            borderRadius: '0.75rem',
+            padding: '1.5rem',
+            opacity: sessionActive ? 1 : 0.6
+          }}>
+            <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
+              <input
+                type="url"
+                value={videoLinkInput}
+                onChange={(e) => setVideoLinkInput(e.target.value)}
+                disabled={!sessionActive}
+                placeholder="Enter video URL (YouTube, Vimeo, etc.)"
+                style={{
+                  flex: 1,
+                  padding: '0.75rem',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '0.5rem',
+                  fontSize: '0.875rem',
+                  backgroundColor: sessionActive ? 'white' : '#f3f4f6',
+                  cursor: sessionActive ? 'text' : 'not-allowed'
+                }}
+              />
+              <input
+                type="text"
+                value={videoTitle}
+                onChange={(e) => setVideoTitle(e.target.value)}
+                disabled={!sessionActive}
+                placeholder="Video title (optional)"
+                style={{
+                  width: '200px',
+                  padding: '0.75rem',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '0.5rem',
+                  fontSize: '0.875rem',
+                  backgroundColor: sessionActive ? 'white' : '#f3f4f6',
+                  cursor: sessionActive ? 'text' : 'not-allowed'
+                }}
+              />
+              <button
+                onClick={addVideoLink}
+                disabled={!videoLinkInput.trim() || !sessionActive}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  padding: '0.75rem 1rem',
+                  background: (videoLinkInput.trim() && sessionActive) ? '#10b981' : '#d1d5db',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '0.5rem',
+                  cursor: (videoLinkInput.trim() && sessionActive) ? 'pointer' : 'not-allowed',
+                  fontSize: '0.875rem',
+                  fontWeight: '600'
+                }}
+              >
+                <Video size={16} />
+                Add
+              </button>
+            </div>
+
+            {gradingData.videoLinks.length > 0 && (
+              <div>
+                <h4 style={{ fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.5rem', color: '#374151' }}>
+                  Video Links:
+                </h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  {gradingData.videoLinks.map((link) => (
+                    <div
+                      key={link.id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        padding: '0.75rem',
+                        background: '#ffffff',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '0.5rem'
+                      }}
+                    >
+                      <Video size={16} style={{ color: '#6b7280' }} />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: '500', fontSize: '0.875rem', color: '#374151' }}>
+                          {link.title}
+                        </div>
+                        <a
+                          href={link.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            fontSize: '0.75rem',
+                            color: '#3b82f6',
+                            textDecoration: 'none'
+                          }}
+                        >
+                          {link.url}
+                        </a>
+                      </div>
+                      <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                        {link.addedDate}
+                      </span>
+                      <button
+                        onClick={() => removeVideoLink(link.id)}
+                        disabled={!sessionActive}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: sessionActive ? '#ef4444' : '#9ca3af',
+                          cursor: sessionActive ? 'pointer' : 'not-allowed',
+                          padding: '0.25rem'
+                        }}
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 
