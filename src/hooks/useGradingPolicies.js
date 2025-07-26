@@ -48,6 +48,42 @@ export const usePolicyValidation = () => {
     });
 };
 
+// Hook to create a new policy
+export const useCreatePolicy = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (policyData) => gradingPolicyService.createPolicy(policyData),
+        onSuccess: () => {
+            // When a new policy is created, refetch the list of all policies
+            queryClient.invalidateQueries({ queryKey: gradingPolicyKeys.lists() });
+        },
+    });
+};
+
+// Hook to update a policy
+export const useUpdatePolicy = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ policyId, policyData }) => gradingPolicyService.updatePolicy(policyId, policyData),
+        onSuccess: () => {
+            // When a policy is updated, refetch the list of all policies
+            queryClient.invalidateQueries({ queryKey: gradingPolicyKeys.lists() });
+        },
+    });
+};
+
+// Hook to delete a policy
+export const useDeletePolicy = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (policyId) => gradingPolicyService.deletePolicy(policyId),
+        onSuccess: () => {
+            // When a policy is deleted, refetch the list of all policies
+            queryClient.invalidateQueries({ queryKey: gradingPolicyKeys.lists() });
+        },
+    });
+};
+
 // Custom hook for managing policy state in components
 export const useGradingPolicyManager = () => {
     const queryClient = useQueryClient();

@@ -23,13 +23,224 @@ import {
     Percent
 } from 'lucide-react';
 import gradingPolicyService from '../services/gradingPolicyService';
-import { useGradingPolicies, useGradeCalculation } from '../hooks/useGradingPolicies';
+import {
+    useGradingPolicies,
+    useGradeCalculation,
+    useCreatePolicy,
+    useUpdatePolicy,
+    useDeletePolicy
+} from '../hooks/useGradingPolicies';
 import { useAssessment, DEFAULT_LATE_POLICY } from './SharedContext';
 
+// PolicyForm component for creating and editing grading policies
+const PolicyForm = ({ policy, onSave, onCancel }) => {
+    const [formData, setFormData] = useState(policy);
+    const supportedProgramTypes = gradingPolicyService.getSupportedProgramTypes();
+
+    const handleInputChange = (field, value) => {
+        setFormData(prev => ({ ...prev, [field]: value }));
+    };
+
+    const handleProgramTypeChange = (programType, isChecked) => {
+        setFormData(prev => ({
+            ...prev,
+            programTypes: isChecked
+                ? [...prev.programTypes, programType]
+                : prev.programTypes.filter(type => type !== programType)
+        }));
+    };
+
+    const handleGradeScaleChange = (index, field, value) => {
+        const newGradeScale = [...formData.gradeScale];
+        newGradeScale[index] = { ...newGradeScale[index], [field]: value };
+        setFormData(prev => ({ ...prev, gradeScale: newGradeScale }));
+    };
+
+    const addGradeScaleRow = () => {
+        setFormData(prev => ({
+            ...prev,
+            gradeScale: [...prev.gradeScale, { letter: '', gpa: 0, minPercentage: 0, maxPercentage: 0, passingGrade: false }]
+        }));
+    };
+
+    const removeGradeScaleRow = (index) => {
+        setFormData(prev => ({
+            ...prev,
+            gradeScale: formData.gradeScale.filter((_, i) => i !== index)
+        }));
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-lg max-w-4xl w-full p-6 overflow-y-auto max-h-[90vh]">
+                <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-xl font-bold">{formData.id ? 'Edit' : 'Create'} Grading Policy</h2>
+                    <button onClick={onCancel} className="text-gray-500 hover:text-gray-700"><X size={20} /></button>
+                </div>
+
+                <div className="space-y-6">
+                    <div className="grid md:grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Policy Name</label>
+                            <input
+                                type="text"
+                                value={formData.name || ''}
+                                onChange={(e) => handleInputChange('name', e.target.value)}
+                                className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                placeholder="e.g., University Degree Standard 2025"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                            <div className="flex items-center space-x-4">
+                                <label className="flex items-center">
+                                    <input
+                                        type="checkbox"
+                                        checked={formData.isActive || false}
+                                        onChange={(e) => handleInputChange('isActive', e.target.checked)}
+                                        className="mr-2"
+                                    />
+                                    <span className="text-sm">Active</span>
+                                </label>
+                                <label className="flex items-center">
+                                    <input
+                                        type="checkbox"
+                                        checked={formData.isDefault || false}
+                                        onChange={(e) => handleInputChange('isDefault', e.target.checked)}
+                                        className="mr-2"
+                                    />
+                                    <span className="text-sm">Default Policy</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                        <textarea
+                            value={formData.description || ''}
+                            onChange={(e) => handleInputChange('description', e.target.value)}
+                            className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            rows="2"
+                            placeholder="A brief description of this policy"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Program Types</label>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                            {supportedProgramTypes.map(programType => (
+                                <label key={programType.value} className="flex items-center">
+                                    <input
+                                        type="checkbox"
+                                        checked={formData.programTypes?.includes(programType.value) || false}
+                                        onChange={(e) => handleProgramTypeChange(programType.value, e.target.checked)}
+                                        className="mr-2"
+                                    />
+                                    <span className="text-sm">{programType.label}</span>
+                                </label>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div>
+                        <div className="flex justify-between items-center mb-3">
+                            <h3 className="text-md font-medium text-gray-800">Grade Scale</h3>
+                            <button
+                                onClick={addGradeScaleRow}
+                                className="text-sm text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-1"
+                            >
+                                <Plus size={14} />Add Grade Row
+                            </button>
+                        </div>
+                        <div className="space-y-2">
+                            <div className="grid grid-cols-6 gap-2 text-xs font-medium text-gray-600 mb-2">
+                                <div>Letter</div>
+                                <div>Min %</div>
+                                <div>Max %</div>
+                                <div>GPA</div>
+                                <div>Passing</div>
+                                <div>Action</div>
+                            </div>
+                            {formData.gradeScale?.map((grade, index) => (
+                                <div key={index} className="grid grid-cols-6 gap-2 items-center">
+                                    <input
+                                        type="text"
+                                        placeholder="A+"
+                                        value={grade.letter || ''}
+                                        onChange={e => handleGradeScaleChange(index, 'letter', e.target.value)}
+                                        className="p-2 border rounded text-sm focus:ring-1 focus:ring-blue-500"
+                                    />
+                                    <input
+                                        type="number"
+                                        placeholder="Min %"
+                                        value={grade.minPercentage || ''}
+                                        onChange={e => handleGradeScaleChange(index, 'minPercentage', parseFloat(e.target.value) || 0)}
+                                        className="p-2 border rounded text-sm focus:ring-1 focus:ring-blue-500"
+                                    />
+                                    <input
+                                        type="number"
+                                        placeholder="Max %"
+                                        value={grade.maxPercentage || ''}
+                                        onChange={e => handleGradeScaleChange(index, 'maxPercentage', parseFloat(e.target.value) || 0)}
+                                        className="p-2 border rounded text-sm focus:ring-1 focus:ring-blue-500"
+                                    />
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        placeholder="GPA"
+                                        value={grade.gpa || ''}
+                                        onChange={e => handleGradeScaleChange(index, 'gpa', parseFloat(e.target.value) || 0)}
+                                        className="p-2 border rounded text-sm focus:ring-1 focus:ring-blue-500"
+                                    />
+                                    <label className="flex items-center justify-center">
+                                        <input
+                                            type="checkbox"
+                                            checked={grade.passingGrade || false}
+                                            onChange={e => handleGradeScaleChange(index, 'passingGrade', e.target.checked)}
+                                            className="w-4 h-4"
+                                        />
+                                    </label>
+                                    <button
+                                        onClick={() => removeGradeScaleRow(index)}
+                                        className="text-red-500 hover:text-red-700 flex justify-center"
+                                        disabled={formData.gradeScale?.length <= 1}
+                                    >
+                                        <Trash2 size={16} />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+
+                <div className="flex gap-3 mt-6">
+                    <button
+                        onClick={() => onSave(formData)}
+                        className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2"
+                    >
+                        <Save size={16} />Save Policy
+                    </button>
+                    <button
+                        onClick={onCancel}
+                        className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                    >
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const GradingPolicyManager = () => {
-    // Use TanStack Query hooks instead of manual state
+    // Use TanStack Query hooks
     const { data: policies = [], isLoading: loading } = useGradingPolicies();
     const gradeCalculation = useGradeCalculation();
+    const createPolicyMutation = useCreatePolicy();
+    const updatePolicyMutation = useUpdatePolicy();
+    const deletePolicyMutation = useDeletePolicy();
+
     const {
         currentLatePolicy,
         setCurrentLatePolicy,
@@ -63,6 +274,41 @@ const GradingPolicyManager = () => {
     useEffect(() => {
         loadLatePoliciesFromStorage();
     }, [loadLatePoliciesFromStorage]);
+
+    const handleSavePolicy = async (policyData) => {
+        try {
+            if (editingPolicy?.id) {
+                // Update existing policy
+                await updatePolicyMutation.mutateAsync({
+                    policyId: editingPolicy.id,
+                    policyData
+                });
+            } else {
+                // Create new policy
+                await createPolicyMutation.mutateAsync(policyData);
+            }
+
+            setShowCreateForm(false);
+            setEditingPolicy(null);
+        } catch (error) {
+            console.error('Error saving policy:', error);
+            alert('Error saving policy. Please try again.');
+        }
+    };
+
+    const handleDeletePolicy = async (policyId) => {
+        if (window.confirm('Are you sure you want to delete this policy?')) {
+            try {
+                await deletePolicyMutation.mutateAsync(policyId);
+                if (selectedPolicy?.id === policyId) {
+                    setSelectedPolicy(null);
+                }
+            } catch (error) {
+                console.error('Error deleting policy:', error);
+                alert('Error deleting policy. Please try again.');
+            }
+        }
+    };
 
     const testGradeCalculation = async () => {
         if (!testGrade || !selectedPolicy) return;
@@ -155,6 +401,15 @@ const GradingPolicyManager = () => {
                         >
                             <Download size={16} />
                         </button>
+                        {!policy.isDefault && (
+                            <button
+                                onClick={() => handleDeletePolicy(policy.id)}
+                                className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                                title="Delete Policy"
+                            >
+                                <Trash2 size={16} />
+                            </button>
+                        )}
                     </div>
                 </div>
 
@@ -171,7 +426,7 @@ const GradingPolicyManager = () => {
                                         </span>
                                     </div>
                                     <span className="text-sm font-medium">
-                                        GPA: {grade.gpaPoints}
+                                        GPA: {grade.gpa}
                                     </span>
                                 </div>
                             ))}
@@ -327,8 +582,8 @@ const GradingPolicyManager = () => {
                         <div
                             key={policy.id}
                             className={`p-4 border rounded-lg cursor-pointer transition-all ${currentLatePolicy?.id === policy.id
-                                    ? 'border-orange-500 bg-orange-50 shadow-md'
-                                    : 'border-gray-200 hover:border-gray-300 hover:shadow-sm'
+                                ? 'border-orange-500 bg-orange-50 shadow-md'
+                                : 'border-gray-200 hover:border-gray-300 hover:shadow-sm'
                                 }`}
                             onClick={() => setCurrentLatePolicy(policy)}
                         >
@@ -952,6 +1207,17 @@ const GradingPolicyManager = () => {
         );
     };
 
+    const newPolicyTemplate = {
+        name: '',
+        description: '',
+        programTypes: [],
+        gradeScale: [
+            { letter: 'A+', gpa: 4.0, minPercentage: 90, maxPercentage: 100, passingGrade: true }
+        ],
+        isActive: true,
+        isDefault: false
+    };
+
     if (loading) {
         return (
             <div className="flex items-center justify-center h-64">
@@ -985,8 +1251,8 @@ const GradingPolicyManager = () => {
                     <button
                         onClick={() => setActiveMainTab('policies')}
                         className={`px-6 py-3 font-medium text-sm border-b-2 transition-all ${activeMainTab === 'policies'
-                                ? 'border-blue-500 text-blue-600'
-                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                            ? 'border-blue-500 text-blue-600'
+                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                             }`}
                     >
                         <div className="flex items-center gap-2">
@@ -997,8 +1263,8 @@ const GradingPolicyManager = () => {
                     <button
                         onClick={() => setActiveMainTab('calculators')}
                         className={`px-6 py-3 font-medium text-sm border-b-2 transition-all ${activeMainTab === 'calculators'
-                                ? 'border-blue-500 text-blue-600'
-                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                            ? 'border-blue-500 text-blue-600'
+                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                             }`}
                     >
                         <div className="flex items-center gap-2">
@@ -1008,6 +1274,18 @@ const GradingPolicyManager = () => {
                     </button>
                 </div>
             </div>
+
+            {/* Policy Form Modal */}
+            {(showCreateForm || editingPolicy) && (
+                <PolicyForm
+                    policy={editingPolicy || newPolicyTemplate}
+                    onSave={handleSavePolicy}
+                    onCancel={() => {
+                        setShowCreateForm(false);
+                        setEditingPolicy(null);
+                    }}
+                />
+            )}
 
             {/* Content based on active tab */}
             {activeMainTab === 'policies' ? (

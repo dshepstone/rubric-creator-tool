@@ -31,52 +31,7 @@ const HelpPage = () => {
         setActiveTab(tabId);
     };
 
-    // Enhanced search with category filtering
-    const searchResults = useMemo(() => {
-        if (!searchQuery.trim()) return [];
-
-        const query = searchQuery.toLowerCase();
-        const results = [];
-
-        helpSections.forEach(section => {
-            // Search in section title and description
-            if (section.title.toLowerCase().includes(query) ||
-                section.content.description?.toLowerCase().includes(query)) {
-                results.push({
-                    type: 'section',
-                    section: section,
-                    matches: [section.title]
-                });
-            }
-
-            // Search in subsections and content
-            Object.entries(section.content).forEach(([key, value]) => {
-                if (typeof value === 'string' && value.toLowerCase().includes(query)) {
-                    results.push({
-                        type: 'content',
-                        section: section,
-                        contentKey: key,
-                        matches: [key]
-                    });
-                }
-
-                if (Array.isArray(value)) {
-                    value.forEach((item, index) => {
-                        if (typeof item === 'object' && item.title?.toLowerCase().includes(query)) {
-                            results.push({
-                                type: 'item',
-                                section: section,
-                                item: item,
-                                itemIndex: index
-                            });
-                        }
-                    });
-                }
-            });
-        });
-
-        return results;
-    }, [searchQuery]);
+   
 
     // Component definitions
     const QuickActionButton = ({ icon: Icon, title, description, onClick, color = 'blue' }) => (
@@ -265,66 +220,6 @@ const HelpPage = () => {
                     'Automatic data sharing with AI Rubric Generator',
                     'Responsive design for all device types'
                 ],
-                quickStart: [
-                    {
-                        title: 'Enter Course Information',
-                        description: 'Provide basic course details and context',
-                        example: 'Course Code: COMP-2100\nCourse Name: Advanced Database Systems\nInstructor: Dr. Sarah Chen\nTerm: Winter 2024\nProgram: Computer Science Diploma',
-                        tip: 'This information will be automatically shared with other tools'
-                    },
-                    {
-                        title: 'Define Assignment Details',
-                        description: 'Specify assignment type, title, and weight',
-                        example: 'Assignment Type: Database Design Project\nTitle: E-Commerce Database Implementation\nWeight: 25% of final grade\nDue Date: March 15, 2024',
-                        tip: 'Weight percentage is used for policy calculations in grading'
-                    },
-                    {
-                        title: 'Map Course Learning Objectives',
-                        description: 'Connect assignment to specific CLOs',
-                        example: 'CLO 1: Design normalized database schemas (Primary)\nCLO 3: Implement complex SQL queries (Secondary)\nCLO 5: Document technical decisions (Supporting)',
-                        tip: 'Primary CLOs drive rubric criteria generation'
-                    },
-                    {
-                        title: 'Specify Submission Requirements',
-                        description: 'Detail what students must submit',
-                        example: 'Required Files:\n• database_schema.sql (DDL statements)\n• sample_data.sql (INSERT statements)\n• queries.sql (Required queries)\n• documentation.pdf (Design decisions)',
-                        tip: 'Clear requirements reduce student confusion and grading time'
-                    },
-                    {
-                        title: 'Generate HTML Output',
-                        description: 'Create professional assignment page',
-                        example: 'Professional Layout:\n• Course header with metadata\n• Clear learning objectives\n• Detailed requirements\n• Submission instructions\n• Grading criteria preview',
-                        tip: 'HTML can be uploaded directly to your LMS'
-                    }
-                ],
-                htmlPreview: `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>COMP-2100: Database Design Project</title>
-    <style>
-        body { font-family: 'Segoe UI', sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
-        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 8px; }
-        .course-info { background: #f8f9fa; padding: 15px; border-radius: 6px; margin: 20px 0; }
-        .requirements { background: #e8f5e8; border-left: 4px solid #28a745; padding: 15px; }
-        @media print { body { font-size: 12pt; } .no-print { display: none; } }
-    </style>
-</head>
-<body>
-    <div class="header">
-        <h1>Database Design Project</h1>
-        <p>COMP-2100: Advanced Database Systems | Dr. Sarah Chen | Winter 2024</p>
-    </div>
-    
-    <div class="course-info">
-        <h2>Assignment Overview</h2>
-        <p><strong>Weight:</strong> 25% of final grade</p>
-        <p><strong>Due Date:</strong> March 15, 2024, 11:59 PM</p>
-    </div>
-    
-    <!-- Additional content sections... -->
-</body>
-</html>`
             }
         },
         {
@@ -343,120 +238,6 @@ const HelpPage = () => {
                     'JSON output format specification',
                     'Context-aware prompt customization'
                 ],
-                promptStructure: `
-┌─────────────────────────────────────────────────────────────┐
-│                     AI PROMPT STRUCTURE                     │
-├─────────────────────────────────────────────────────────────┤
-│ 1. CONTEXT SETTING                                          │
-│    • Assignment type and educational level                  │
-│    • Subject area and learning objectives                   │
-│    • Institutional requirements                             │
-├─────────────────────────────────────────────────────────────┤
-│ 2. RUBRIC SPECIFICATIONS                                    │
-│    • 7-level assessment system (0x to 1.0x multipliers)    │
-│    • Criteria count and focus areas                        │
-│    • Point distribution and weight percentages             │
-├─────────────────────────────────────────────────────────────┤
-│ 3. OUTPUT FORMAT                                            │
-│    • Complete JSON structure specification                  │
-│    • Required fields and data types                        │
-│    • Example format with placeholders                      │
-├─────────────────────────────────────────────────────────────┤
-│ 4. QUALITY GUIDELINES                                       │
-│    • Observable, measurable criteria                       │
-│    • Progressive difficulty across levels                  │
-│    • Professional language standards                       │
-└─────────────────────────────────────────────────────────────┘`,
-                workflowSteps: [
-                    {
-                        title: 'Import or Enter Assignment Data',
-                        description: 'Start with assignment information from previous step or enter manually',
-                        example: 'Import from Assignment Generator:\n✓ Course: COMP-2100 Advanced Database Systems\n✓ Assignment: Database Design Project\n✓ CLOs: Design schemas, implement queries\n✓ Weight: 25%',
-                        tip: 'Importing ensures consistency across your assessment materials'
-                    },
-                    {
-                        title: 'Configure Criteria Generation',
-                        description: 'Choose between AI-suggested criteria or provide your own',
-                        example: 'AI-Suggested (Recommended):\n• System analyzes CLOs and assignment type\n• Suggests optimal criteria count (3-6)\n• Balances technical and soft skills\n\nUser-Provided:\n• Database Schema Design\n• SQL Query Implementation\n• Data Integrity & Constraints\n• Documentation Quality',
-                        tip: 'AI-suggested often produces more balanced rubrics for complex assignments'
-                    },
-                    {
-                        title: 'Customize Assessment Parameters',
-                        description: 'Set point totals, criteria count, and special considerations',
-                        example: 'Configuration:\n• Total Points: 100\n• Criteria Count: 5\n• Special Focus: Database normalization\n• Assessment Level: College diploma program',
-                        tip: 'Match point totals to your gradebook system for easier integration'
-                    },
-                    {
-                        title: 'Generate and Copy AI Prompt',
-                        description: 'System creates optimized prompt for AI consumption',
-                        example: 'Generated prompt includes:\n• Full context about assignment\n• Specific rubric requirements\n• JSON output format specification\n• Quality guidelines for AI',
-                        tip: 'Copy the entire prompt - missing sections reduce AI output quality'
-                    },
-                    {
-                        title: 'Use with AI Service',
-                        description: 'Paste prompt into ChatGPT, Claude, or similar service',
-                        example: 'AI Workflow:\n1. Paste complete prompt into AI chat\n2. Review generated rubric for quality\n3. Request refinements if needed\n4. Copy final JSON output\n5. Save as .json file for import',
-                        tip: 'Don\'t accept first output - iterate for best results'
-                    }
-                ],
-                promptExample: `Create a comprehensive educational rubric for the following assignment:
-
-**Assignment Type:** Database Design Project
-**Course Level:** College Diploma Program
-**Subject Area:** Computer Science - Database Systems
-**Assignment Description:** Students will design and implement a normalized database schema for an e-commerce system, including complex queries and constraints.
-
-**Criteria Generation:**
-Please suggest 5 appropriate criteria for this Computer Science assignment. Base your suggestions on best practices for Database Design Project assessment and the specified learning context.
-
-**Specific Requirements:**
-- Total Points: 100 points
-- Weight: 25% of Final Grade
-- Number of Criteria: 5 main criteria
-- Assessment Levels: Use this 7-level system:
-  1. Incomplete (0x multiplier)
-  2. Unacceptable (0.4x multiplier) 
-  3. Developing (0.6x multiplier)
-  4. Acceptable - PASS (0.75x multiplier)
-  5. Proficient (0.85x multiplier)
-  6. Accomplished (0.95x multiplier)
-  7. Exceptional (1.0x multiplier)
-
-**Output Format Required:**
-Please provide the output as a complete JSON file matching this exact structure:
-
-\`\`\`json
-{
-  "assignmentInfo": {
-    "title": "Database Design Project",
-    "description": "Students will design and implement...",
-    "weight": 25,
-    "totalPoints": 100,
-    "passingThreshold": 65,
-    "dueDate": "2025-04-15",
-    "courseCode": "COMP-2100",
-    "instructor": "Dr. Sarah Chen"
-  },
-  "rubricLevels": [
-    // 7-level system as specified above
-  ],
-  "criteria": [
-    {
-      "id": "criterion1",
-      "name": "Database Schema Design",
-      "description": "Quality of ERD, normalization, relationships",
-      "maxPoints": 30,
-      "levelDescriptions": {
-        "incomplete": "No schema submitted or completely unusable",
-        // ... descriptions for each level
-      }
-    }
-    // ... additional criteria
-  ]
-}
-\`\`\`
-
-Please ensure each criterion has detailed, observable descriptions for all 7 levels.`
             }
         },
         {
@@ -477,69 +258,6 @@ Please ensure each criterion has detailed, observable descriptions for all 7 lev
                     'Preview mode for student-facing display',
                     'Import capability for AI-generated rubrics'
                 ],
-                levelSystem: `
-┌─────────────────────────────────────────────────────────────┐
-│                  7-LEVEL ASSESSMENT SYSTEM                 │
-├─────────────────────────────────────────────────────────────┤
-│ Level 7: EXCEPTIONAL    │ 1.00x │ 100% │ Exceeds all      │
-│                         │       │      │ expectations     │
-├─────────────────────────────────────────────────────────────┤
-│ Level 6: ACCOMPLISHED   │ 0.95x │  95% │ High quality     │
-│                         │       │      │ work             │
-├─────────────────────────────────────────────────────────────┤
-│ Level 5: PROFICIENT     │ 0.85x │  85% │ Solid work       │
-│                         │       │      │ above average    │
-├─────────────────────────────────────────────────────────────┤
-│ Level 4: ACCEPTABLE     │ 0.75x │  75% │ MINIMUM PASS     │
-│                         │       │      │ Meets requirements│
-├─────────────────────────────────────────────────────────────┤
-│ Level 3: DEVELOPING     │ 0.60x │  60% │ Below standard   │
-│                         │       │      │ but improving    │
-├─────────────────────────────────────────────────────────────┤
-│ Level 2: UNACCEPTABLE   │ 0.40x │  40% │ Major problems   │
-│                         │       │      │ need addressing  │
-├─────────────────────────────────────────────────────────────┤
-│ Level 1: INCOMPLETE     │ 0.00x │   0% │ Not submitted    │
-│                         │       │      │ or unusable      │
-└─────────────────────────────────────────────────────────────┘`,
-                creationWorkflow: [
-                    {
-                        title: 'Initialize Assignment Information',
-                        description: 'Start with basic assignment metadata and parameters',
-                        example: 'Assignment Setup:\nTitle: Database Design Project\nDescription: Students create normalized schemas...\nTotal Points: 100\nPassing Threshold: 65%\nDue Date: March 15, 2024',
-                        tip: 'Import from Assignment Generator to maintain consistency'
-                    },
-                    {
-                        title: 'Add and Configure Criteria',
-                        description: 'Create assessment criteria with appropriate point weights',
-                        example: 'Sample Criteria:\n• Database Schema Design (30 points - 30%)\n• SQL Implementation (25 points - 25%)\n• Data Integrity (20 points - 20%)\n• Documentation (15 points - 15%)\n• Code Quality (10 points - 10%)\n\nTotal: 100 points (100%)',
-                        tip: 'Ensure weights total 100% - system will validate automatically'
-                    },
-                    {
-                        title: 'Write Level Descriptions',
-                        description: 'Create detailed, observable descriptions for each performance level',
-                        example: 'Criterion: Database Schema Design\n\nEXCEPTIONAL (100%):\nDemonstrates exceptional database design with advanced normalization (3NF+), optimal indexing strategies, sophisticated relationship management, and comprehensive constraint implementation. Schema shows deep understanding of performance optimization and industry best practices.\n\nACCOMPLISHED (95%):\nShows strong database design with proper normalization, appropriate indexing, clear relationships, and effective constraints. Demonstrates solid understanding of design principles with minor optimization opportunities.\n\n[Continue for all 7 levels...]',
-                        tip: 'Use specific, measurable language - avoid subjective terms like "good" or "poor"'
-                    },
-                    {
-                        title: 'Build Feedback Libraries',
-                        description: 'Create reusable comment banks for efficient grading',
-                        example: 'Feedback Library Examples:\n\nPositive Comments:\n• "Excellent use of foreign key constraints"\n• "Impressive query optimization techniques"\n• "Clear, professional documentation style"\n\nImprovement Areas:\n• "Consider adding indexes for performance"\n• "Review normalization rules for this table"\n• "Add comments to explain complex queries"\n\nNeutral Observations:\n• "Schema meets functional requirements"\n• "Queries return correct results"\n• "Documentation follows required format"',
-                        tip: 'Organize feedback by criterion and performance level for quick access'
-                    },
-                    {
-                        title: 'Test and Preview',
-                        description: 'Use preview features to verify rubric appearance and calculations',
-                        example: 'Testing Checklist:\n✓ All criteria weights total 100%\n✓ Point calculations work correctly\n✓ Level descriptions are clear and distinct\n✓ Student-facing preview looks professional\n✓ Feedback libraries are complete\n✓ Export formats work properly',
-                        tip: 'Test with sample grades to ensure calculations are accurate'
-                    },
-                    {
-                        title: 'Export and Distribute',
-                        description: 'Generate rubric in appropriate formats for different uses',
-                        example: 'Export Options:\n• JSON: For GradingPilot grading tool\n• HTML: For student distribution and LMS\n• PDF: For printing and official records\n• Preview: For real-time student viewing',
-                        tip: 'Export HTML version early to share with students - transparency improves learning'
-                    }
-                ]
             }
         },
         {
@@ -560,83 +278,6 @@ Please ensure each criterion has detailed, observable descriptions for all 7 lev
                     'Comprehensive privacy protection',
                     'Export capabilities for record keeping'
                 ],
-                privacyArchitecture: `
-┌─────────────────────────────────────────────────────────────┐
-│                    PRIVACY-FIRST DESIGN                    │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  📁 Excel Upload                                            │
-│      ↓                                                      │
-│  🔍 Local Validation                                        │
-│      ↓                                                      │
-│  🔒 Encrypted Session Storage (60 min)                     │
-│      ↓                                                      │
-│  ⚡ In-Memory Processing Only                               │
-│      ↓                                                      │
-│  🗑️ Automatic Cleanup (No Persistence)                     │
-│                                                             │
-│  Key Privacy Features:                                      │
-│  • No permanent database storage                           │
-│  • Session-based encryption                                │
-│  • Automatic data destruction                              │
-│  • Local processing only                                   │
-│  • GDPR compliant by design                                │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘`,
-                excelFormat: `Required Excel Structure:
-
-Column A: Student_ID (unique identifier)
-Column B: First_Name 
-Column C: Last_Name
-Column D: Email_Address
-Column E: Program_Type (diploma/degree/certificate)
-
-Metadata Row (Row 1):
-Course_Code | Course_Name | Instructor | Term | Section
-
-Example:
-COMP-2100 | Advanced Database Systems | Dr. Sarah Chen | Winter 2024 | 001
-
-Student Data (Starting Row 2):
-S001 | John | Smith | john.smith@email.com | diploma
-S002 | Jane | Doe | jane.doe@email.com | diploma
-S003 | Bob | Johnson | bob.j@email.com | degree`,
-                importProcess: [
-                    {
-                        title: 'Prepare Excel File',
-                        description: 'Format student data according to required structure',
-                        example: 'File Requirements:\n• .xlsx format (not .xls or .csv)\n• Metadata in Row 1 (course info)\n• Student data starting Row 2\n• Required columns: ID, First_Name, Last_Name, Email, Program_Type\n• Program types: diploma, degree, certificate',
-                        tip: 'Use official class rosters when possible - they typically have fewer formatting issues'
-                    },
-                    {
-                        title: 'Upload and Validate',
-                        description: 'Import file and review validation results',
-                        example: 'Validation Report:\n✅ Found 28 students\n✅ Course metadata detected\n⚠️ 2 students missing email addresses\n⚠️ 1 invalid program type\n❌ 3 duplicate student IDs found\n\nActions Required:\n• Fix duplicate IDs\n• Add missing emails\n• Correct program types',
-                        tip: 'Address all errors before proceeding - they can cause grading issues later'
-                    },
-                    {
-                        title: 'Configure Privacy Settings',
-                        description: 'Set session timeout and privacy preferences',
-                        example: 'Privacy Configuration:\n• Session Timeout: 60 minutes (default)\n• Data Encryption: Enabled\n• Auto-cleanup: Enabled\n• Export Logging: Minimal\n• External Sharing: Disabled',
-                        tip: 'Set calendar reminders for session expiry to avoid data loss'
-                    },
-                    {
-                        title: 'Verify Policy Assignment',
-                        description: 'Confirm correct grading policy based on program types',
-                        example: 'Policy Detection:\n• Primary Program: Diploma (85% of students)\n• Selected Policy: School Diploma Programs\n• Grade Scale: A+ (90-100), A (85-89), B+ (80-84)...\n• Late Policy: 20% reduction after 24 hours',
-                        tip: 'Mixed program types require manual policy selection'
-                    }
-                ],
-                privacyCompliance: [
-                    '✅ Right to Erasure: Automatic after 60 minutes',
-                    '✅ Data Minimization: Only essential fields stored',
-                    '✅ Purpose Limitation: Education use only',
-                    '✅ Storage Limitation: Session-based, no persistence',
-                    '✅ Data Portability: Export capabilities provided',
-                    '✅ Transparency: Clear privacy notices shown',
-                    '✅ Security: Encrypted session storage',
-                    '✅ Consent: Institutional consent assumed for grades'
-                ]
             }
         },
         {
@@ -657,66 +298,6 @@ S003 | Bob | Johnson | bob.j@email.com | degree`,
                     'Export/import capabilities',
                     'Integration with grading workflows'
                 ],
-                policyTypes: `
-┌─────────────────────────────────────────────────────────────┐
-│                    POLICY CATEGORIES                        │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  🎓 SCHOOL DIPLOMA PROGRAMS                                 │
-│     A+ (95-100%) A (90-94%) A- (85-89%)                    │
-│     B+ (80-84%)  B (75-79%) B- (70-74%)                    │
-│     C+ (67-69%)  C (64-66%) C- (60-63%)                    │
-│     D  (50-59%)  F (0-49%)                                 │
-│                                                             │
-│  🏛️ UNIVERSITY DEGREE PROGRAMS                              │
-│     A+ (90-100%) A (85-89%) A- (80-84%)                    │
-│     B+ (77-79%)  B (73-76%) B- (70-72%)                    │
-│     C+ (67-69%)  C (63-66%) C- (60-62%)                    │
-│     D+ (57-59%)  D (53-56%) D- (50-52%)                    │
-│     F  (0-49%)                                             │
-│                                                             │
-│  📜 CERTIFICATE PROGRAMS                                    │
-│     Excellent (85-100%) Good (70-84%)                      │
-│     Satisfactory (60-69%) Needs Improvement (0-59%)        │
-│                                                             │
-│  ⚙️ CUSTOM POLICIES                                         │
-│     User-defined grade boundaries                          │
-│     Custom late penalty structures                         │
-│     Institution-specific requirements                      │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘`,
-                policyConfiguration: [
-                    {
-                        title: 'Select Policy Template',
-                        description: 'Choose appropriate policy for your program type',
-                        example: 'Policy Selection:\n• School Diploma Programs (Most common)\n  - A+ starts at 95%\n  - Passing grade: 60% (C-)\n  - Late penalty: 20% after 24 hours\n\n• University Degree Programs\n  - A+ starts at 90%\n  - Passing grade: 50% (D-)\n  - Late penalty: 10% per day',
-                        tip: 'Match policy to your institution\'s official grading scale'
-                    },
-                    {
-                        title: 'Customize Grade Boundaries',
-                        description: 'Adjust percentage ranges for each letter grade',
-                        example: 'Boundary Adjustment:\nOriginal: A (90-94%), A- (85-89%)\nCustom:   A (88-94%), A- (83-87%)\n\nValidation:\n✅ No gaps between grades\n✅ All ranges sum to 100%\n✅ Passing threshold maintained',
-                        tip: 'Small changes can significantly impact grade distribution'
-                    },
-                    {
-                        title: 'Configure Late Penalties',
-                        description: 'Set up late submission penalty structure',
-                        example: 'Late Policy Options:\n\n1. Institutional Standard:\n   - On time: 100%\n   - 1-24 hours: 80% (20% penalty)\n   - >24 hours: 0%\n\n2. Graduated Penalties:\n   - 1-24 hours: 90% (10% penalty)\n   - 2-7 days: 70% (30% penalty)\n   - >7 days: 50% (50% penalty)',
-                        tip: 'Align with institutional policy - document any deviations'
-                    },
-                    {
-                        title: 'Test Policy Calculations',
-                        description: 'Verify policy works correctly with sample grades',
-                        example: 'Test Cases:\n• 89.5% → A- (should round to 90% for A?)\n• 84.9% → B+ (verify boundary behavior)\n• 67% + 20% late penalty = 53.6% → D\n• Edge case: exactly 85% → A- or B+?',
-                        tip: 'Test edge cases and rounding behavior thoroughly'
-                    },
-                    {
-                        title: 'Deploy and Monitor',
-                        description: 'Activate policy and monitor for issues',
-                        example: 'Deployment Checklist:\n✅ Policy validated with test cases\n✅ Backup of previous policy created\n✅ Team notified of changes\n✅ Documentation updated\n✅ First few grades manually verified',
-                        tip: 'Keep old policy available in case rollback is needed'
-                    }
-                ]
             }
         },
         {
@@ -737,185 +318,8 @@ S003 | Bob | Johnson | bob.j@email.com | degree`,
                     'AI feedback data export for external processing',
                     'Session management with auto-save'
                 ],
-                gradingInterface: `
-┌─────────────────────────────────────────────────────────────┐
-│                   GRADING INTERFACE                         │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  👤 STUDENT: John Smith (ID: S001)               [3/28]     │
-│  ────────────────────────────────────────────────────────   │
-│                                                             │
-│  📋 DATABASE SCHEMA DESIGN (30 points)                     │
-│  ┌─────────────────────────────────────────────────┐       │
-│  │ ● Exceptional  ● Accomplished  ● Proficient     │       │
-│  │ ○ Acceptable   ○ Developing    ○ Unacceptable   │       │
-│  │ ○ Incomplete                                    │       │
-│  └─────────────────────────────────────────────────┘       │
-│  Points: 28.5/30 (95%) - Accomplished Level                │
-│                                                             │
-│  💬 Feedback: [Excellent normalization techniques...]      │
-│  📎 Attachments: schema_diagram.png, notes.pdf             │
-│                                                             │
-│  ────────────────────────────────────────────────────────   │
-│                                                             │
-│  📊 OVERALL GRADE                                           │
-│  Raw Score: 87.5/100 (87.5%)                              │
-│  Policy Applied: School Diploma Programs                   │
-│  Letter Grade: B+ (No late penalty)                        │
-│  Status: PASSING (>60% threshold)                          │
-│                                                             │
-│  💾 [Save Draft]  [Finalize]  [Export Individual]         │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘`,
-                gradingWorkflow: [
-                    {
-                        title: 'Initialize Grading Session',
-                        description: 'Load rubric and class roster to begin grading',
-                        example: 'Session Setup:\n1. Import rubric JSON file\n2. Verify criteria and point totals\n3. Load class roster (28 students)\n4. Confirm grading policy (School Diploma)\n5. Note session timeout (60 minutes)\n\nSession Info:\nRubric: Database Project (5 criteria, 100 points)\nPolicy: School Diploma Programs\nClass: COMP-2100-001 (28 students)\nExpires: 3:45 PM (set reminder!)',
-                        tip: 'Export session data immediately after setup as backup'
-                    },
-                    {
-                        title: 'Navigate to Student',
-                        description: 'Select student and review submission materials',
-                        example: 'Student Navigation:\n• Use dropdown: "Smith, John (S001)"\n• Or Previous/Next buttons\n• Or "Jump to Ungraded" option\n\nSubmission Review:\n• Check for all required files\n• Note late submission status\n• Review any special circumstances\n• Prepare workspace for assessment',
-                        tip: 'Grade in alphabetical order to maintain consistency'
-                    },
-                    {
-                        title: 'Assess Each Criterion',
-                        description: 'Use rubric levels to evaluate each assessment criterion',
-                        example: 'Criterion Assessment:\n\n1. Database Schema Design (30 pts)\n   Selected: Accomplished (95% = 28.5 pts)\n   Reason: Strong normalization, minor optimization opportunities\n\n2. SQL Implementation (25 pts)\n   Selected: Proficient (85% = 21.25 pts)\n   Reason: Queries work correctly, could be more efficient\n\n3. Continue for all criteria...',
-                        tip: 'Read rubric descriptions carefully - maintain consistency across students'
-                    },
-                    {
-                        title: 'Add Comprehensive Feedback',
-                        description: 'Provide specific, actionable feedback using libraries and custom comments',
-                        example: 'Feedback Strategy:\n\nStrengths (from library):\n• "Excellent use of foreign key constraints"\n• "Clear, logical table structure"\n\nAreas for Improvement:\n• "Consider adding indexes on frequently queried columns"\n• "Review third normal form rules for the Orders table"\n\nOverall Comment:\n• "Strong technical foundation with good understanding of database principles. Focus on performance optimization for advanced work."',
-                        tip: 'Balance positive feedback with specific improvement suggestions'
-                    },
-                    {
-                        title: 'Attach Supporting Materials',
-                        description: 'Upload graded files, annotated images, or reference materials',
-                        example: 'Attachment Options:\n• Annotated schema diagrams\n• Graded SQL files with comments\n• Screenshots of query results\n• Reference materials or examples\n• Voice recording explanations\n\nFile Support:\n• Images: PNG, JPG, GIF\n• Documents: PDF, DOC, TXT\n• Code: SQL, TXT, MD\n• Max size: 10MB per file',
-                        tip: 'Visual feedback is especially valuable for technical assignments'
-                    },
-                    {
-                        title: 'Finalize and Export',
-                        description: 'Complete grading and export individual or batch results',
-                        example: 'Completion Steps:\n1. Review final grade calculation\n2. Verify all feedback is complete\n3. Check for attached files\n4. Save as draft or finalize\n5. Export individual report (PDF)\n6. Continue to next student\n\nFinal Grade: 87.5% (B+)\nStatus: Passing\nFeedback: Complete\nAttachments: 3 files',
-                        tip: 'Export individual reports immediately - session timeout can cause data loss'
-                    }
-                ],
-                exportOptions: [
-                    {
-                        name: 'Individual PDF Report',
-                        description: 'Comprehensive grade report for single student',
-                        content: 'Student details, rubric assessment, feedback, attachments, grade breakdown'
-                    },
-                    {
-                        name: 'Class Excel Summary',
-                        description: 'Spreadsheet with all student grades and statistics',
-                        content: 'Grade totals, percentages, letter grades, class statistics, policy info'
-                    },
-                    {
-                        name: 'Session JSON Backup',
-                        description: 'Complete session data for recovery or analysis',
-                        content: 'All grading data, rubric, student info, timestamps, attachments'
-                    },
-                    {
-                        name: 'AI Feedback Data',
-                        description: 'Structured data for AI-powered feedback generation',
-                        content: 'Grade data, rubric context, student info, feedback prompts'
-                    }
-                ]
             }
         },
-        {
-            id: 'troubleshooting',
-            title: 'Troubleshooting Guide',
-            icon: AlertTriangle,
-            color: 'red',
-            content: {
-                description: 'Comprehensive troubleshooting guide for common issues, error resolution, and system optimization. Includes diagnostic steps and preventive measures.',
-                commonIssues: [
-                    {
-                        category: 'File Import Problems',
-                        issues: [
-                            {
-                                problem: 'Excel file won\'t import or shows format errors',
-                                symptoms: 'Error messages about file format, missing data, or validation failures',
-                                diagnosis: 'File format or structure doesn\'t match requirements',
-                                solution: 'Verification Steps:\n1. Ensure file is .xlsx format (not .xls or .csv)\n2. Check metadata row (Row 1) has course information\n3. Verify student data starts in Row 2\n4. Confirm all required columns are present\n5. Check for special characters in names/emails\n6. Verify program types are valid (diploma/degree/certificate)\n\nQuick Fix:\n• Open file in Excel\n• Save As → Excel Workbook (.xlsx)\n• Remove any merged cells\n• Ensure no empty rows between data',
-                                prevention: 'Use provided Excel template, avoid manual formatting changes'
-                            },
-                            {
-                                problem: 'Rubric JSON import fails with parsing errors',
-                                symptoms: 'JSON parse error messages, missing fields warnings, or incomplete rubric loading',
-                                diagnosis: 'JSON structure is invalid or missing required fields',
-                                solution: 'JSON Validation:\n1. Copy JSON to online validator (jsonlint.com)\n2. Check for missing commas, brackets, or quotes\n3. Verify all required fields exist:\n   - assignmentInfo (title, totalPoints, etc.)\n   - rubricLevels (all 7 levels with multipliers)\n   - criteria (id, name, maxPoints, descriptions)\n4. Ensure multipliers are numbers, not strings\n5. Check for trailing commas (not allowed in JSON)\n\nRepair Steps:\n• Fix syntax errors first\n• Add missing required fields\n• Verify multiplier values (0.0 to 1.0)\n• Test import with minimal rubric first',
-                                prevention: 'Use AI-generated JSON, validate before saving, keep backup copies'
-                            }
-                        ]
-                    },
-                    {
-                        category: 'Session and Privacy Issues',
-                        issues: [
-                            {
-                                problem: 'Session expires during grading, losing work',
-                                symptoms: 'Sudden logout, data not accessible, timeout warnings',
-                                diagnosis: 'Session exceeded configured timeout period (default 60 minutes)',
-                                solution: 'Recovery Steps:\n1. Check browser local storage for auto-saved drafts\n2. Look for temporary files in Downloads folder\n3. Re-import class roster (student data lost, must restart)\n4. Check if any individual reports were exported\n\nPrevention Strategy:\n• Set multiple alarms (50min, 55min, 58min warnings)\n• Export session data every 20 minutes during grading\n• Work in focused 45-minute blocks\n• Export individual reports immediately after grading each student',
-                                prevention: 'Work efficiently, set timers, export frequently, consider shorter sessions'
-                            },
-                            {
-                                problem: 'Cannot export data before session expires',
-                                symptoms: 'Export buttons disabled, empty files generated, or browser crashes during export',
-                                diagnosis: 'Session corruption, browser memory issues, or insufficient storage space',
-                                solution: 'Emergency Export:\n1. Try different export formats (JSON → Excel → PDF)\n2. Export individual students instead of batch\n3. Clear browser cache and retry\n4. Close other browser tabs to free memory\n5. Try incognito/private browsing mode\n6. Copy visible data manually as last resort\n\nData Recovery:\n• Check browser Downloads folder\n• Look in browser local storage\n• Check for auto-saved drafts\n• Review any previously exported files',
-                                prevention: 'Export early and often, monitor browser memory usage, close unnecessary tabs'
-                            }
-                        ]
-                    },
-                    {
-                        category: 'Calculation and Grading Errors',
-                        issues: [
-                            {
-                                problem: 'Grade calculations don\'t match expected values',
-                                symptoms: 'Final grades different from manual calculations, unexpected letter grades, or percentage mismatches',
-                                diagnosis: 'Policy application, multiplier errors, or weight distribution problems',
-                                solution: 'Calculation Debugging:\n1. Verify rubric criterion weights total 100%\n2. Check each performance level multiplier:\n   - Exceptional: 1.0 (100%)\n   - Accomplished: 0.95 (95%)\n   - Proficient: 0.85 (85%)\n   - Acceptable: 0.75 (75%)\n   - Developing: 0.60 (60%)\n   - Unacceptable: 0.40 (40%)\n   - Incomplete: 0.0 (0%)\n3. Test with simple example (all "Accomplished" should = 95%)\n4. Verify grading policy is correctly applied\n5. Check for late penalty application\n\nManual Verification:\n• Calculate: (Score × Weight × Multiplier) for each criterion\n• Sum all criterion scores\n• Apply late penalty if applicable\n• Convert to letter grade using active policy',
-                                prevention: 'Test rubrics before use, verify policies, double-check complex calculations'
-                            }
-                        ]
-                    }
-                ],
-                diagnosticTools: [
-                    {
-                        name: 'Browser Console',
-                        purpose: 'View JavaScript errors and system messages',
-                        howTo: 'Press F12 → Console tab → Look for red error messages'
-                    },
-                    {
-                        name: 'Network Tab',
-                        purpose: 'Check for connection issues or failed requests',
-                        howTo: 'F12 → Network tab → Reload page → Look for failed requests (red entries)'
-                    },
-                    {
-                        name: 'Local Storage Inspector',
-                        purpose: 'Examine stored session data',
-                        howTo: 'F12 → Application tab → Local Storage → Check for gradingpilot data'
-                    },
-                    {
-                        name: 'JSON Validator',
-                        purpose: 'Validate rubric JSON structure',
-                        howTo: 'Copy JSON to jsonlint.com or similar validator service'
-                    }
-                ]
-            }
-        },
-
-        // GradeBook Help Section - Add this to your HelpPage.js component
-
-        // Add this to the helpSections array in HelpPage.js
         {
             id: 'gradebook',
             title: 'Grade Book Management',
@@ -1033,7 +437,6 @@ S003 | Bob | Johnson | bob.j@email.com | degree`,
                 ]
             }
         },
-
         {
             id: 'best-practices',
             title: 'Best Practices',
@@ -1041,116 +444,6 @@ S003 | Bob | Johnson | bob.j@email.com | degree`,
             color: 'yellow',
             content: {
                 description: 'Professional best practices for efficient grading, rubric design, and classroom implementation. Based on educational research and user feedback.',
-                gradingEfficiency: [
-                    {
-                        title: 'Batch Processing Strategy',
-                        tips: [
-                            'Review all submissions before starting to grade',
-                            'Grade one criterion across all students before moving to next',
-                            'Use feedback libraries extensively to maintain consistency',
-                            'Set up physical workspace to minimize distractions',
-                            'Grade during your most alert hours (usually mornings)'
-                        ]
-                    },
-                    {
-                        title: 'Consistency Maintenance',
-                        tips: [
-                            'Re-read rubric descriptions periodically during grading',
-                            'Keep notes about edge cases and decisions',
-                            'Grade anonymously when possible (use student IDs)',
-                            'Take breaks every 45-60 minutes to maintain focus',
-                            'Review first and last graded students for drift'
-                        ]
-                    },
-                    {
-                        title: 'Quality Assurance',
-                        tips: [
-                            'Double-check calculations for outlier grades',
-                            'Review all feedback for professionalism and clarity',
-                            'Verify file attachments are properly associated',
-                            'Test export functions before finalizing grades',
-                            'Keep backup copies of all grading data'
-                        ]
-                    }
-                ],
-                rubricDesign: [
-                    {
-                        title: 'Criterion Development',
-                        tips: [
-                            'Align criteria directly with course learning objectives',
-                            'Use 3-6 criteria for most assignments (avoid overcomplication)',
-                            'Make criteria observable and measurable',
-                            'Weight criteria based on learning importance, not work volume',
-                            'Include both technical skills and professional behaviors'
-                        ]
-                    },
-                    {
-                        title: 'Level Description Writing',
-                        tips: [
-                            'Use specific, action-oriented language',
-                            'Describe what students DO, not what they don\'t do',
-                            'Make clear distinctions between adjacent levels',
-                            'Include examples of evidence for each level',
-                            'Avoid subjective terms like "good" or "adequate"'
-                        ]
-                    },
-                    {
-                        title: 'Student Communication',
-                        tips: [
-                            'Share rubrics with students before assignment due date',
-                            'Explain the 7-level system and multipliers',
-                            'Provide examples of work at different levels',
-                            'Encourage self-assessment using the rubric',
-                            'Use rubric language in class discussions and feedback'
-                        ]
-                    }
-                ],
-                implementationGuide: [
-                    {
-                        phase: 'Planning Phase',
-                        duration: '1-2 weeks before assignment',
-                        tasks: [
-                            'Create assignment prompt using Assignment Generator',
-                            'Generate AI rubric and refine in Rubric Creator',
-                            'Share HTML assignment page with students',
-                            'Export rubric HTML for student reference',
-                            'Prepare class roster Excel file'
-                        ]
-                    },
-                    {
-                        phase: 'Collection Phase',
-                        duration: 'Assignment due date to grading start',
-                        tasks: [
-                            'Collect submissions in organized folder structure',
-                            'Note late submissions and timestamps',
-                            'Import class roster and verify data',
-                            'Set up grading environment and workspace',
-                            'Schedule uninterrupted grading time blocks'
-                        ]
-                    },
-                    {
-                        phase: 'Grading Phase',
-                        duration: '2-5 days depending on class size',
-                        tasks: [
-                            'Start grading session with rubric import',
-                            'Grade systematically using established order',
-                            'Export individual reports immediately after each student',
-                            'Take regular breaks to maintain consistency',
-                            'Monitor session time and export data frequently'
-                        ]
-                    },
-                    {
-                        phase: 'Distribution Phase',
-                        duration: '1 day after grading completion',
-                        tasks: [
-                            'Export final class summary to Excel',
-                            'Upload grades to LMS or gradebook system',
-                            'Distribute individual reports to students',
-                            'Archive grading session data for records',
-                            'Gather student feedback on rubric clarity'
-                        ]
-                    }
-                ]
             }
         },
         {
@@ -1160,121 +453,66 @@ S003 | Bob | Johnson | bob.j@email.com | degree`,
             color: 'green',
             content: {
                 description: 'Comprehensive privacy protection and security measures implemented in GradingPilot. Designed for GDPR compliance and educational data protection.',
-                privacyPrinciples: [
-                    {
-                        principle: 'Data Minimization',
-                        implementation: 'Only essential student data is collected (ID, name, email, program type)',
-                        compliance: 'GDPR Article 5(1)(c) - adequate, relevant, and limited to necessary'
-                    },
-                    {
-                        principle: 'Purpose Limitation',
-                        implementation: 'Data used exclusively for educational assessment and grading',
-                        compliance: 'GDPR Article 5(1)(b) - collected for specified, explicit, legitimate purposes'
-                    },
-                    {
-                        principle: 'Storage Limitation',
-                        implementation: 'Session-based storage with automatic deletion after 60 minutes',
-                        compliance: 'GDPR Article 5(1)(e) - kept for no longer than necessary'
-                    },
-                    {
-                        principle: 'Security',
-                        implementation: 'Client-side encryption, HTTPS transport, no permanent database storage',
-                        compliance: 'GDPR Article 32 - appropriate technical and organizational measures'
-                    }
-                ],
-                dataFlowDiagram: `
-┌─────────────────────────────────────────────────────────────┐
-│                    DATA FLOW ARCHITECTURE                   │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  📱 User Device                                             │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │ 📂 Excel File Upload                                │   │
-│  │      ↓                                              │   │
-│  │ 🔍 Client-Side Validation                           │   │
-│  │      ↓                                              │   │
-│  │ 🔐 Browser Session Storage (Encrypted)             │   │
-│  │      ↓                                              │   │
-│  │ ⚡ In-Memory Processing                             │   │
-│  │      ↓                                              │   │
-│  │ 💾 Local Export (User Controlled)                  │   │
-│  │      ↓                                              │   │
-│  │ 🗑️ Automatic Cleanup (60min timeout)               │   │
-│  └─────────────────────────────────────────────────────┘   │
-│                                                             │
-│  🚫 NO SERVER STORAGE                                       │
-│  🚫 NO DATABASE PERSISTENCE                                 │
-│  🚫 NO THIRD-PARTY DATA SHARING                             │
-│  🚫 NO CLOUD SYNCHRONIZATION                                │
-│                                                             │
-│  ✅ GDPR COMPLIANT BY DESIGN                                │
-│  ✅ PRIVACY FIRST ARCHITECTURE                              │
-│  ✅ USER DATA CONTROL                                       │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘`,
-                securityMeasures: [
-                    {
-                        measure: 'Client-Side Processing',
-                        description: 'All data processing occurs in user\'s browser',
-                        benefit: 'No server-side data exposure or storage risks'
-                    },
-                    {
-                        measure: 'Session-Based Encryption',
-                        description: 'Student data encrypted in browser session storage',
-                        benefit: 'Protection against local data access by other applications'
-                    },
-                    {
-                        measure: 'Automatic Data Destruction',
-                        description: 'All data automatically deleted after session timeout',
-                        benefit: 'No persistent data storage reduces long-term exposure risks'
-                    },
-                    {
-                        measure: 'HTTPS Transport',
-                        description: 'All communication encrypted in transit',
-                        benefit: 'Protection against network-based attacks and eavesdropping'
-                    },
-                    {
-                        measure: 'No Third-Party Integrations',
-                        description: 'No external services access student data',
-                        benefit: 'Eliminates third-party data sharing risks'
-                    }
-                ],
-                complianceChecklist: [
-                    '✅ Lawful basis for processing (educational institution consent)',
-                    '✅ Data subject rights implementation (automatic erasure)',
-                    '✅ Privacy by design and by default',
-                    '✅ Data protection impact assessment completed',
-                    '✅ Security measures appropriate to risk level',
-                    '✅ Staff training on privacy procedures',
-                    '✅ Data breach response procedures in place',
-                    '✅ Record of processing activities maintained'
-                ],
-                userRights: [
-                    {
-                        right: 'Right to be Informed',
-                        implementation: 'Clear privacy notices displayed during data collection'
-                    },
-                    {
-                        right: 'Right of Access',
-                        implementation: 'Users can export all their data at any time'
-                    },
-                    {
-                        right: 'Right to Rectification',
-                        implementation: 'Users can edit and correct data during session'
-                    },
-                    {
-                        right: 'Right to Erasure',
-                        implementation: 'Automatic data deletion after 60 minutes'
-                    },
-                    {
-                        right: 'Right to Data Portability',
-                        implementation: 'Export capabilities in multiple formats (JSON, Excel, PDF)'
-                    }
-                ]
+            }
+        },
+        {
+            id: 'troubleshooting',
+            title: 'Troubleshooting',
+            icon: AlertTriangle,
+            color: 'red',
+            content: {
+                description: 'Solutions for common issues and errors.',
             }
         }
     ];
 
+    // Enhanced search with category filtering
+    const searchResults = useMemo(() => {
+        if (!searchQuery.trim()) return [];
+
+        const query = searchQuery.toLowerCase();
+        const results = [];
+
+        helpSections.forEach(section => {
+            // Search in section title and description
+            if (section.title.toLowerCase().includes(query) ||
+                section.content.description?.toLowerCase().includes(query)) {
+                results.push({
+                    type: 'section',
+                    section: section,
+                    matches: [section.title]
+                });
+            }
+
+            // Search in subsections and content
+            Object.entries(section.content).forEach(([key, value]) => {
+                if (typeof value === 'string' && value.toLowerCase().includes(query)) {
+                    results.push({
+                        type: 'content',
+                        section: section,
+                        contentKey: key,
+                        matches: [key]
+                    });
+                }
+
+                if (Array.isArray(value)) {
+                    value.forEach((item, index) => {
+                        if (typeof item === 'object' && item.title?.toLowerCase().includes(query)) {
+                            results.push({
+                                type: 'item',
+                                section: section,
+                                item: item,
+                                itemIndex: index
+                            });
+                        }
+                    });
+                }
+            });
+        });
+
+        return results;
+    }, [searchQuery]);
+    
     // Category navigation
     const categories = [
         { id: 'overview', name: 'Overview', icon: Monitor },

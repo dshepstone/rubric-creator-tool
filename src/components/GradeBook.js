@@ -15,6 +15,7 @@ import * as XLSX from 'xlsx';
 import gradingPolicyService from '../services/gradingPolicyService';
 
 const GradeBook = () => {
+    // In GradeBook.js, update the useAssessment hook
     const {
         classList,
         setClassList,
@@ -22,6 +23,8 @@ const GradeBook = () => {
         setActiveTab,
         drafts,
         finalGrades,
+        gradeBook,    // Add this
+        setGradeBook, // Add this
     } = useAssessment();
 
     // Core gradebook state
@@ -67,6 +70,28 @@ const GradeBook = () => {
     // File input refs
     const importGradesRef = useRef(null);
     const importGradeBookRef = useRef(null);
+    
+    // Add this useEffect hook to GradeBook.js, near your other useEffect hooks
+    useEffect(() => {
+        // Load the gradebook from the shared context if it exists
+        if (gradeBook) {
+            setGradeBookData(gradeBook);
+        }
+        // Otherwise, try to load from localStorage on initial mount
+        else {
+            try {
+                const savedGradeBook = localStorage.getItem('activeGradeBook');
+                if (savedGradeBook) {
+                    const parsedGradeBook = JSON.parse(savedGradeBook);
+                    setGradeBookData(parsedGradeBook);
+                    setGradeBook(parsedGradeBook); // Also update the context
+                }
+            } catch (error) {
+                console.error("Failed to load gradebook from localStorage", error);
+                localStorage.removeItem('activeGradeBook');
+            }
+        }
+    }, [gradeBook, setGradeBook]);
 
     // Initialize gradebook with class list data and default projects
     useEffect(() => {
@@ -452,6 +477,7 @@ const GradeBook = () => {
         URL.revokeObjectURL(url);
     };
 
+    // In GradeBook.js, replace the existing importGradeBook function
     const importGradeBook = (event) => {
         const file = event.target.files[0];
         if (!file) return;
@@ -460,28 +486,25 @@ const GradeBook = () => {
         reader.onload = (e) => {
             try {
                 const importedData = JSON.parse(e.target.result);
-
-                // Validate the imported data structure
                 if (!importedData.projects || !importedData.students || !importedData.grades) {
                     throw new Error('Invalid gradebook file format');
                 }
 
-                setGradeBookData({
-                    ...importedData,
-                    metadata: {
-                        ...importedData.metadata,
-                        lastModified: new Date().toISOString()
-                    }
-                });
+                // Set the local state for immediate view
+                setGradeBookData(importedData);
 
-                alert('Gradebook imported successfully!');
+                // Save to shared context and localStorage for persistence
+                setGradeBook(importedData);
+                localStorage.setItem('activeGradeBook', JSON.stringify(importedData));
+
+                alert('Gradebook imported and set as active session.');
             } catch (error) {
                 console.error('Import error:', error);
                 alert('Error importing gradebook: ' + error.message);
             }
         };
         reader.readAsText(file);
-        event.target.value = '';
+        event.target.value = null; // Reset file input
     };
 
     const exportToExcel = () => {
