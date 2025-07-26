@@ -1,4 +1,4 @@
-// src/App.js - Updated with GradeBook Integration (Preserving ALL Original Features)
+// src/App.js - Updated with Clerk Authentication & GradeBook Integration
 import React, { useState, useEffect } from 'react';
 import { AssessmentProvider, useAssessment } from './components/SharedContext';
 import TabNavigation from './components/TabNavigation';
@@ -12,6 +12,9 @@ import ExcelImportTest from './components/ExcelImportTest';
 import HelpPage from './components/HelpPage';
 import GradingPolicyManager from './components/GradingPolicyManager';
 import './index.css';
+
+// Import Clerk components
+import { SignedIn, SignedOut, RedirectToSignIn, UserButton, useUser } from '@clerk/clerk-react';
 
 // Add TanStack Query imports
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -195,6 +198,7 @@ const ScrollToTopButton = () => {
 
 const AppContent = () => {
   const { activeTab } = useAssessment();
+  const { user } = useUser();
 
   return (
     <div className="min-h-screen bg-gray-50 relative">
@@ -217,8 +221,16 @@ const AppContent = () => {
                 <p className="text-gray-600">Advanced grading and rubric creation tools for educators</p>
               </div>
             </div>
-            <div className="text-sm text-gray-500">
-              GradingPilot Professional Suite v2.0
+            <div className="flex items-center space-x-4">
+              {user && (
+                <div className="text-right">
+                  <p className="text-sm font-medium text-gray-800">Welcome, {user.fullName}</p>
+                  <p className="text-xs text-gray-500">
+                    GradingPilot Professional Suite v2.0
+                  </p>
+                </div>
+              )}
+              <UserButton afterSignOutUrl="/" />
             </div>
           </div>
         </div>
@@ -244,25 +256,30 @@ const AppContent = () => {
   );
 };
 
-// Updated App component with QueryClient integration
+// Updated App component with Clerk Authentication
 const App = () => {
   return (
-    <QueryClientProvider client={queryClient}>
-      <AssessmentProvider>
-        <AppContent />
-      </AssessmentProvider>
+    <>
+      <SignedIn>
+        <QueryClientProvider client={queryClient}>
+          <AssessmentProvider>
+            <AppContent />
+          </AssessmentProvider>
 
-      {/* Add ReactQuery DevTools for development */}
-      {process.env.NODE_ENV === 'development' && (
-        <ReactQueryDevtools
-          initialIsOpen={false}
-          position="bottom-left"
-          buttonPosition="bottom-left"
-        />
-      )}
-    </QueryClientProvider>
-
-
+          {/* Add ReactQuery DevTools for development */}
+          {process.env.NODE_ENV === 'development' && (
+            <ReactQueryDevtools
+              initialIsOpen={false}
+              position="bottom-left"
+              buttonPosition="bottom-left"
+            />
+          )}
+        </QueryClientProvider>
+      </SignedIn>
+      <SignedOut>
+        <RedirectToSignIn />
+      </SignedOut>
+    </>
   );
 };
 
