@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Download, Sparkles, FileText, ArrowRight, Lightbulb, BookOpen, Code, Plus, Minus, Upload, Save } from 'lucide-react';
 import { useAssessment } from './SharedContext';
+import { generateAssignmentHeader, hasSchoolLogo } from './logoIntegrationUtility';
 
 // Simple Rich Text Editor Component
 const SimpleRichTextEditor = React.forwardRef(({ value, onChange, placeholder }, ref) => {
@@ -715,7 +716,7 @@ ${formData.specialInstructions && formData.specialInstructions.trim() !== '' ? `
             }
         };
 
-        // ENHANCED: Generate header with school logo on the right
+        // Generate header with school logo on the right
         const assignmentHeaderHTML = generateAssignmentHeader({
             title: formData.assignmentTitle || 'Assignment Title',
             assignmentNumber: formData.assignmentNumber || 'X',
@@ -730,130 +731,128 @@ ${formData.specialInstructions && formData.specialInstructions.trim() !== '' ? `
 <html lang="en">
 <head>
     <meta charset="utf-8"/>
-    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-    <title>${formData.courseCode || 'Course'} - Assignment ${formData.assignmentNumber || 'X'}: ${formData.assignmentTitle || 'Assignment Title'}</title>
-    ${getReportStyles()}
+    <meta content="width=device-width, initial-scale=1" name="viewport"/>
+    <title>${formData.assignmentTitle || 'Assignment'} - ${formData.courseCode || 'Course'}</title>
     <style>
-        /* Additional Assignment-Specific Styles */
-        .container {
-            max-width: 1000px;
-            margin: 0 auto;
-            background-color: white;
-            padding: 30px;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-        }
-
-        .important-box {
-            background-color: #fef3e8;
-            border-left: 4px solid #f39c12;
-            padding: 15px;
-            margin-bottom: 20px;
-            border-radius: 4px;
-        }
-
-        .deadline-box {
-            background-color: #ffebee;
-            border-left: 4px solid #e74c3c;
-            padding: 15px;
-            margin-bottom: 20px;
-            border-radius: 4px;
-        }
-
-        .deliverables-box {
-            background-color: #e8f4fd;
-            border-left: 4px solid #3498db;
-            padding: 15px;
-            margin-bottom: 20px;
-            border-radius: 4px;
-        }
-
-        .instructor-box {
-            background-color: #edf7ed;
-            border-left: 4px solid #27ae60;
-            padding: 15px;
-            margin-bottom: 20px;
-            border-radius: 4px;
-        }
-
         body {
-            background-color: #ecf0f1;
-            color: #2c3e50;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             line-height: 1.6;
+            margin: 0;
             padding: 20px;
+            background-color: #f8fafc;
+            color: #334155;
         }
-
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .assignment-header {
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #e2e8f0;
+        }
+        h1 {
+            color: #1e40af;
+            margin: 0 0 10px 0;
+            font-size: 2rem;
+            font-weight: 700;
+        }
         h2 {
-            color: #3498db;
-            font-size: 1.8rem;
-            margin: 25px 0 15px 0;
-            padding-bottom: 10px;
-            border-bottom: 1px solid #ecf0f1;
-        }
-
-        h3 {
-            color: #2c3e50;
-            font-size: 1.4rem;
-            margin: 20px 0 10px 0;
-        }
-
-        p {
+            color: #1e40af;
+            border-bottom: 2px solid #3b82f6;
+            padding-bottom: 5px;
+            margin-top: 30px;
             margin-bottom: 15px;
         }
-
-        ul, ol {
-            margin-bottom: 20px;
-            padding-left: 25px;
-        }
-
-        li {
+        h3 {
+            color: #1f2937;
+            margin-top: 25px;
             margin-bottom: 10px;
         }
-
+        .due-info {
+            background: #dbeafe;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #3b82f6;
+        }
+        .submission-info {
+            background: #f0fdf4;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #16a34a;
+        }
+        ul {
+            padding-left: 20px;
+        }
+        li {
+            margin-bottom: 8px;
+        }
+        .school-logo, .assignment-logo {
+            max-height: 70px;
+            max-width: 200px;
+            object-fit: contain;
+        }
         footer {
-            text-align: center;
             margin-top: 40px;
             padding-top: 20px;
-            color: #7f8c8d;
+            border-top: 1px solid #e2e8f0;
+            text-align: center;
+            color: #64748b;
             font-size: 0.9rem;
-            border-top: 1px solid #ecf0f1;
+        }
+        
+        @media print {
+            body { background: white; }
+            .container { box-shadow: none; }
+            .school-logo, .assignment-logo { max-height: 50px !important; }
         }
     </style>
 </head>
 <body>
     <div class="container">
         ${assignmentHeaderHTML}
-
-        <div class="deadline-box">
-            <h3>Due Date</h3>
-            <p><strong>${dueText}</strong></p>
-            <p>Submit to the Assignment ${formData.submissionFolderNumber || formData.assignmentNumber || 'X'} dropbox on eConestoga</p>
+        
+        <div class="due-info">
+            <strong>📅 Due:</strong> ${dueText}
+        </div>
+        
+        <div class="submission-info">
+            <strong>📤 Submit to:</strong> The <strong>Assignment ${formData.submissionFolderNumber || formData.assignmentNumber || 'X'}</strong> submission folder. 
+            Submission folders can be accessed by selecting <strong>Course Tools</strong> and then <strong>Assignments</strong> on the course navigation bar.
         </div>
 
-        <h2>Assignment Description</h2>
-        <p>${formData.assignmentDescription || 'Assignment description will be provided here.'}</p>
+        <h2>📋 Description</h2>
+        ${formatRichTextForStudentHTML(formData.assignmentDescription, 'Please provide a short description of the assignment')}
 
-        <h3>Rationale</h3>
-        <p>${formData.rationale || 'This assignment will evaluate the following Course Learning Outcomes:'}</p>
+        <h2>🎯 Rationale</h2>
+        ${formatRichTextForStudentHTML(formData.rationale, 'This assignment will evaluate the following Course Learning Outcomes:')}
+        
         <ul>
-${closHTML || '            <li><strong>CLO1:</strong> Learning outcome description</li>\n            <li><strong>CLO2:</strong> Learning outcome description</li>\n            <li><strong>CLO3:</strong> Learning outcome description</li>\n            <li><strong>CLO4:</strong> Learning outcome description</li>'}
+${closHTML || '            <li><strong>CLO1:</strong> [Learning outcome description]</li>\n            <li><strong>CLO2:</strong> [Learning outcome description]</li>\n            <li><strong>CLO3:</strong> [Learning outcome description]</li>\n            <li><strong>CLO4:</strong> [Learning outcome description]</li>'}
         </ul>
 
-        <h2>Directions</h2>
-        ${formatRichTextForStudentHTML(formData.directions, 'Assignment directions will be provided here.')}
+        <h2>📝 Directions</h2>
+        ${formatRichTextForStudentHTML(formData.directions, 'Provide step-by-step instructions if applicable')}
 
-        <h2>How Your Assignment Will be Graded</h2>
-        ${formatRichTextForStudentHTML(formData.gradingDetails, 'Grading information will be provided here.')}
-        <p>See your Program Handbook for the late policy.</p>
+        <h2>📊 How Your Assignment Will be Graded</h2>
+        ${formatRichTextForStudentHTML(formData.gradingDetails, 'A rubric has been created and can be found attached to the submission folder. Your work will be evaluated on [specify criteria].')}
+        
+        <p><strong>⚠️ Late Policy:</strong> See your Program Handbook for the late policy.</p>
 
-        <h2>Tips for Success</h2>
-        ${formatRichTextForStudentHTML(formData.tipsForSuccess, 'Tips for success will be provided here.')}
+        <h2>💡 Tips for Success</h2>
+        ${formatRichTextForStudentHTML(formData.tipsForSuccess, 'Tips for completing this assignment successfully will be provided here.')}
 
-${formData.specialInstructions && formData.specialInstructions.trim() !== '' ? `        <h2>Additional Information</h2>
+${formData.specialInstructions && formData.specialInstructions.trim() !== '' ? `        <h2>ℹ️ Additional Information</h2>
         ${formatRichTextForStudentHTML(formData.specialInstructions, '')}
 ` : ''}
         <footer>
-            <p>${formData.courseCode || 'Course Code'} | ${new Date().getFullYear()}</p>
+            <p><strong>${formData.courseCode || 'Course Code'}</strong> | ${new Date().getFullYear()}</p>
             <p>Last Updated: ${new Date().toLocaleDateString()}</p>
             ${hasSchoolLogo() ? '<p>Generated with institutional branding</p>' : ''}
         </footer>

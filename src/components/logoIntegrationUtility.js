@@ -44,6 +44,14 @@ export const getSchoolLogoInfo = () => {
 };
 
 /**
+ * Check if school logo exists
+ * @returns {boolean} True if logo exists
+ */
+export const hasSchoolLogo = () => {
+    return !!getSchoolLogo();
+};
+
+/**
  * Generate HTML for logo display in exports
  * @param {object} options - Styling options for the logo
  * @returns {string} HTML string for logo or empty string if no logo
@@ -66,10 +74,10 @@ export const getLogoHtml = (options = {}) => {
 };
 
 /**
- * Enhanced HTML header with logo for grade reports
+ * UPDATED: Enhanced HTML header with logo positioned on the right side
  * @param {object} reportData - Report information
  * @param {object} logoOptions - Logo styling options
- * @returns {string} Complete HTML header with logo
+ * @returns {string} Complete HTML header with logo on right side
  */
 export const generateReportHeader = (reportData, logoOptions = {}) => {
     const {
@@ -91,17 +99,50 @@ export const generateReportHeader = (reportData, logoOptions = {}) => {
     });
 
     return `
-    <div class="header" style="text-align: center; margin-bottom: 30px;">
-      ${logoHtml}
-      <h1 style="color: #1e3a8a; margin: 10px 0; font-size: 24px;">${title}</h1>
-      <div class="meta" style="color: #666; font-size: 14px; line-height: 1.5;">
-        ${courseCode ? `${courseCode} – ${courseName}` : courseName}<br>
-        ${section ? `Section: ${section}<br>` : ''}
-        ${rubricTitle ? `Rubric: ${rubricTitle}<br>` : ''}
-        Generated: ${currentDate} | ${currentTime}
+    <div class="header" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 30px; border-bottom: 2px solid #1e3a8a; padding-bottom: 20px;">
+      <div class="header-content" style="flex: 1;">
+        <h1 style="color: #1e3a8a; margin: 0 0 10px 0; font-size: 24px;">${title}</h1>
+        <div class="meta" style="color: #666; font-size: 14px; line-height: 1.5;">
+          ${courseCode ? `<strong>${courseCode}</strong> – ${courseName}${section ? ` | Section: ${section}` : ''}<br>` : ''}
+          ${rubricTitle ? `Rubric: ${rubricTitle}<br>` : ''}
+          Generated: ${currentDate} | ${currentTime}
+        </div>
       </div>
-    </div>
-  `;
+      ${logoHtml ? `<div class="logo-container" style="flex-shrink: 0; margin-left: 20px;">${logoHtml}</div>` : ''}
+    </div>`;
+};
+
+/**
+ * NEW: Generate assignment header with logo positioned on the right side
+ * @param {object} assignmentData - Assignment information
+ * @param {object} logoOptions - Logo styling options
+ * @returns {string} Complete HTML header for assignments
+ */
+export const generateAssignmentHeader = (assignmentData, logoOptions = {}) => {
+    const {
+        title = 'Assignment',
+        assignmentNumber = '',
+        courseCode = '',
+        weight = ''
+    } = assignmentData;
+
+    const logoHtml = getLogoHtml({
+        className: 'assignment-logo',
+        maxHeight: 60,
+        style: 'margin-bottom: 0;',
+        ...logoOptions
+    });
+
+    return `
+    <div class="assignment-header" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid #e2e8f0;">
+      <div class="assignment-info" style="flex: 1;">
+        <h1 style="color: #1e40af; margin: 0 0 5px 0; font-size: 28px;">Assignment ${assignmentNumber}: ${title}</h1>
+        <div class="assignment-meta" style="color: #666; font-size: 14px;">
+          ${courseCode ? `<span style="font-weight: 500;">${courseCode}</span> | ` : ''}Weight: ${weight}% of final grade
+        </div>
+      </div>
+      ${logoHtml ? `<div class="logo-container" style="flex-shrink: 0; margin-left: 20px;">${logoHtml}</div>` : ''}
+    </div>`;
 };
 
 /**
