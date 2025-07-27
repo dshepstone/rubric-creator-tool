@@ -241,61 +241,60 @@ const TabNavigation = () => {
                         );
                     })}
                 </nav>
+            </div>
 
-                
 
-                {/* ——— Quick Actions (unchanged) ——— */}
-                <div className="border-t border-gray-100 bg-gray-50">
-                    <div className="flex items-center justify-between px-6 py-2">
-                        <div className="flex items-center gap-4">
-                            <div className="flex items-center gap-2">
-                                <button
-                                    onClick={exportSession}
-                                    className="flex items-center gap-1 text-gray-600 hover:text-gray-800 text-xs font-medium"
-                                    title="Export Current Session"
-                                >
-                                    <Save size={12} /> Export
-                                </button>
-                                <input
-                                    ref={importSessionInputRef}
-                                    type="file"
-                                    accept=".json"
-                                    onChange={handleSessionImport}
-                                    className="hidden"
-                                />
-                                <button
-                                    onClick={() => importSessionInputRef.current?.click()}
-                                    className="flex items-center gap-1 text-gray-600 hover:text-gray-800 text-xs font-medium"
-                                    title="Import Session"
-                                >
-                                    <Upload size={12} /> Import
-                                </button>
-                            </div>
-
-                            {activeTab !== 'help' && (
-                                <button
-                                    onClick={() => setActiveTab('help')}
-                                    className="flex items-center gap-1 text-blue-600 hover:text-blue-800 text-xs font-medium"
-                                    title="Need help? View user guide"
-                                >
-                                    <HelpCircle size={12} /> Need Help?
-                                </button>
-                            )}
-
-                            {activeTab !== 'policy-manager' && hasClassListData && (
-                                <button
-                                    onClick={() => setActiveTab('policy-manager')}
-                                    className="flex items-center gap-1 text-teal-600 hover:text-teal-800 text-xs font-medium"
-                                    title="Manage grading policies for your program type"
-                                >
-                                    <Settings size={12} /> Manage Policies
-                                </button>
-                            )}
-                        </div>
-
+            {/* ——— Quick Actions Bar (Restructured) ——— */}
+            <div className="border-t border-gray-100 bg-gray-50">
+                <div className="max-w-8xl mx-auto flex items-center justify-center px-6 py-2">
+                    <div className="flex items-center gap-4">
                         <div className="flex items-center gap-2">
-                            {/* …all of your per‑tab quick‑action buttons… */}
+                            <button
+                                onClick={exportSession}
+                                className="flex items-center gap-1 text-gray-600 hover:text-gray-800 text-xs font-medium"
+                                title="Export Current Session"
+                            >
+                                <Save size={12} /> Export
+                            </button>
+                            <input
+                                ref={importSessionInputRef}
+                                type="file"
+                                accept=".json"
+                                onChange={handleSessionImport}
+                                className="hidden"
+                            />
+                            <button
+                                onClick={() => importSessionInputRef.current?.click()}
+                                className="flex items-center gap-1 text-gray-600 hover:text-gray-800 text-xs font-medium"
+                                title="Import Session"
+                            >
+                                <Upload size={12} /> Import
+                            </button>
                         </div>
+
+                        {activeTab !== 'help' && (
+                            <button
+                                onClick={() => setActiveTab('help')}
+                                className="flex items-center gap-1 text-blue-600 hover:text-blue-800 text-xs font-medium"
+                                title="Need help? View user guide"
+                            >
+                                <HelpCircle size={12} /> Need Help?
+                            </button>
+                        )}
+
+                        {activeTab !== 'policy-manager' && hasClassListData && (
+                            <button
+                                onClick={() => setActiveTab('policy-manager')}
+                                className="flex items-center gap-1 text-teal-600 hover:text-teal-800 text-xs font-medium"
+                                title="Manage grading policies for your program type"
+                            >
+                                <Settings size={12} /> Manage Policies
+                            </button>
+                        )}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                        {/* …all of your per‐tab quick‑action buttons… */}
                     </div>
                 </div>
             </div>

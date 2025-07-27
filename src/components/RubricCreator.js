@@ -90,7 +90,8 @@ SimpleRichTextEditor.displayName = 'SimpleRichTextEditor';
 // Insert these components before "const RubricCreator = () => {"
 
 // JSON Paste Panel Component
-const JSONPastePanel = ({ onImport, isOpen, onToggle }) => {
+// JSON Paste Panel Component
+const JSONPastePanel = React.forwardRef(({ onImport, isOpen, onToggle }, ref) => {
     const [jsonInput, setJsonInput] = React.useState('');
     const [error, setError] = React.useState('');
 
@@ -126,7 +127,7 @@ const JSONPastePanel = ({ onImport, isOpen, onToggle }) => {
     };
 
     return (
-        <div className="border border-gray-200 rounded-lg mb-6">
+        <div ref={ref} className="border border-gray-200 rounded-lg mb-6">
             <button
                 onClick={onToggle}
                 className="w-full flex items-center justify-between p-4 bg-gradient-to-r from-purple-50 to-indigo-50 hover:from-purple-100 hover:to-indigo-100 transition-colors rounded-t-lg"
@@ -188,7 +189,10 @@ const JSONPastePanel = ({ onImport, isOpen, onToggle }) => {
             )}
         </div>
     );
-};
+});
+
+// Add display name for debugging
+JSONPastePanel.displayName = 'JSONPastePanel';
 
 // Achievement Level Control Component
 const AchievementLevelControl = ({ rubricData, setRubricData }) => {
@@ -455,7 +459,7 @@ const RubricCreator = () => {
 
     // Refs for file inputs
     const importInputRef = useRef(null);
-
+    const jsonPastePanelRef = useRef(null);
     // Auto-save to shared context whenever rubricData changes
     useEffect(() => {
         if (autoSaveTimeout) {
@@ -1258,14 +1262,44 @@ const RubricCreator = () => {
                                 File Operations
                             </h3>
                             <div className="flex flex-col gap-2">
-                                <button
-                                    onClick={() => importInputRef.current?.click()}
-                                    className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded flex items-center gap-1 text-sm font-medium shadow-md transition-all duration-200"
-                                    title="Import existing rubric JSON file"
-                                >
-                                    <Upload size={14} />
-                                    Import
-                                </button>
+                                {/* Import and Paste JSON buttons in one row */}
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={() => importInputRef.current?.click()}
+                                        className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded flex items-center gap-1 text-sm font-medium shadow-md transition-all duration-200 flex-1"
+                                        title="Import existing rubric JSON file"
+                                    >
+                                        <Upload size={14} />
+                                        Import File
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setShowJSONPaste(!showJSONPaste);
+                                            // Scroll to JSON paste panel if opening it
+                                            if (!showJSONPaste) {
+                                                setTimeout(() => {
+                                                    if (jsonPastePanelRef.current) {
+                                                        jsonPastePanelRef.current.scrollIntoView({
+                                                            behavior: 'smooth',
+                                                            block: 'start',
+                                                            inline: 'nearest'
+                                                        });
+                                                    }
+                                                }, 150); // Slightly longer delay to ensure panel is fully rendered
+                                            }
+                                        }}
+                                        className={`${showJSONPaste
+                                            ? 'bg-indigo-700 hover:bg-indigo-800'
+                                            : 'bg-indigo-600 hover:bg-indigo-700'
+                                            } text-white px-3 py-2 rounded flex items-center gap-1 text-sm font-medium shadow-md transition-all duration-200 flex-1`}
+                                        title="Paste JSON rubric data directly"
+                                    >
+                                        <Code size={14} />
+                                        Paste JSON
+                                    </button>
+                                </div>
+
+                                {/* Save and Export buttons in second row */}
                                 <div className="flex gap-2">
                                     <button
                                         onClick={saveRubric}
@@ -1286,7 +1320,6 @@ const RubricCreator = () => {
                                 </div>
                             </div>
                         </div>
-
                         {/* Utility Actions */}
                         <div>
                             <h3 className="text-sm font-semibold text-white uppercase tracking-wide mb-2">
@@ -1610,6 +1643,7 @@ const RubricCreator = () => {
 
                     {/* JSON Paste Panel */}
                     <JSONPastePanel
+                        ref={jsonPastePanelRef}
                         onImport={importFromJSON}
                         isOpen={showJSONPaste}
                         onToggle={() => setShowJSONPaste(!showJSONPaste)}

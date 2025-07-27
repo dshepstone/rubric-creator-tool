@@ -374,7 +374,17 @@ const AssignmentPromptGenerator = () => {
     const [generatedHTML, setGeneratedHTML] = useState('');
     const [showHTML, setShowHTML] = useState(false);
 
-    // ADD: File input ref for loading JSON
+    // ✅ ADD: Ref for the results container to scroll to
+    const resultsRef = useRef(null);
+
+    // ✅ ADD: useEffect hook for scrolling
+    useEffect(() => {
+        if ((showPrompt || showHTML) && resultsRef.current) {
+            resultsRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    }, [showPrompt, showHTML]);
+
+    // File input ref for loading JSON (this line should already exist)
     const fileInputRef = useRef(null);
 
     const handleInputChange = (field, value) => {
@@ -1311,7 +1321,7 @@ ${formData.specialInstructions && formData.specialInstructions.trim() !== '' ? `
 
                 {/* Generated Content Display */}
                 {(showPrompt || showHTML) && (
-                    <div className="mt-8 bg-white rounded-lg shadow-sm border">
+                    <div ref={resultsRef} className="mt-8 bg-white rounded-lg shadow-sm border">
                         <div className="p-6 border-b">
                             <h2 className="text-xl font-semibold text-gray-900">
                                 {showPrompt ? 'Generated AI Prompt' : 'Generated D2L HTML'}
