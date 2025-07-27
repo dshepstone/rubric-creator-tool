@@ -14,13 +14,11 @@ import {
     ExternalLink,
     FileSpreadsheet,
     CheckCircle2,
-    Settings,
-    Lock,
-    Shield,
-    Timer
+    Settings
 } from 'lucide-react';
 import { useAssessment, DEFAULT_LATE_POLICY } from './SharedContext';
 import { parseExcelFile, validateStudentData } from '../utils/excelParser';
+import { getSchoolLogo, generateReportHeader, getReportStyles } from './logoIntegrationUtility';
 
 // Add new imports for grading policy management
 import gradingPolicyService from '../services/gradingPolicyService';
@@ -30,11 +28,6 @@ import {
     useGradeCalculation,
     useGradingPolicyManager
 } from '../hooks/useGradingPolicies';
-
-/**
- * PRIVACY-FOCUSED ClassListManager - Session-Only Storage
- * PRESERVES ALL ORIGINAL FUNCTIONALITY while implementing privacy controls
- */
 
 /**
  * Enhanced getLetterGrade function with dynamic policy support
@@ -110,10 +103,6 @@ const ClassListManager = () => {
     const fileInputRef = useRef(null);
     const [importStatus, setImportStatus] = useState('');
 
-    // PRIVACY: Add session monitoring
-    const [sessionWarning, setSessionWarning] = useState(false);
-    const [timeRemaining, setTimeRemaining] = useState(null);
-
     // Add new grading policy state management using TanStack Query hooks
     const { data: availablePolicies = [], isLoading: policiesLoading } = useGradingPolicies({ isActive: true });
     const [currentProgramType, setCurrentProgramType] = useState('degree');
@@ -138,46 +127,12 @@ const ClassListManager = () => {
         sharedRubric,
         updateStudentInfo,
         updateAssignmentInfo,
-        updateCourseInfo,
+        updateCourseInfo, // FIXED: Added updateCourseInfo from the context
         loadFinalGrade,
         finalGrades,
         rubricFormData,
         currentLatePolicy,
-        // PRIVACY: Session management
-        sessionActive,
-        sessionManager,
-        extendSession
     } = useAssessment();
-
-    // PRIVACY: Session monitoring effect
-    useEffect(() => {
-        if (!sessionActive) {
-            setSessionWarning(true);
-            return;
-        }
-
-        if (sessionManager) {
-            // Update time remaining every minute
-            const interval = setInterval(() => {
-                const remaining = sessionManager.getTimeRemaining();
-                setTimeRemaining(remaining);
-
-                // Show warning at 5 minutes
-                if (remaining <= 5 * 60 * 1000 && remaining > 0) {
-                    setSessionWarning(true);
-                }
-            }, 60000);
-
-            // Initial check
-            const remaining = sessionManager.getTimeRemaining();
-            setTimeRemaining(remaining);
-            if (remaining <= 5 * 60 * 1000 && remaining > 0) {
-                setSessionWarning(true);
-            }
-
-            return () => clearInterval(interval);
-        }
-    }, [sessionActive, sessionManager]);
 
     // Load current program type from class metadata and update policy
     useEffect(() => {
@@ -490,92 +445,64 @@ const ClassListManager = () => {
         console.log('✅ CSV export completed with letter grades');
     };
 
-    // FIXED: Generate HTML for class grades report with async/await properly handled
-    const getClassGradesHTML = async () => {
-        const progress = getGradingProgress();
-        const currentDate = new Date().toLocaleDateString('en-US', {
-            weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
-        });
-        const currentTime = new Date().toLocaleTimeString();
+    // Enhanced version of your existing getClassGradesHTML function
+    const getClassGradesHTMLWithLogo = async () => {
+        const now = new Date();
+        const currentDate = now.toLocaleDateString('en-CA');
+        const currentTime = now.toLocaleTimeString('en-CA');
 
-        console.log('🔄 Generating HTML with async grade calculations...');
+        console.log('🔄 Generating class grades HTML with logo...');
 
-        // Calculate grades for all students asynchronously
+        // Calculate grades for all students asynchronously (your existing logic)
         const studentRows = await Promise.all(
-            classList.students.map(async (student, i) => {
-                const prog = classList.gradingProgress[i] || {};
+            classList.students.map(async (student, idx) => {
                 const info = await calculateStudentGrade(student.id);
-                const lm = prog.lastModified
-                    ? new Date(prog.lastModified).toLocaleDateString()
-                    : 'Never';
-                const statusClass = prog.status?.includes('final')
-                    ? 'status-final'
-                    : prog.status?.includes('draft')
-                        ? 'status-draft'
-                        : 'status-pending';
+                const gradeDisplay = info.score !== 'N/A' ? `${info.score}%` : 'N/A';
+                const letterGrade = info.letterGrade || 'N/A';
+                const percentage = info.score !== 'N/A' ? `${info.score}%` : 'N/A';
+                const lastModified = classList.gradingProgress[idx]?.lastModified
+                    ? new Date(classList.gradingProgress[idx].lastModified).toLocaleDateString('en-CA')
+                    : 'Not graded';
 
-                return (
-                    '<tr>' +
-                    '<td>' + (i + 1) + '</td>' +
-                    '<td>' + student.id + '</td>' +
-                    '<td>' + student.name + '</td>' +
-                    '<td>' + student.email + '</td>' +
-                    '<td>' + (student.program || '') + '</td>' +
-                    '<td><span class="status-badge ' + statusClass + '">' +
-                    (prog.status || 'pending') +
-                    '</span></td>' +
-                    '<td>' + (prog.gradeType || 'none') + '</td>' +
-                    '<td>' + (info.score !== 'N/A'
-                        ? info.score + '/' + info.maxPossible
-                        : 'N/A') + '</td>' +
-                    '<td>' + (info.letterGrade || 'N/A') + '</td>' +
-                    '<td>' + (info.percentage !== 'N/A'
-                        ? info.percentage + '%'
-                        : 'N/A') + '</td>' +
-                    '<td>' + lm + '</td>' +
-                    '</tr>'
-                );
+                return `
+        <tr>
+          <td>${idx + 1}</td>
+          <td>${student.id}</td>
+          <td>${student.name}</td>
+          <td>${student.email}</td>
+          <td>${student.program}</td>
+          <td>${classList.gradingProgress[idx]?.status || 'pending'}</td>
+          <td>${classList.gradingProgress[idx]?.gradeType || 'N/A'}</td>
+          <td>${gradeDisplay}</td>
+          <td>${letterGrade}</td>
+          <td>${percentage}</td>
+          <td>${lastModified}</td>
+        </tr>
+      `;
             })
         );
 
         const rowsHtml = studentRows.join('');
 
+        // Use the logo utility to generate header
+        const reportData = {
+            title: '📊 Class Grade Report',
+            courseCode: classList.courseMetadata?.courseCode || '',
+            courseName: classList.courseMetadata?.courseName || '',
+            section: classList.courseMetadata?.section || '',
+            rubricTitle: sharedRubric?.assignmentInfo?.title || 'Unnamed Rubric'
+        };
+
         return `<!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
+  <title>Class Grade Report</title>
   <meta charset="UTF-8">
-  <title>Class Grade Report - ${classList.courseMetadata?.courseCode || ''}</title>
-  <style>
-    @page { size: A4 portrait; margin:15mm; }
-    *, *::before, *::after { box-sizing:border-box }
-    body { margin:0; padding:0; font-family:sans-serif; font-size:12px; line-height:1.4; color:#333; }
-    .header { text-align:center; margin-bottom:12px; }
-    .header h1 { font-size:18px; margin:4px 0; }
-    .header .meta { font-size:14px; color:#555; }
-    .table-container { width:100%; overflow-x:auto; margin-bottom:12px; }
-    table { width:100%; border-collapse:collapse; table-layout:fixed; }
-    thead { display:table-header-group; }
-    th, td {
-      padding:8px 12px; text-align:left; border-bottom:1px solid #e5e7eb;
-      white-space:normal; word-wrap:break-word; overflow-wrap:anywhere; word-break:break-all;
-      vertical-align:top;
-    }
-    th { background:#f0f0f0; font-weight:600; position:sticky; top:0; }
-    tr:nth-child(even) td { background:#fafafa; }
-    .footer { font-size:10px; text-align:center; color:#666; margin-top:12px; }
-    @media print { body{background:white} .table-container{overflow-x:visible} }
-  </style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  ${getReportStyles()}
 </head>
 <body>
-  <div class="header">
-    <h1>📊 Class Grade Report</h1>
-    <div class="meta">
-      ${classList.courseMetadata?.courseCode || ''} – ${classList.courseMetadata?.courseName || ''} |
-      Section: ${classList.courseMetadata?.section || ''}<br>
-      Rubric: ${sharedRubric?.assignmentInfo?.title || 'Unnamed Rubric'}<br>
-      Generated: ${currentDate} | ${currentTime}
-    </div>
-  </div>
+  ${generateReportHeader(reportData)}
 
   <div class="table-container">
     <table>
@@ -605,7 +532,8 @@ const ClassListManager = () => {
 
         console.log('🔄 Exporting HTML with async grade calculations...');
 
-        const htmlContent = await getClassGradesHTML();
+        // Use the logo-enhanced version
+        const htmlContent = await getClassGradesHTMLWithLogo();
         const blob = new Blob([htmlContent], { type: 'text/html' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
@@ -619,95 +547,122 @@ const ClassListManager = () => {
 
         URL.revokeObjectURL(url);
 
-        console.log('✅ HTML export completed with letter grades');
+        console.log('✅ HTML export completed with letter grades and logo');
     };
 
-    // FIXED: Portrait PDF report with async/await properly handled
-    const getPortraitClassReportHTML = async () => {
+    // Enhanced version of your existing getPortraitClassReportHTML function
+    const getPortraitClassReportHTMLWithLogo = async () => {
         const now = new Date();
         const currentDate = now.toLocaleDateString('en-CA');
         const currentTime = now.toLocaleTimeString('en-CA');
         const rubricName = sharedRubric?.assignmentInfo?.title || 'Unnamed Rubric';
 
-        console.log('🔄 Generating portrait report with async grade calculations...');
+        console.log('🔄 Generating portrait report with logo and async grade calculations...');
 
-        // Calculate grades for all students asynchronously
+        // Calculate grades for all students asynchronously (your existing logic)
         const studentRows = await Promise.all(
             classList.students.map(async (student, idx) => {
                 const info = await calculateStudentGrade(student.id);
                 const num = info.score !== 'N/A'
-                    ? `${info.score}/${info.maxPossible}`
-                    : 'N/A';
+                    ? parseFloat(info.score)
+                    : null;
+
+                const rowClass = num !== null
+                    ? (num >= 80 ? 'high-grade' : num >= 60 ? 'medium-grade' : 'low-grade')
+                    : 'no-grade';
+
                 return `
-      <tr>
-        <td>${idx + 1}</td>
-        <td>${student.id}</td>
-        <td>${student.name}</td>
-        <td>${num}</td>
-        <td>${info.letterGrade || 'N/A'}</td>
-        <td>${info.percentage !== 'N/A' ? info.percentage + '%' : 'N/A'}</td>
-      </tr>`;
+        <tr class="${rowClass}">
+          <td style="text-align:center">${idx + 1}</td>
+          <td>${student.id}</td>
+          <td><strong>${student.name}</strong></td>
+          <td>${student.email}</td>
+          <td>${student.program}</td>
+          <td style="text-align:center">${info.score !== 'N/A' ? `${info.score}%` : 'N/A'}</td>
+          <td style="text-align:center; font-weight:bold">${info.letterGrade || 'N/A'}</td>
+        </tr>
+      `;
             })
         );
 
-        const rowsHtml = studentRows.join('');
+        const studentRowsHtml = studentRows.join('');
+
+        // Use the logo utility to generate header
+        const reportData = {
+            title: '📊 Class Grade Report (Portrait)',
+            courseCode: classList.courseMetadata?.courseCode || '',
+            courseName: classList.courseMetadata?.courseName || '',
+            section: classList.courseMetadata?.section || '',
+            rubricTitle: rubricName
+        };
 
         return `<!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
+  <title>Class Grade Report</title>
   <meta charset="UTF-8">
-  <title>Portrait Class Report</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  ${getReportStyles()}
   <style>
-  @page { size: A4 portrait; margin: 15mm; }
-  *, *::before, *::after { box-sizing: border-box; }
-  body { margin: 0; padding: 0; font-family: sans-serif; font-size: 12px; line-height: 1.4; color: #333; background: white; }
-  .header { text-align: center; margin-bottom: 8px; }
-  .header h1 { font-size: 18px; margin: 4px 0; }
-  .header .meta { font-size: 14px; color: #555; }
-  .table-container { width: 100%; overflow-x: auto; }
-  table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-  thead { display: table-header-group; }
-  tbody { display: table-row-group; }
-  th, td {
-    padding: 8px 12px; text-align: left; border-bottom: 1px solid #e5e7eb;
-    white-space: normal; word-wrap: break-word; overflow-wrap: anywhere; word-break: break-all;
-    vertical-align: top;
-  }
-  tr:nth-child(even) td { background-color: #fafafa; }
-  .footer { margin-top: 12px; font-size: 10px; text-align: center; color: #666; }
-  @media print { body { background: white; } .table-container { overflow-x: visible; } }
+    .high-grade { background-color: #d4edda !important; }
+    .medium-grade { background-color: #fff3cd !important; }
+    .low-grade { background-color: #f8d7da !important; }
+    .no-grade { background-color: #f8f9fa !important; }
+    
+    @page {
+      size: A4 portrait;
+      margin: 15mm;
+    }
+    
+    @media print {
+      body { 
+        font-size: 10pt; 
+        background: white;
+      }
+      .school-logo, .report-logo { 
+        max-height: 50px !important; 
+      }
+      table { 
+        page-break-inside: auto; 
+      }
+      tr { 
+        page-break-inside: avoid; 
+        page-break-after: auto; 
+      }
+      thead { 
+        display: table-header-group; 
+      }
+    }
   </style>
 </head>
 <body>
-  <div class="header">
-    <h1>Class Grade Report</h1>
-    <div class="meta">
-      ${classList.courseMetadata?.courseCode || ''} –
-      ${classList.courseMetadata?.courseName || ''} |
-      Section: ${classList.courseMetadata?.section || ''}<br>
-      Rubric: ${rubricName}<br>
-      Generated: ${currentDate} ${currentTime}
-    </div>
+  ${generateReportHeader(reportData, { maxHeight: 60 })}
+
+  <div class="table-container">
+    <table>
+      <thead>
+        <tr style="background-color: #2563eb; color: white;">
+          <th style="text-align:center">#</th>
+          <th>Student ID</th>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Program</th>
+          <th style="text-align:center">Grade</th>
+          <th style="text-align:center">Letter</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${studentRowsHtml}
+      </tbody>
+    </table>
   </div>
 
-  <table>
-    <thead>
-      <tr>
-        <th style="width:4%">#</th>
-        <th style="width:15%">Student ID</th>
-        <th style="width:40%">Name</th>
-        <th style="width:15%">Numeric Grade</th>
-        <th style="width:12%">Letter Grade</th>
-        <th style="width:14%">%</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${rowsHtml}
-    </tbody>
-  </table>
-
   <div class="footer">
-    Imported from: ${classList.fileName}
+    <div style="margin-top: 20px; text-align: center; font-size: 12px; color: #666;">
+      <strong>Grade Distribution Summary</strong><br>
+      Report generated on ${currentDate} at ${currentTime}<br>
+      Total Students: ${classList.students.length} | Rubric: ${rubricName}
+    </div>
   </div>
 </body>
 </html>`;
@@ -717,9 +672,10 @@ const ClassListManager = () => {
     const exportClassGradesPortraitPDF = async () => {
         if (!classList) return;
 
-        console.log('🔄 Generating PDF with async grade calculations...');
+        console.log('🔄 Generating PDF with async grade calculations and logo...');
 
-        const htmlContent = await getPortraitClassReportHTML();
+        // Use the logo-enhanced version
+        const htmlContent = await getPortraitClassReportHTMLWithLogo();
         const printWin = window.open('', '_blank', 'width=800,height=600');
         printWin.document.write(htmlContent);
         printWin.document.close();
@@ -729,7 +685,7 @@ const ClassListManager = () => {
             printWin.print();
         };
 
-        console.log('✅ PDF generation completed with letter grades');
+        console.log('✅ PDF generation completed with letter grades and logo');
     };
 
     // Complete exportStudentGrade function for ClassListManager.js (preserved exactly from original)
@@ -1050,16 +1006,11 @@ const ClassListManager = () => {
         }
     };
 
-    // PRIVACY: Modified file upload handling - NO AUTO-PERSISTENCE
+    // File upload handling (preserved exactly from original)
+    // COMPLETE ENHANCED handleFileUpload function - replaces lines ~600-650 in ClassListManager.js
     const handleFileUpload = async (event) => {
         const file = event.target.files[0];
         if (!file) return;
-
-        // PRIVACY: Check session status
-        if (!sessionActive) {
-            alert('Session has expired. Please refresh the page to start a new session.');
-            return;
-        }
 
         setImportStatus('processing');
 
@@ -1085,7 +1036,7 @@ const ClassListManager = () => {
                 gradeType: null
             }));
 
-            // PRIVACY: Create the class list data structure with session-only storage
+            // ENHANCED: Create the class list data structure with proper field mapping
             const classListData = {
                 students: result.students,
                 gradingProgress,
@@ -1110,13 +1061,9 @@ const ClassListManager = () => {
                 validation: {
                     validationScore: validation.validationScore || 100,
                     issues: validation.issues || []
-                },
-                // PRIVACY: Mark as session-only data
-                sessionOnly: true,
-                privacyMode: true
+                }
             };
 
-            // PRIVACY: Set in shared context (session memory only, no localStorage)
             setClassList(classListData);
             setImportStatus('success');
 
@@ -1138,7 +1085,7 @@ const ClassListManager = () => {
                 }
             }
 
-            console.log('✅ Excel import completed successfully (session-only):', {
+            console.log('✅ Excel import completed successfully:', {
                 students: result.students.length,
                 courseMetadata: classListData.courseMetadata
             });
@@ -1151,7 +1098,7 @@ const ClassListManager = () => {
         }
     };
 
-    // ENHANCED startGradingSession function - preserves all original functionality
+    // ENHANCED startGradingSession function - replaces lines ~670-690 in ClassListManager.js
     const startGradingSession = () => {
         if (!classList || classList.students.length === 0) {
             alert('No students available for grading.');
@@ -1160,12 +1107,6 @@ const ClassListManager = () => {
 
         if (!sharedRubric) {
             alert('Please load a rubric before starting batch grading.');
-            return;
-        }
-
-        // PRIVACY: Check session status
-        if (!sessionActive) {
-            alert('Session has expired. Please refresh the page to start a new session.');
             return;
         }
 
@@ -1207,84 +1148,11 @@ const ClassListManager = () => {
 
     // Resume the grading session
     const resumeGradingSession = () => {
-        if (!sessionActive) {
-            alert('Session has expired. Please refresh the page to start a new session.');
-            return;
-        }
-
         setGradingSession(prev => ({
             ...prev,
             active: true
         }));
         setActiveTab('grading-tool');
-    };
-
-    // PRIVACY: Session warning modal component
-    const SessionWarningModal = () => {
-        if (!sessionWarning) return null;
-
-        const formatTime = (ms) => {
-            const minutes = Math.floor(ms / 60000);
-            const seconds = Math.floor((ms % 60000) / 1000);
-            return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-        };
-
-        return (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                <div className="bg-white rounded-lg p-6 max-w-md w-mx-4">
-                    <div className="flex items-center mb-4">
-                        <Timer className="w-6 h-6 text-orange-500 mr-2" />
-                        <h3 className="text-lg font-semibold text-gray-900">
-                            Session Warning
-                        </h3>
-                    </div>
-
-                    <div className="mb-4">
-                        <p className="text-gray-700 mb-2">
-                            {sessionActive
-                                ? `Your session will expire in ${timeRemaining ? formatTime(timeRemaining) : 'less than 5 minutes'}.`
-                                : 'Your session has expired for privacy protection.'
-                            }
-                        </p>
-                        <p className="text-sm text-gray-600">
-                            {sessionActive
-                                ? 'All data will be automatically cleared when the session expires. Export any work you want to keep.'
-                                : 'All data has been cleared. Please refresh the page to start a new session.'
-                            }
-                        </p>
-                    </div>
-
-                    <div className="flex gap-2">
-                        {sessionActive ? (
-                            <>
-                                <button
-                                    onClick={() => {
-                                        extendSession();
-                                        setSessionWarning(false);
-                                    }}
-                                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                                >
-                                    Extend Session
-                                </button>
-                                <button
-                                    onClick={() => setSessionWarning(false)}
-                                    className="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
-                                >
-                                    Continue
-                                </button>
-                            </>
-                        ) : (
-                            <button
-                                onClick={() => window.location.reload()}
-                                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                            >
-                                Start New Session
-                            </button>
-                        )}
-                    </div>
-                </div>
-            </div>
-        );
     };
 
     // NEW: Policy Preview Component
@@ -1353,623 +1221,535 @@ const ClassListManager = () => {
         );
     };
 
-    // PRIVACY: Empty state component
-    const EmptyStateWithPrivacy = () => (
+    return (
         <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
             <div className="max-w-7xl mx-auto">
-                {/* Header with Privacy Notice */}
+                {/* Header (preserved exactly from original) */}
                 <div className="bg-gradient-to-r text-gray-800 p-6 rounded-t-lg shadow-lg">
                     <div className="flex justify-between items-center">
                         <div>
                             <h1 className="text-3xl font-bold mb-2">Class List Manager</h1>
                             <p className="text-gray-600">
-                                Privacy-focused class management with session-only storage
+                                Import, manage, and grade entire classes efficiently
                             </p>
                         </div>
                         <div className="flex items-center gap-4">
-                            <div className="text-right">
-                                <div className="text-2xl font-bold text-orange-600">
-                                    <Shield size={48} />
+                            {classList && (
+                                <div className="text-right">
+                                    <div className="text-2xl font-bold">
+                                        {classList.students.length}
+                                    </div>
+                                    <div className="text-sm text-gray-700">
+                                        Students
+                                    </div>
                                 </div>
-                                <div className="text-sm text-gray-700">
-                                    Privacy Mode
-                                </div>
-                            </div>
+                            )}
+                            <Users size={48} className="text-gray-700" />
                         </div>
                     </div>
                 </div>
 
                 <div className="bg-white rounded-b-lg shadow-lg">
-                    {/* Privacy Notice */}
-                    <div className="p-6 bg-yellow-50 border-b border-yellow-200">
-                        <div className="flex items-center">
-                            <Lock className="w-5 h-5 text-yellow-600 mr-2" />
-                            <div className="text-sm text-yellow-800">
-                                <strong>Privacy Protection Active:</strong> No data is automatically loaded.
-                                All imported data is stored in session only and will be automatically cleared after 1 hour
-                                or when the application restarts.
-                            </div>
-                        </div>
-                    </div>
+                    {/* Import Section (preserved exactly from original) */}
+                    {!classList && (
+                        <div className="p-8">
+                            <div className="grid lg:grid-cols-3 gap-8">
 
-                    {/* Import Section */}
-                    <div className="p-8">
-                        <div className="grid lg:grid-cols-3 gap-8">
-                            {/* Left Column - Upload Area */}
-                            <div className="lg:col-span-2">
-                                <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
-                                    {/* Upload Header */}
-                                    <div className="bg-gradient-to-r from-blue-700 to-indigo-700 px-8 py-6 relative">
-                                        <div className="absolute inset-0 bg-black/20"></div>
-                                        <div className="flex items-center space-x-3 relative z-10">
-                                            <div className="bg-white/30 rounded-lg p-3 backdrop-blur-sm">
-                                                <FileSpreadsheet size={32} className="text-white" />
-                                            </div>
-                                            <div>
-                                                <h2 className="text-3xl font-bold text-white drop-shadow-lg">Import Student List</h2>
-                                                <p className="text-gray-100 font-semibold text-lg drop-shadow-md">Upload your Excel file to get started</p>
-                                            </div>
-                                        </div>
-                                    </div>
+                                {/* Left Column - Upload Area */}
+                                <div className="lg:col-span-2">
+                                    <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+                                        {/* Upload Header */}
+                                        <div className="bg-gradient-to-r from-blue-700 to-indigo-700 px-8 py-6 relative">
+                                            {/* Semi-transparent overlay for better text contrast */}
+                                            <div className="absolute inset-0 bg-black/20"></div>
 
-                                    {/* Drag and Drop Area */}
-                                    <div className="p-8">
-                                        <div className="relative border-2 border-dashed border-gray-300 hover:border-blue-400 hover:bg-gray-50 rounded-xl p-12 text-center transition-all duration-300">
-                                            <input
-                                                type="file"
-                                                accept=".xls,.xlsx"
-                                                onChange={handleFileUpload}
-                                                className="hidden"
-                                                id="excel-upload"
-                                                ref={fileInputRef}
-                                            />
-
-                                            <div className="space-y-4">
-                                                <div className="mx-auto w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center">
-                                                    <Upload size={32} className="text-gray-400" />
+                                            <div className="flex items-center space-x-3 relative z-10">
+                                                <div className="bg-white/30 rounded-lg p-3 backdrop-blur-sm">
+                                                    <FileSpreadsheet size={32} className="text-white" />
                                                 </div>
-
                                                 <div>
-                                                    <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                                                        Drop your Excel file here
-                                                    </h3>
-                                                    <p className="text-gray-600 mb-6">
-                                                        or click to browse and select your student roster
-                                                    </p>
-                                                </div>
-
-                                                <button
-                                                    onClick={() => fileInputRef.current?.click()}
-                                                    className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-8 rounded-lg transition-colors duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
-                                                >
-                                                    Choose Excel File
-                                                </button>
-                                            </div>
-                                        </div>
-
-                                        {/* Status Messages */}
-                                        {importStatus === 'processing' && (
-                                            <div className="mt-6 flex items-center space-x-3 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                                                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
-                                                <span className="text-blue-800 font-medium">
-                                                    📊 Processing Excel file...
-                                                </span>
-                                            </div>
-                                        )}
-
-                                        {importStatus === 'success' && (
-                                            <div className="mt-6 flex items-center space-x-3 p-4 bg-green-50 border border-green-200 rounded-lg">
-                                                <CheckCircle2 size={20} className="text-green-600" />
-                                                <span className="text-green-800 font-medium">
-                                                    ✅ Excel file imported successfully! (Session only - privacy protected)
-                                                </span>
-                                            </div>
-                                        )}
-
-                                        {importStatus === 'error' && (
-                                            <div className="mt-6 flex items-center space-x-3 p-4 bg-red-50 border border-red-200 rounded-lg">
-                                                <AlertCircle size={20} className="text-red-600" />
-                                                <span className="text-red-800 font-medium">
-                                                    ✗ Error importing Excel file. Please check format and try again.
-                                                </span>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Right Column - Format Requirements */}
-                            <div className="space-y-6">
-                                {/* Privacy Notice Card */}
-                                <div className="bg-orange-50 rounded-xl shadow-lg border border-orange-200 overflow-hidden">
-                                    <div className="bg-orange-100 px-6 py-4 border-b border-orange-200">
-                                        <h3 className="text-lg font-semibold text-orange-900 flex items-center">
-                                            <Shield size={20} className="mr-2" />
-                                            Privacy Protection
-                                        </h3>
-                                    </div>
-
-                                    <div className="p-6 space-y-3">
-                                        <div className="flex items-start space-x-2">
-                                            <div className="w-2 h-2 bg-orange-500 rounded-full mt-2"></div>
-                                            <span className="text-sm text-orange-800">
-                                                <strong>Session Only:</strong> Data stored in memory, never saved to disk
-                                            </span>
-                                        </div>
-                                        <div className="flex items-start space-x-2">
-                                            <div className="w-2 h-2 bg-orange-500 rounded-full mt-2"></div>
-                                            <span className="text-sm text-orange-800">
-                                                <strong>1-Hour Limit:</strong> Automatic data clearing for privacy
-                                            </span>
-                                        </div>
-                                        <div className="flex items-start space-x-2">
-                                            <div className="w-2 h-2 bg-orange-500 rounded-full mt-2"></div>
-                                            <span className="text-sm text-orange-800">
-                                                <strong>Manual Export:</strong> Save your work before session ends
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Format Requirements Card */}
-                                <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
-                                    <div className="bg-gray-50 px-6 py-4 border-b border-gray-100">
-                                        <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-                                            <FileText size={20} className="mr-2 text-blue-600" />
-                                            Excel Format Requirements
-                                        </h3>
-                                    </div>
-
-                                    <div className="p-6 space-y-4">
-                                        <div>
-                                            <h4 className="font-medium text-gray-900 mb-2">Required Columns</h4>
-                                            <div className="space-y-1">
-                                                {['ID', 'Name', 'Email'].map((col) => (
-                                                    <div key={col} className="flex items-center space-x-2">
-                                                        <div className="w-2 h-2 bg-red-400 rounded-full"></div>
-                                                        <span className="text-sm text-gray-700">{col}</span>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-
-                                        <div>
-                                            <h4 className="font-medium text-gray-900 mb-2">Optional Columns</h4>
-                                            <div className="space-y-1">
-                                                {['Program', 'Campus', 'Level', 'Status'].map((col) => (
-                                                    <div key={col} className="flex items-center space-x-2">
-                                                        <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
-                                                        <span className="text-sm text-gray-700">{col}</span>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-
-                                        <div className="pt-4 border-t border-gray-100">
-                                            <div className="space-y-2 text-sm text-gray-600">
-                                                <div className="flex items-start space-x-2">
-                                                    <span className="font-medium">File types:</span>
-                                                    <span>.xls or .xlsx</span>
-                                                </div>
-                                                <div className="flex items-start space-x-2">
-                                                    <span className="font-medium">Headers:</span>
-                                                    <span>First row should contain column names</span>
+                                                    <h2 className="text-3xl font-bold text-white drop-shadow-lg">Import Student List</h2>
+                                                    <p className="text-gray-100 font-semibold text-lg drop-shadow-md">Upload your Excel file to get started</p>
                                                 </div>
                                             </div>
                                         </div>
-                                    </div>
-                                </div>
 
-                                {/* Tips Card */}
-                                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-100">
-                                    <h3 className="text-lg font-semibold text-blue-900 mb-3 flex items-center">
-                                        <BookOpen size={20} className="mr-2" />
-                                        Pro Tips
-                                    </h3>
-                                    <ul className="space-y-2 text-sm text-blue-800">
-                                        <li className="flex items-start space-x-2">
-                                            <span className="w-1.5 h-1.5 bg-blue-600 rounded-full mt-2 flex-shrink-0"></span>
-                                            <span>Include all required columns for best results</span>
-                                        </li>
-                                        <li className="flex items-start space-x-2">
-                                            <span className="w-1.5 h-1.5 bg-blue-600 rounded-full mt-2 flex-shrink-0"></span>
-                                            <span>Ensure email addresses are properly formatted</span>
-                                        </li>
-                                        <li className="flex items-start space-x-2">
-                                            <span className="w-1.5 h-1.5 bg-blue-600 rounded-full mt-2 flex-shrink-0"></span>
-                                            <span>Remove any empty rows or columns</span>
-                                        </li>
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <SessionWarningModal />
-        </div>
-    );
+                                        {/* Drag and Drop Area */}
+                                        <div className="p-8">
+                                            <div className="relative border-2 border-dashed border-gray-300 hover:border-blue-400 hover:bg-gray-50 rounded-xl p-12 text-center transition-all duration-300">
+                                                <input
+                                                    type="file"
+                                                    accept=".xls,.xlsx"
+                                                    onChange={handleFileUpload}
+                                                    className="hidden"
+                                                    id="excel-upload"
+                                                    ref={fileInputRef}
+                                                />
 
-    // Main render logic
-    return (
-        <>
-            {/* PRIVACY: Show session warning modal */}
-            <SessionWarningModal />
-
-            {!classList ? (
-                <EmptyStateWithPrivacy />
-            ) : (
-                <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-                    <div className="max-w-7xl mx-auto">
-                        {/* Header (enhanced with session status) */}
-                        <div className="bg-gradient-to-r text-gray-800 p-6 rounded-t-lg shadow-lg">
-                            <div className="flex justify-between items-center">
-                                <div>
-                                    <h1 className="text-3xl font-bold mb-2">Class List Manager</h1>
-                                    <p className="text-gray-600">
-                                        Import, manage, and grade entire classes efficiently
-                                    </p>
-                                    <div className="mt-2 flex items-center gap-4 text-sm">
-                                        <span className="px-2 py-1 bg-orange-100 text-orange-700 rounded text-xs flex items-center gap-1">
-                                            <Shield size={12} />
-                                            Privacy Mode - Session Only
-                                        </span>
-                                        {timeRemaining && (
-                                            <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs flex items-center gap-1">
-                                                <Timer size={12} />
-                                                {Math.floor(timeRemaining / 60000)}min remaining
-                                            </span>
-                                        )}
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-4">
-                                    {classList && (
-                                        <div className="text-right">
-                                            <div className="text-2xl font-bold">
-                                                {classList.students.length}
-                                            </div>
-                                            <div className="text-sm text-gray-700">
-                                                Students
-                                            </div>
-                                        </div>
-                                    )}
-                                    <Users size={48} className="text-gray-700" />
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="bg-white rounded-b-lg shadow-lg">
-                            {/* Management Dashboard (preserved with enhanced program type dropdown) */}
-                            <div className="p-6">
-                                {/* Overview Cards */}
-                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-                                    {/* Course Info with Enhanced Program Type Dropdown */}
-                                    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6">
-                                        <div className="flex items-center gap-3 mb-4">
-                                            <BookOpen className="text-blue-600" size={24} />
-                                            <h3 className="text-lg font-semibold text-blue-800">
-                                                Course Information
-                                            </h3>
-                                        </div>
-                                        <div className="space-y-2 text-sm">
-                                            <div>
-                                                <strong>Code:</strong>{' '}
-                                                {classList.courseMetadata?.courseCode || 'N/A'}
-                                            </div>
-                                            <div>
-                                                <strong>Name:</strong>{' '}
-                                                {classList.courseMetadata?.courseName || 'N/A'}
-                                            </div>
-                                            <div>
-                                                <strong>Section:</strong>{' '}
-                                                {classList.courseMetadata?.section || 'N/A'}
-                                            </div>
-                                            <div>
-                                                <strong>Professor:</strong>{' '}
-                                                {classList.courseMetadata?.instructor || 'N/A'}
-                                            </div>
-
-                                            {/* ENHANCED: Program type selector with policy preview */}
-                                            <div className="mt-3">
-                                                {renderEnhancedProgramTypeDropdown()}
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Progress Stats (preserved exactly from original) */}
-                                    <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-6">
-                                        <div className="flex items-center gap-3 mb-4">
-                                            <GraduationCap className="text-green-600" size={24} />
-                                            <h3 className="text-lg font-semibold text-green-800">
-                                                Grading Progress
-                                            </h3>
-                                        </div>
-                                        <div className="space-y-2 text-sm">
-                                            <div>
-                                                <strong>Total Students:</strong> {classList.students.length}
-                                            </div>
-                                            <div>
-                                                <strong>Final Grades:</strong>{' '}
-                                                {getGradingProgress().final}
-                                            </div>
-                                            <div>
-                                                <strong>Draft Grades:</strong>{' '}
-                                                {getGradingProgress().draft}
-                                            </div>
-                                            <div>
-                                                <strong>Completion:</strong>{' '}
-                                                {getGradingProgress().percentage}%
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Session Control (preserved exactly from original) */}
-                                    <div className="bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-lg p-6">
-                                        <div className="flex items-center gap-3 mb-4">
-                                            <Play className="text-purple-600" size={24} />
-                                            <h3 className="text-lg font-semibold text-purple-800">
-                                                Batch Grading Session
-                                            </h3>
-                                        </div>
-                                        <div className="space-y-3">
-                                            {!gradingSession?.active ? (
-                                                <div>
-                                                    <div className="text-sm text-purple-600 mb-2">
-                                                        {gradingSession?.currentStudentIndex > 0
-                                                            ? `Paused at student ${gradingSession.currentStudentIndex + 1} of ${classList.students.length}`
-                                                            : 'Ready to start batch grading'
-                                                        }
+                                                <div className="space-y-4">
+                                                    <div className="mx-auto w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center">
+                                                        <Upload size={32} className="text-gray-400" />
                                                     </div>
-                                                    <div className="flex gap-2">
-                                                        {gradingSession?.currentStudentIndex > 0 ? (
-                                                            <button
-                                                                onClick={resumeGradingSession}
-                                                                disabled={!sessionActive}
-                                                                className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                                            >
-                                                                <Play size={16} />
-                                                                Resume Session
-                                                            </button>
-                                                        ) : (
-                                                            <button
-                                                                onClick={startGradingSession}
-                                                                disabled={!sharedRubric || !sessionActive}
-                                                                className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                                            >
-                                                                <Play size={16} />
-                                                                Start Batch Grading
-                                                            </button>
-                                                        )}
-                                                        {!sharedRubric && (
-                                                            <div className="text-xs text-purple-600 mt-1">
-                                                                Load a rubric first
-                                                            </div>
-                                                        )}
-                                                        {!sessionActive && (
-                                                            <div className="text-xs text-red-600 mt-1">
-                                                                Session expired - refresh page
-                                                            </div>
-                                                        )}
+
+                                                    <div>
+                                                        <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                                                            Drop your Excel file here
+                                                        </h3>
+                                                        <p className="text-gray-600 mb-6">
+                                                            or click to browse and select your student roster
+                                                        </p>
                                                     </div>
-                                                </div>
-                                            ) : (
-                                                <div>
-                                                    <div className="text-sm text-green-600 font-medium mb-2">
-                                                        ✓ Session Active - Student {gradingSession.currentStudentIndex + 1} of {classList.students.length}
-                                                    </div>
+
                                                     <button
-                                                        onClick={pauseGradingSession}
-                                                        className="flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-medium transition-colors"
+                                                        onClick={() => fileInputRef.current?.click()}
+                                                        className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-8 rounded-lg transition-colors duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
                                                     >
-                                                        <Clock size={16} />
-                                                        Pause Session
+                                                        Choose Excel File
                                                     </button>
+                                                </div>
+                                            </div>
+
+                                            {/* Status Messages */}
+                                            {importStatus === 'loading' && (
+                                                <div className="mt-6 flex items-center space-x-3 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                                                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+                                                    <span className="text-blue-800 font-medium">
+                                                        📊 Processing Excel file...
+                                                    </span>
+                                                </div>
+                                            )}
+
+                                            {importStatus === 'success' && (
+                                                <div className="mt-6 flex items-center space-x-3 p-4 bg-green-50 border border-green-200 rounded-lg">
+                                                    <CheckCircle2 size={20} className="text-green-600" />
+                                                    <span className="text-green-800 font-medium">
+                                                        ✅ Excel file imported successfully!
+                                                    </span>
+                                                </div>
+                                            )}
+
+                                            {importStatus === 'error' && (
+                                                <div className="mt-6 flex items-center space-x-3 p-4 bg-red-50 border border-red-200 rounded-lg">
+                                                    <AlertCircle size={20} className="text-red-600" />
+                                                    <span className="text-red-800 font-medium">
+                                                        ✗ Error importing Excel file. Please check format and try again.
+                                                    </span>
                                                 </div>
                                             )}
                                         </div>
                                     </div>
                                 </div>
 
-                                {/* Student Table (preserved exactly from original) */}
-                                <div className="bg-white border border-gray-200 rounded-lg">
-                                    {/* FIXED: Export button handlers that properly handle async functions */}
-                                    <div className="px-6 py-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
-                                        <h3 className="text-lg font-semibold text-gray-800">
-                                            Student Roster
+                                {/* Right Column - Format Requirements */}
+                                <div className="space-y-6">
+
+                                    {/* Format Requirements Card */}
+                                    <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
+                                        <div className="bg-gray-50 px-6 py-4 border-b border-gray-100">
+                                            <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                                                <FileText size={20} className="mr-2 text-blue-600" />
+                                                Excel Format Requirements
+                                            </h3>
+                                        </div>
+
+                                        <div className="p-6 space-y-4">
+                                            <div>
+                                                <h4 className="font-medium text-gray-900 mb-2">Required Columns</h4>
+                                                <div className="space-y-1">
+                                                    {['ID', 'Name', 'Email'].map((col) => (
+                                                        <div key={col} className="flex items-center space-x-2">
+                                                            <div className="w-2 h-2 bg-red-400 rounded-full"></div>
+                                                            <span className="text-sm text-gray-700">{col}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <h4 className="font-medium text-gray-900 mb-2">Optional Columns</h4>
+                                                <div className="space-y-1">
+                                                    {['Program', 'Campus', 'Level', 'Status'].map((col) => (
+                                                        <div key={col} className="flex items-center space-x-2">
+                                                            <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+                                                            <span className="text-sm text-gray-700">{col}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            <div className="pt-4 border-t border-gray-100">
+                                                <div className="space-y-2 text-sm text-gray-600">
+                                                    <div className="flex items-start space-x-2">
+                                                        <span className="font-medium">File types:</span>
+                                                        <span>.xls or .xlsx</span>
+                                                    </div>
+                                                    <div className="flex items-start space-x-2">
+                                                        <span className="font-medium">Headers:</span>
+                                                        <span>First row should contain column names</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Tips Card */}
+                                    <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-100">
+                                        <h3 className="text-lg font-semibold text-blue-900 mb-3 flex items-center">
+                                            <BookOpen size={20} className="mr-2" />
+                                            Pro Tips
                                         </h3>
-                                        <div className="flex gap-2">
-                                            <button
-                                                onClick={async () => {
-                                                    console.log('🔄 Starting CSV export...');
-                                                    await exportClassGradesCSV();
-                                                }}
-                                                className="px-2 py-1 rounded text-xs font-medium text-white bg-green-500 hover:bg-green-700 focus:ring-2 focus:ring-green-500 transition-colors duration-150"
-                                            >
-                                                <Download size={14} />
-                                                CSV
-                                            </button>
-                                            <button
-                                                onClick={async () => {
-                                                    console.log('🔄 Starting HTML export...');
-                                                    await exportClassGradesHTML();
-                                                }}
-                                                className="flex items-center gap-1 px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm font-medium transition-colors"
-                                            >
-                                                <FileText size={14} />
-                                                HTML
-                                            </button>
-                                            <button
-                                                onClick={async () => {
-                                                    console.log('🔄 Starting PDF export...');
-                                                    await exportClassGradesPortraitPDF();
-                                                }}
-                                                className="flex items-center gap-1 px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm font-medium transition-colors"
-                                            >
-                                                <FileText size={14} />
-                                                PDF
-                                            </button>
-                                        </div>
+                                        <ul className="space-y-2 text-sm text-blue-800">
+                                            <li className="flex items-start space-x-2">
+                                                <span className="w-1.5 h-1.5 bg-blue-600 rounded-full mt-2 flex-shrink-0"></span>
+                                                <span>Include all required columns for best results</span>
+                                            </li>
+                                            <li className="flex items-start space-x-2">
+                                                <span className="w-1.5 h-1.5 bg-blue-600 rounded-full mt-2 flex-shrink-0"></span>
+                                                <span>Ensure email addresses are properly formatted</span>
+                                            </li>
+                                            <li className="flex items-start space-x-2">
+                                                <span className="w-1.5 h-1.5 bg-blue-600 rounded-full mt-2 flex-shrink-0"></span>
+                                                <span>Remove any empty rows or columns</span>
+                                            </li>
+                                        </ul>
                                     </div>
 
-                                    <div className="overflow-x-auto">
-                                        <table className="table-auto w-max mx-auto">
-                                            <thead className="bg-gray-50">
-                                                <tr>
-                                                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                        #
-                                                    </th>
-                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                        Status
-                                                    </th>
-                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                        Student ID
-                                                    </th>
-                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                        Name
-                                                    </th>
-                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                        Email
-                                                    </th>
-                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                        Program
-                                                    </th>
-                                                    <th className="w-48 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                        Actions
-                                                    </th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="bg-white divide-y divide-gray-200">
-                                                {classList.students.map((student, index) => {
-                                                    const progress = classList.gradingProgress[index];
-                                                    const isCurrentStudent = gradingSession.active && index === gradingSession.currentStudentIndex;
-                                                    const gradeStatus = getGradeStatus(student.id);
-
-                                                    return (
-                                                        <tr
-                                                            key={student.id}
-                                                            className={`${isCurrentStudent
-                                                                ? 'bg-blue-50 border-l-4 border-blue-500'
-                                                                : 'hover:bg-gray-50'
-                                                                } transition-colors`}
-                                                        >
-                                                            <td className="px-4 py-2 whitespace-normal break-words text-sm text-gray-900 max-w-xs">
-                                                                {index + 1}
-                                                            </td>
-                                                            <td className="px-6 py-4 whitespace-nowrap">
-                                                                {getStatusDisplay(progress, student.id)}
-                                                            </td>
-                                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                                                {student.id}
-                                                            </td>
-                                                            <td className="px-4 py-2 whitespace-normal break-words text-sm text-gray-900 max-w-xs">
-                                                                {student.name}
-                                                            </td>
-                                                            <td className="px-4 py-2 whitespace-normal break-words text-sm text-gray-500 max-w-xs">
-                                                                {student.email}
-                                                            </td>
-                                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                                {student.program}
-                                                            </td>
-
-                                                            <td className="w-48 px-4 py-2 text-sm whitespace-normal">
-                                                                <div className="flex flex-wrap items-center gap-2">
-                                                                    {/* View or Edit */}
-                                                                    <button
-                                                                        onClick={() => loadStudentForGrading(student)}
-                                                                        disabled={!sessionActive}
-                                                                        className="flex items-center gap-1 px-3 py-1 bg-blue-500 hover:bg-blue-700 text-white rounded text-sm font-medium transition-colors focus:ring-2 focus:ring-blue-500 duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
-                                                                    >
-                                                                        {gradeStatus === 'final' ? 'View' : 'Edit'}
-                                                                    </button>
-
-                                                                    {/* Finalize draft */}
-                                                                    {gradeStatus === 'draft' && sessionActive && (
-                                                                        <button
-                                                                            onClick={() => finalizeGrade(student.id)}
-                                                                            className="flex items-center gap-1 px-3 py-1 bg-green-500 hover:bg-green-700 text-white rounded text-sm font-medium transition-colors focus:ring-2 focus:ring-green-500 duration-150"
-                                                                        >
-                                                                            Finalize
-                                                                        </button>
-                                                                    )}
-
-                                                                    {/* Export Grade (always visible) */}
-                                                                    <button
-                                                                        onClick={() => exportStudentGrade(student.id)}
-                                                                        className="flex items-center gap-1 px-3 py-1 bg-purple-500 hover:bg-purple-700 text-white rounded text-sm font-medium transition-colors focus:ring-2 focus:ring-purple-500 duration-150"
-                                                                    >
-                                                                        <ExternalLink size={14} />
-                                                                        Export Grade
-                                                                    </button>
-
-                                                                    {/* Unlock (only for final) */}
-                                                                    {gradeStatus === 'final' && sessionActive && (
-                                                                        <button
-                                                                            onClick={() => unlockGrade(student.id)}
-                                                                            className="flex items-center gap-1 px-3 py-1 bg-orange-500 hover:bg-orange-700 text-white rounded text-sm font-medium transition-colors focus:ring-2 focus:ring-orange-500 duration-150"
-                                                                        >
-                                                                            <Unlock size={14} />
-                                                                            Unlock
-                                                                        </button>
-                                                                    )}
-                                                                </div>
-                                                            </td>
-                                                        </tr>
-                                                    );
-                                                })}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-
-                                {/* Import Summary (enhanced with privacy notices) */}
-                                <div className="mt-8 bg-gray-50 rounded-lg p-6">
-                                    <h3 className="text-lg font-semibold text-gray-800 mb-4">Import Summary</h3>
-                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                                        <div>
-                                            <span className="text-gray-600">File:</span>
-                                            <div className="font-medium">{classList.fileName}</div>
-                                        </div>
-                                        <div>
-                                            <span className="text-gray-600">Import Date:</span>
-                                            <div className="font-medium">
-                                                {new Date(classList.importTime).toLocaleDateString()}
-                                            </div>
-                                        </div>
-                                        <div>
-                                            <span className="text-gray-600">Storage:</span>
-                                            <div className="font-medium text-orange-600 flex items-center gap-1">
-                                                <Shield size={12} />
-                                                Session Only
-                                            </div>
-                                        </div>
-                                        <div>
-                                            <span className="text-gray-600">Total Students:</span>
-                                            <div className="font-medium">{classList.students.length}</div>
-                                        </div>
-                                    </div>
-
-                                    {/* PRIVACY: Enhanced privacy notice */}
-                                    <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                                        <div className="flex items-center mb-2">
-                                            <Lock className="h-4 w-4 text-yellow-600 mr-2" />
-                                            <span className="text-sm font-semibold text-yellow-800">
-                                                Privacy Protection Active
-                                            </span>
-                                        </div>
-                                        <div className="text-xs text-yellow-700 space-y-1">
-                                            <div>• All data stored in session memory only (not saved to disk)</div>
-                                            <div>• Automatic data clearing after 1 hour or application restart</div>
-                                            <div>• Export your work before session expires to avoid data loss</div>
-                                            <div>• No persistent storage of student information for privacy compliance</div>
-                                        </div>
+                                    {/* Sample Template Download */}
+                                    <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-6">
+                                        <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
+                                            <Download size={20} className="mr-2 text-green-600" />
+                                            Need Help?
+                                        </h3>
+                                        <p className="text-sm text-gray-600 mb-4">
+                                            Download our sample template to ensure your Excel file is formatted correctly.
+                                        </p>
+                                        <button
+                                            onClick={() => {
+                                                const link = document.createElement('a');
+                                                link.href = '/Example-Class-List.xlsx';
+                                                link.download = 'Example-Class-List.xlsx';
+                                                link.click();
+                                            }}
+                                            className="w-full bg-green-100 hover:bg-green-200 text-green-800 font-medium py-3 px-4 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
+                                        >
+                                            <Download size={16} />
+                                            Download Sample Template
+                                        </button>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
+                    )}
+
+                    {/* Management Dashboard (preserved with enhanced program type dropdown) */}
+                    {classList && (
+                        <div className="p-6">
+                            {/* Overview Cards */}
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                                {/* Course Info with Enhanced Program Type Dropdown */}
+                                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6">
+                                    <div className="flex items-center gap-3 mb-4">
+                                        <BookOpen className="text-blue-600" size={24} />
+                                        <h3 className="text-lg font-semibold text-blue-800">
+                                            Course Information
+                                        </h3>
+                                    </div>
+                                    <div className="space-y-2 text-sm">
+                                        <div>
+                                            <strong>Code:</strong>{' '}
+                                            {classList.courseMetadata?.courseCode || 'N/A'}
+                                        </div>
+                                        <div>
+                                            <strong>Name:</strong>{' '}
+                                            {classList.courseMetadata?.courseName || 'N/A'}
+                                        </div>
+                                        <div>
+                                            <strong>Section:</strong>{' '}
+                                            {classList.courseMetadata?.section || 'N/A'}
+                                        </div>
+                                        <div>
+                                            <strong>Professor:</strong>{' '}
+                                            {classList.courseMetadata?.instructor || 'N/A'}
+                                        </div>
+
+                                        {/* ENHANCED: Program type selector with policy preview */}
+                                        <div className="mt-3">
+                                            {renderEnhancedProgramTypeDropdown()}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Progress Stats (preserved exactly from original) */}
+                                <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-6">
+                                    <div className="flex items-center gap-3 mb-4">
+                                        <GraduationCap className="text-green-600" size={24} />
+                                        <h3 className="text-lg font-semibold text-green-800">
+                                            Grading Progress
+                                        </h3>
+                                    </div>
+                                    <div className="space-y-2 text-sm">
+                                        <div>
+                                            <strong>Total Students:</strong> {classList.students.length}
+                                        </div>
+                                        <div>
+                                            <strong>Final Grades:</strong>{' '}
+                                            {getGradingProgress().final}
+                                        </div>
+                                        <div>
+                                            <strong>Draft Grades:</strong>{' '}
+                                            {getGradingProgress().draft}
+                                        </div>
+                                        <div>
+                                            <strong>Completion:</strong>{' '}
+                                            {getGradingProgress().percentage}%
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Session Control (preserved exactly from original) */}
+                                <div className="bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-lg p-6">
+                                    <div className="flex items-center gap-3 mb-4">
+                                        <Play className="text-purple-600" size={24} />
+                                        <h3 className="text-lg font-semibold text-purple-800">
+                                            Batch Grading Session
+                                        </h3>
+                                    </div>
+                                    <div className="space-y-3">
+                                        {!gradingSession?.active ? (
+                                            <div>
+                                                <div className="text-sm text-purple-600 mb-2">
+                                                    {gradingSession?.currentStudentIndex > 0
+                                                        ? `Paused at student ${gradingSession.currentStudentIndex + 1} of ${classList.students.length}`
+                                                        : 'Ready to start batch grading'
+                                                    }
+                                                </div>
+                                                <div className="flex gap-2">
+                                                    {gradingSession?.currentStudentIndex > 0 ? (
+                                                        <button
+                                                            onClick={resumeGradingSession}
+                                                            className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors"
+                                                        >
+                                                            <Play size={16} />
+                                                            Resume Session
+                                                        </button>
+                                                    ) : (
+                                                        <button
+                                                            onClick={startGradingSession}
+                                                            disabled={!sharedRubric}
+                                                            className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                                        >
+                                                            <Play size={16} />
+                                                            Start Batch Grading
+                                                        </button>
+                                                    )}
+                                                    {!sharedRubric && (
+                                                        <div className="text-xs text-purple-600 mt-1">
+                                                            Load a rubric first
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div>
+                                                <div className="text-sm text-green-600 font-medium mb-2">
+                                                    ✓ Session Active - Student {gradingSession.currentStudentIndex + 1} of {classList.students.length}
+                                                </div>
+                                                <button
+                                                    onClick={pauseGradingSession}
+                                                    className="flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-medium transition-colors"
+                                                >
+                                                    <Clock size={16} />
+                                                    Pause Session
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Student Table (preserved exactly from original) */}
+                            <div className="bg-white border border-gray-200 rounded-lg">
+                                {/* FIXED: Export button handlers that properly handle async functions */}
+                                <div className="px-6 py-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+                                    <h3 className="text-lg font-semibold text-gray-800">
+                                        Student Roster
+                                    </h3>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={async () => {
+                                                console.log('🔄 Starting CSV export...');
+                                                await exportClassGradesCSV();
+                                            }}
+                                            className="px-2 py-1 rounded text-xs font-medium text-white bg-green-500 hover:bg-green-700 focus:ring-2 focus:ring-green-500 transition-colors duration-150"
+                                        >
+                                            <Download size={14} />
+                                            CSV
+                                        </button>
+                                        <button
+                                            onClick={async () => {
+                                                console.log('🔄 Starting HTML export...');
+                                                await exportClassGradesHTML();
+                                            }}
+                                            className="flex items-center gap-1 px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm font-medium transition-colors"
+                                        >
+                                            <FileText size={14} />
+                                            HTML
+                                        </button>
+                                        <button
+                                            onClick={async () => {
+                                                console.log('🔄 Starting PDF export...');
+                                                await exportClassGradesPortraitPDF();
+                                            }}
+                                            className="flex items-center gap-1 px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm font-medium transition-colors"
+                                        >
+                                            <FileText size={14} />
+                                            PDF
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="overflow-x-auto">
+                                    <table className="table-auto w-max mx-auto">
+                                        <thead className="bg-gray-50">
+                                            <tr>
+                                                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                    #
+                                                </th>
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                    Status
+                                                </th>
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                    Student ID
+                                                </th>
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                    Name
+                                                </th>
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                    Email
+                                                </th>
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                    Program
+                                                </th>
+                                                <th className="w-48 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                    Actions
+                                                </th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="bg-white divide-y divide-gray-200">
+                                            {classList.students.map((student, index) => {
+                                                const progress = classList.gradingProgress[index];
+                                                const isCurrentStudent = gradingSession.active && index === gradingSession.currentStudentIndex;
+                                                const gradeStatus = getGradeStatus(student.id);
+
+                                                return (
+                                                    <tr
+                                                        key={student.id}
+                                                        className={`${isCurrentStudent
+                                                            ? 'bg-blue-50 border-l-4 border-blue-500'
+                                                            : 'hover:bg-gray-50'
+                                                            } transition-colors`}
+                                                    >
+                                                        <td className="px-4 py-2 whitespace-normal break-words text-sm text-gray-900 max-w-xs">
+                                                            {index + 1}
+                                                        </td>
+                                                        <td className="px-6 py-4 whitespace-nowrap">
+                                                            {getStatusDisplay(progress, student.id)}
+                                                        </td>
+                                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                                            {student.id}
+                                                        </td>
+                                                        <td className="px-4 py-2 whitespace-normal break-words text-sm text-gray-900 max-w-xs">
+                                                            {student.name}
+                                                        </td>
+                                                        <td className="px-4 py-2 whitespace-normal break-words text-sm text-gray-500 max-w-xs">
+                                                            {student.email}
+                                                        </td>
+                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                            {student.program}
+                                                        </td>
+
+                                                        <td className="w-48 px-4 py-2 text-sm whitespace-normal">
+                                                            <div className="flex flex-wrap items-center gap-2">
+                                                                {/* View or Edit */}
+                                                                <button
+                                                                    onClick={() => loadStudentForGrading(student)}
+                                                                    className="flex items-center gap-1 px-3 py-1 bg-blue-500 hover:bg-blue-700 text-white rounded text-sm font-medium transition-colors focus:ring-2 focus:ring-blue-500 duration-150"
+                                                                >
+                                                                    {gradeStatus === 'final' ? 'View' : 'Edit'}
+                                                                </button>
+
+                                                                {/* Finalize draft */}
+                                                                {gradeStatus === 'draft' && (
+                                                                    <button
+                                                                        onClick={() => finalizeGrade(student.id)}
+                                                                        className="flex items-center gap-1 px-3 py-1 bg-green-500 hover:bg-green-700 text-white rounded text-sm font-medium transition-colors focus:ring-2 focus:ring-green-500 duration-150"
+                                                                    >
+                                                                        Finalize
+                                                                    </button>
+                                                                )}
+
+                                                                {/* Export Grade (always visible) */}
+                                                                <button
+                                                                    onClick={() => exportStudentGrade(student.id)}
+                                                                    className="flex items-center gap-1 px-3 py-1 bg-purple-500 hover:bg-purple-700 text-white rounded text-sm font-medium transition-colors focus:ring-2 focus:ring-purple-500 duration-150"
+                                                                >
+                                                                    <ExternalLink size={14} />
+                                                                    Export Grade
+                                                                </button>
+
+                                                                {/* Unlock (only for final) */}
+                                                                {gradeStatus === 'final' && (
+                                                                    <button
+                                                                        onClick={() => unlockGrade(student.id)}
+                                                                        className="flex items-center gap-1 px-3 py-1 bg-orange-500 hover:bg-orange-700 text-white rounded text-sm font-medium transition-colors focus:ring-2 focus:ring-orange-500 duration-150"
+                                                                    >
+                                                                        <Unlock size={14} />
+                                                                        Unlock
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            {/* Import Summary (preserved exactly from original) */}
+                            <div className="mt-8 bg-gray-50 rounded-lg p-6">
+                                <h3 className="text-lg font-semibold text-gray-800 mb-4">Import Summary</h3>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                                    <div>
+                                        <span className="text-gray-600">File:</span>
+                                        <div className="font-medium">{classList.fileName}</div>
+                                    </div>
+                                    <div>
+                                        <span className="text-gray-600">Import Date:</span>
+                                        <div className="font-medium">
+                                            {new Date(classList.importTime).toLocaleDateString()}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <span className="text-gray-600">Data Quality:</span>
+                                        <div className="font-medium">
+                                            {classList.validation?.validationScore || 0}%
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <span className="text-gray-600">Total Students:</span>
+                                        <div className="font-medium">{classList.students.length}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
-            )}
-        </>
+            </div>
+        </div>
+
+
     );
 };
 
