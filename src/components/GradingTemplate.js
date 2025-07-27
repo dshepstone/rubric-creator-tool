@@ -28,6 +28,10 @@ import {
 // app‑specific hooks / helpers
 import { useAssessment, DEFAULT_LATE_POLICY } from './SharedContext';
 import { ensureUniqueCriterionIds } from '../utils/ensureUniqueCriterionIds';
+<<<<<<< HEAD
+=======
+import { getSchoolLogo, generateReportHeader, getReportStyles } from './logoIntegrationUtility';
+>>>>>>> logo-insertion
 
 /**
  * PRIVACY-FOCUSED GradingTemplate - Session-Only Storage
@@ -439,6 +443,7 @@ const GradingTemplate = () => {
     return 'F';
   };
 
+<<<<<<< HEAD
   // Helper function to generate the student report HTML. This avoids code duplication.
   const generateStudentReportHTML = () => {
     const totalScore = scoreSummary.finalScore;
@@ -448,11 +453,29 @@ const GradingTemplate = () => {
     const penaltyApplied = scoreSummary.penaltyApplied;
 
     const attachmentsHTML = gradingData.attachments.map((att, index) => {
+=======
+  // Enhanced version of your existing generateStudentReportHTML function (from GradingTemplate.js)
+  const generateStudentReportHTML = () => {
+    const currentDate = new Date().toLocaleDateString('en-CA');
+    const currentTime = new Date().toLocaleTimeString('en-CA');
+
+    // Calculate scores
+    const scoreCalculation = calculateTotalScore();
+    const totalScore = scoreCalculation.finalScore;
+    const rawScore = scoreCalculation.rawScore;
+    const maxPoints = sharedRubric ? sharedRubric.assignmentInfo.totalPoints : gradingData.assignment.maxPoints;
+    const percentage = ((totalScore / (maxPoints || 1)) * 100).toFixed(1);
+    const penaltyApplied = scoreCalculation.penaltyApplied;
+
+    // Generate attachments HTML
+    const attachmentsHTML = gradingData.attachments?.map((att, index) => {
+>>>>>>> logo-insertion
       if (att.base64Data) {
         return `<div class="attachment-item"><img src="${att.base64Data}" alt="${att.name}" class="clickable-image" data-index="${index}" style="max-width: 200px; max-height: 200px; object-fit: contain; display: block; margin-bottom: 0.5rem; border: 1px solid #ddd; border-radius: 4px;" /><div style="font-size: 0.875rem; font-weight: 500; word-break: break-word;">${att.name}</div><div style="font-size: 0.75rem; color: #666;">${(att.size / 1024).toFixed(1)} KB</div><div style="font-size: 0.75rem; color: #007bff; margin-top: 4px;">Click to enlarge</div></div>`;
       } else {
         return `<div class="attachment-item"><div style="width: 40px; height: 40px; background: #f3f4f6; border-radius: 4px; display: flex; align-items: center; justify-content: center; margin: 0 auto 0.5rem auto;">📄</div><div style="font-size: 0.875rem; font-weight: 500; word-break: break-word;">${att.name}</div><div style="font-size: 0.75rem; color: #666;">${(att.size / 1024).toFixed(1)} KB</div></div>`;
       }
+<<<<<<< HEAD
     }).join('');
 
     const videoLinksHTML = gradingData.videoLinks.map(link => `<div class="video-link-item" style="background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 8px; padding: 1rem; margin-bottom: 1rem;"><div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;"><span style="font-size: 1.25rem;">🎥</span><strong style="color: #495057;">${link.title}</strong></div><a href="${link.url}" target="_blank" rel="noopener noreferrer" style="color: #007bff; text-decoration: none; word-break: break-all;">${link.url}</a></div>`).join('');
@@ -500,6 +523,145 @@ const GradingTemplate = () => {
     const htmlContent = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Grade Report - ${gradingData.student.name}</title><style>body{font-family:Arial,sans-serif;max-width:800px;margin:20px auto;padding:20px;line-height:1.6}.header{background:#f8f9fa;padding:20px;border-radius:8px;margin-bottom:30px}.score-summary{background:#e8f5e8;border:2px solid #4caf50;border-radius:8px;padding:20px;margin:20px 0;text-align:center}.late-policy-section{margin:30px 0;background:#fff5f5;border:1px solid #f87171;border-radius:8px;padding:20px}.feedback-section{margin:20px 0;padding:15px;background:#f9f9f9;border-radius:8px}.attachments{margin:30px 0}.attachment-item{display:inline-block;text-align:center;margin:1rem;padding:1rem;background:#fff;border:1px solid #ddd;border-radius:8px;box-shadow:0 2px 4px rgba(0,0,0,.1);max-width:250px;vertical-align:top}.clickable-image{cursor:pointer;transition:all .3s ease;position:relative}.clickable-image:hover{transform:scale(1.05);box-shadow:0 4px 8px rgba(0,0,0,.2)}.video-links{margin:30px 0}.video-link-item{margin-bottom:1rem}.video-link-item a{color:#007bff;text-decoration:none}.video-link-item a:hover{text-decoration:underline}h1,h2,h3{color:#333}.image-modal{display:none;position:fixed;z-index:1000;left:0;top:0;width:100%;height:100%;background-color:rgba(0,0,0,.9);animation:fadeIn .3s ease}.image-modal.show{display:flex;align-items:center;justify-content:center}.modal-content{max-width:95%;max-height:95%;object-fit:contain;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,.5);animation:zoomIn .3s ease}.close-modal{position:absolute;top:20px;right:30px;color:#fff;font-size:40px;font-weight:700;cursor:pointer;z-index:1001;background:rgba(0,0,0,.5);border-radius:50%;width:50px;height:50px;display:flex;align-items:center;justify-content:center;line-height:1}.close-modal:hover{background:rgba(0,0,0,.8)}.modal-caption{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);color:#fff;background:rgba(0,0,0,.7);padding:10px 20px;border-radius:6px;text-align:center;max-width:80%}@keyframes fadeIn{from{opacity:0}to{opacity:1}}@keyframes zoomIn{from{transform:scale(.5);opacity:0}to{transform:scale(1);opacity:1}}@media print{.attachment-item,.video-link-item{break-inside:avoid}.image-modal{display:none!important}}</style></head><body><div class="header"><h1>📋 Grade Report</h1><p><strong>Student:</strong> ${gradingData.student.name} (${gradingData.student.id})</p><p><strong>Course:</strong> ${gradingData.course?.code ?? ''} - ${gradingData.course?.name ?? ''}</p><p><strong>Assignment:</strong> ${gradingData.assignment.name}</p><p><strong>Instructor:</strong> ${gradingData.course?.instructor ?? ''}</p><p><strong>Term:</strong> ${gradingData.course?.term ?? ''}</p></div><div class="score-summary"><h2>📊 Final Score</h2><div style="font-size:2rem;font-weight:700;color:#2e7d32;margin:15px 0">${totalScore.toFixed(1)} / ${maxPoints} (${percentage}%)</div><p style="margin:10px 0;color:#555">${sharedRubric ? `Rubric: ${sharedRubric.assignmentInfo.title}` : ""}${penaltyApplied ? ` | Late Policy: ${getSafeLatePolicy(gradingData.latePolicy?.level).name}` : ""}</p></div>${penaltyApplied ? `<div class="late-policy-section"><h3 style="color:#dc2626">📅 Late Submission Policy Applied</h3><p><strong>Policy Status:</strong> ${getSafeLatePolicy(gradingData.latePolicy?.level).name}</p><p>${getSafeLatePolicy(gradingData.latePolicy?.level).description}</p><p><strong>Raw Score:</strong> ${Math.round(rawScore * 10) / 10}/${maxPoints} → <strong>Final Score:</strong> ${Math.round(totalScore * 10) / 10}/${maxPoints}</p></div>` : ""}${rubricTableHTML}${Object.entries(gradingData.feedback).filter(([e, t]) => t).map(([e, t]) => `<div class="feedback-section"><h3>${e.charAt(0).toUpperCase() + e.slice(1)} Feedback</h3><p>${t.replace(/\n/g, "<br>")}</p></div>`).join("")}${attachmentsHTML ? `<div class="attachments"><h3>📎 File Attachments</h3><div style="display: flex; flex-wrap: wrap; justify-content: flex-start;">${attachmentsHTML}</div></div>` : ""}${videoLinksHTML ? `<div class="video-links"><h3>🎥 Video Review Links</h3>${videoLinksHTML}</div>` : ""}<p style="margin-top:40px;text-align:center;color:#666;font-size:.9rem">Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}</p><div id="imageModal" class="image-modal"><span class="close-modal" onclick="closeImageModal()">&times;</span><img class="modal-content" id="modalImage"><div class="modal-caption" id="modalCaption"></div></div><script>const attachmentData=${JSON.stringify(gradingData.attachments)};function openImageModal(e,t){const n=document.getElementById("imageModal"),o=document.getElementById("modalImage"),a=document.getElementById("modalCaption");n.classList.add("show"),o.src=e,a.textContent=t,document.body.style.overflow="hidden"}function closeImageModal(){document.getElementById("imageModal").classList.remove("show"),document.body.style.overflow="auto"}document.addEventListener("DOMContentLoaded",function(){document.querySelectorAll(".clickable-image").forEach(e=>{e.addEventListener("click",function(){const e=parseInt(this.getAttribute("data-index")),t=attachmentData[e];t&&t.base64Data&&openImageModal(t.base64Data,t.name)})}),document.getElementById("imageModal").addEventListener("click",function(e){e.target===this&&closeImageModal()}),document.addEventListener("keydown",function(e){"Escape"===e.key&&closeImageModal()})})</script></body></html>`;
 
     return htmlContent;
+=======
+    }).join('') || '';
+
+    // Generate video links HTML
+    const videoLinksHTML = gradingData.videoLinks?.map(link =>
+      `<div class="video-link-item" style="background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 8px; padding: 1rem; margin-bottom: 1rem;"><div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;"><span style="font-size: 1.25rem;">🎥</span><strong style="color: #495057;">${link.title}</strong></div><a href="${link.url}" target="_blank" rel="noopener noreferrer" style="color: #007bff; text-decoration: none; word-break: break-all;">${link.url}</a></div>`
+    ).join('') || '';
+
+    // Generate rubric table HTML
+    const rubricTableHTML = sharedRubric ? `
+        <div style="margin: 30px 0;">
+            <h3>📊 Detailed Rubric Assessment</h3>
+            <table style="width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.9rem;">
+                <thead>
+                    <tr style="background: #f8f9fa;">
+                        <th style="border: 1px solid #ddd; padding: 12px; text-align: left;">Criterion</th>
+                        <th style="border: 1px solid #ddd; padding: 12px; text-align: center; width: 120px;">Level Achieved</th>
+                        <th style="border: 1px solid #ddd; padding: 12px; text-align: center; width: 80px;">Points</th>
+                        <th style="border: 1px solid #ddd; padding: 12px; text-align: left;">Details & Comments</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${sharedRubric.criteria.map(criterion => {
+      const rubricGrading = gradingData.rubricGrading?.[criterion.id];
+      const selectedLevel = rubricGrading?.selectedLevel;
+      const level = selectedLevel ? sharedRubric.rubricLevels.find(l => l.level === selectedLevel) : null;
+      const points = level ? Math.round(criterion.maxPoints * level.multiplier * 10) / 10 : 0;
+      const levelDescription = level && criterion.levels?.[selectedLevel]?.description ? criterion.levels[selectedLevel].description : '';
+      const additionalComments = rubricGrading?.customComments || '';
+
+      return `<tr>
+                            <td style="border: 1px solid #ddd; padding: 12px; vertical-align: top;">
+                                <strong>${criterion.name}</strong><br>
+                                <small style="color: #666;">${criterion.description || ''}</small><br>
+                                <small style="color: #888;">Max Points: ${criterion.maxPoints}</small>
+                            </td>
+                            <td style="border: 1px solid #ddd; padding: 8px; text-align: center; vertical-align: top;">
+                                <span style="display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: bold; background: ${level?.color || '#f0f0f0'}; color: white;">
+                                    ${level?.name || 'Not Assessed'}
+                                </span>
+                            </td>
+                            <td style="border: 1px solid #ddd; padding: 8px; text-align: center; font-weight: bold; font-size: 1.1em; color: #2c3e50;">${points}</td>
+                            <td style="border: 1px solid #ddd; padding: 8px; vertical-align: top;">
+                                ${levelDescription ? `<div style="margin-bottom: 10px; padding: 8px; background: #f8f9fa; border-left: 4px solid ${level.color}; border-radius: 4px;"><strong style="color: ${level.color};">Level Description:</strong><br><span style="font-size: 0.85em; line-height: 1.4;">${levelDescription}</span></div>` : ''}
+                                ${additionalComments ? `<div style="margin-top: 8px; padding: 8px; background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px;"><strong style="color: #856404;">Additional Comments:</strong><br><span style="font-size: 0.85em; line-height: 1.4; white-space: pre-wrap;">${additionalComments}</span></div>` : ''}
+                                ${(!levelDescription && !additionalComments) ? '<em style="color: #999;">No assessment provided</em>' : ''}
+                            </td>
+                        </tr>`;
+    }).join('')}
+                </tbody>
+            </table>
+            <div style="background: #e8f5e8; border: 1px solid #4caf50; border-radius: 8px; padding: 15px; margin-top: 20px;">
+                <h4 style="color: #2e7d32; margin-bottom: 10px;">📊 Rubric Score Summary</h4>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                    <div><strong>Total Score:</strong> ${Math.round(totalScore * 10) / 10} / ${maxPoints}<br><strong>Percentage:</strong> ${percentage}%</div>
+                    <div><strong>Grade Status:</strong><span style="color: ${percentage >= (sharedRubric.assignmentInfo.passingThreshold || 60) ? '#4caf50' : '#f44336'}; font-weight: bold;">${percentage >= (sharedRubric.assignmentInfo.passingThreshold || 60) ? '✓ PASSING' : '✗ NEEDS IMPROVEMENT'}</span></div>
+                    ${penaltyApplied ? `<div style="color: #ff9800;"><strong>Late Penalty Applied:</strong><br>Raw Score: ${Math.round(rawScore * 10) / 10}</div>` : ''}
+                </div>
+            </div>
+        </div>` : '';
+
+    // Use the logo utility to generate header
+    const reportData = {
+      title: `📋 Individual Grade Report - ${gradingData.student.name}`,
+      courseCode: gradingData.course.code || '',
+      courseName: gradingData.course.name || '',
+      section: gradingData.course.section || '',
+      rubricTitle: sharedRubric?.assignmentInfo?.title || 'Assessment'
+    };
+
+    // Complete HTML document with logo integration
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grade Report - ${gradingData.student.name}</title>
+    ${getReportStyles()}
+    <style>
+        .score-summary { background: #e8f5e8; border: 2px solid #4caf50; border-radius: 8px; padding: 20px; margin: 20px 0; text-align: center; }
+        .late-policy-section { margin: 30px 0; background: #fff5f5; border: 1px solid #f87171; border-radius: 8px; padding: 20px; }
+        .feedback-section { margin: 20px 0; padding: 15px; background: #f9f9f9; border-radius: 8px; }
+        .attachments { margin: 30px 0; }
+        .attachment-item { display: inline-block; text-align: center; margin: 1rem; padding: 1rem; background: #fff; border: 1px solid #ddd; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,.1); max-width: 250px; vertical-align: top; }
+    </style>
+</head>
+<body>
+    ${generateReportHeader(reportData)}
+
+    <div class="score-summary">
+        <h2>📊 Final Score</h2>
+        <div style="font-size: 2rem; font-weight: 700; color: #2e7d32; margin: 15px 0;">
+            ${totalScore.toFixed(1)} / ${maxPoints} (${percentage}%)
+        </div>
+        <p style="margin: 10px 0; color: #555;">
+            ${sharedRubric ? `Rubric: ${sharedRubric.assignmentInfo.title}` : ""}
+            ${penaltyApplied ? ` | Late Policy Applied` : ""}
+        </p>
+    </div>
+
+    ${penaltyApplied ? `
+        <div class="late-policy-section">
+            <h3 style="color: #dc2626;">📅 Late Submission Policy Applied</h3>
+            <p><strong>Raw Score:</strong> ${Math.round(rawScore * 10) / 10}/${maxPoints} → <strong>Final Score:</strong> ${Math.round(totalScore * 10) / 10}/${maxPoints}</p>
+        </div>
+    ` : ""}
+
+    ${rubricTableHTML}
+
+    ${Object.entries(gradingData.feedback || {}).filter(([key, text]) => text).map(([key, text]) => `
+        <div class="feedback-section">
+            <h3>${key.charAt(0).toUpperCase() + key.slice(1)} Feedback</h3>
+            <p>${text.replace(/\n/g, "<br>")}</p>
+        </div>
+    `).join("")}
+
+    ${attachmentsHTML ? `
+        <div class="attachments">
+            <h3>📎 File Attachments</h3>
+            <div style="display: flex; flex-wrap: wrap; justify-content: flex-start;">
+                ${attachmentsHTML}
+            </div>
+        </div>
+    ` : ""}
+
+    ${videoLinksHTML ? `
+        <div class="video-links">
+            <h3>🎥 Video Review Links</h3>
+            ${videoLinksHTML}
+        </div>
+    ` : ""}
+
+    <div class="footer">
+        <p>Generated on ${currentDate} at ${currentTime}</p>
+        <p>Instructor: ${gradingData.course.instructor || 'Course Instructor'}</p>
+    </div>
+</body>
+</html>`;
+>>>>>>> logo-insertion
   };
 
   // AI FEEDBACK EXPORT FUNCTIONS

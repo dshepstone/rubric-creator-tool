@@ -11,6 +11,11 @@ import GradeBook from './components/GradeBook';
 import ExcelImportTest from './components/ExcelImportTest';
 import HelpPage from './components/HelpPage';
 import GradingPolicyManager from './components/GradingPolicyManager';
+<<<<<<< HEAD
+=======
+
+import SchoolLogoSettings from './components/SchoolLogoSettings';
+>>>>>>> logo-insertion
 import './index.css';
 
 // Import Clerk components
@@ -246,6 +251,10 @@ const AppContent = () => {
         {activeTab === 'policy-manager' && <GradingPolicyManager />}
         {activeTab === 'grading-tool' && <GradingTemplate />}
         {activeTab === 'gradebook' && <GradeBook />}
+<<<<<<< HEAD
+=======
+        {activeTab === 'logo-settings' && <SchoolLogoSettings />}  {/* ADD THIS LINE */}
+>>>>>>> logo-insertion
         {activeTab === 'excel-import-test' && <ExcelImportTest />}
         {activeTab === 'help' && <HelpPage />}
       </div>

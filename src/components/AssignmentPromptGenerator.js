@@ -1,6 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Download, Sparkles, FileText, ArrowRight, Lightbulb, BookOpen, Code, Plus, Minus, Upload, Save } from 'lucide-react';
 import { useAssessment } from './SharedContext';
+<<<<<<< HEAD
+=======
+import { generateAssignmentHeader, hasSchoolLogo } from './logoIntegrationUtility';
+>>>>>>> logo-insertion
 
 // Simple Rich Text Editor Component
 const SimpleRichTextEditor = React.forwardRef(({ value, onChange, placeholder }, ref) => {
@@ -698,33 +702,58 @@ ${formData.specialInstructions && formData.specialInstructions.trim() !== '' ? `
             `Week ${formData.dueWeek}${formData.dueDateCustom ? ` - ${formData.dueDateCustom}` : ''}` :
             formData.dueDateCustom || 'See your Instructional Plan for exact due dates';
 
+<<<<<<< HEAD
         // Generate submission folder text
         const submissionFolderText = `Assignment ${formData.submissionFolderNumber || formData.assignmentNumber || 'X'}`;
 
+=======
+>>>>>>> logo-insertion
         // Helper function to extract text content from HTML and format for display
         const formatRichTextForStudentHTML = (htmlContent, fallbackText) => {
             if (!htmlContent || htmlContent.trim() === '') {
                 return `<p>${fallbackText}</p>`;
             }
 
+<<<<<<< HEAD
             // If it's already HTML content (contains HTML tags), use it as is
             if (htmlContent.includes('<') && htmlContent.includes('>')) {
                 // Clean up the HTML content and ensure proper formatting
+=======
+            if (htmlContent.includes('<') && htmlContent.includes('>')) {
+>>>>>>> logo-insertion
                 return htmlContent
                     .replace(/<div>/g, '<p>')
                     .replace(/<\/div>/g, '</p>')
                     .replace(/<br\s*\/?>/g, '<br>')
                     .trim();
             } else {
+<<<<<<< HEAD
                 // If it's plain text, wrap in paragraph tags
+=======
+>>>>>>> logo-insertion
                 return `<p>${htmlContent}</p>`;
             }
         };
 
+<<<<<<< HEAD
+=======
+        // Generate header with school logo on the right
+        const assignmentHeaderHTML = generateAssignmentHeader({
+            title: formData.assignmentTitle || 'Assignment Title',
+            assignmentNumber: formData.assignmentNumber || 'X',
+            courseCode: formData.courseCode || 'Course Code',
+            weight: formData.weightPercentage || 'X'
+        }, {
+            maxHeight: 70,
+            maxWidth: 200
+        });
+
+>>>>>>> logo-insertion
         const studentHTML = `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8"/>
+<<<<<<< HEAD
     <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
     <title>${formData.courseCode || 'Course'} - Assignment ${formData.assignmentNumber || 'X'}: ${formData.assignmentTitle || 'Assignment Title'}</title>
     <style>
@@ -844,11 +873,94 @@ ${formData.specialInstructions && formData.specialInstructions.trim() !== '' ? `
             color: var(--dark-gray);
             font-size: 0.9rem;
             border-top: 1px solid var(--light-gray);
+=======
+    <meta content="width=device-width, initial-scale=1" name="viewport"/>
+    <title>${formData.assignmentTitle || 'Assignment'} - ${formData.courseCode || 'Course'}</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background-color: #f8fafc;
+            color: #334155;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .assignment-header {
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #e2e8f0;
+        }
+        h1 {
+            color: #1e40af;
+            margin: 0 0 10px 0;
+            font-size: 2rem;
+            font-weight: 700;
+        }
+        h2 {
+            color: #1e40af;
+            border-bottom: 2px solid #3b82f6;
+            padding-bottom: 5px;
+            margin-top: 30px;
+            margin-bottom: 15px;
+        }
+        h3 {
+            color: #1f2937;
+            margin-top: 25px;
+            margin-bottom: 10px;
+        }
+        .due-info {
+            background: #dbeafe;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #3b82f6;
+        }
+        .submission-info {
+            background: #f0fdf4;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #16a34a;
+        }
+        ul {
+            padding-left: 20px;
+        }
+        li {
+            margin-bottom: 8px;
+        }
+        .school-logo, .assignment-logo {
+            max-height: 70px;
+            max-width: 200px;
+            object-fit: contain;
+        }
+        footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #e2e8f0;
+            text-align: center;
+            color: #64748b;
+            font-size: 0.9rem;
+        }
+        
+        @media print {
+            body { background: white; }
+            .container { box-shadow: none; }
+            .school-logo, .assignment-logo { max-height: 50px !important; }
+>>>>>>> logo-insertion
         }
     </style>
 </head>
 <body>
     <div class="container">
+<<<<<<< HEAD
         <header>
             <h1>Assignment ${formData.assignmentNumber || 'X'}: ${formData.assignmentTitle || 'Assignment Title'}</h1>
             <p>Weight: ${formData.weightPercentage || 'X'}% of Final Grade</p>
@@ -885,6 +997,47 @@ ${formData.specialInstructions && formData.specialInstructions.trim() !== '' ? `
         <footer>
             <p>${formData.courseCode || 'Course Code'} | ${new Date().getFullYear()}</p>
             <p>Last Updated: ${new Date().toLocaleDateString()}</p>
+=======
+        ${assignmentHeaderHTML}
+        
+        <div class="due-info">
+            <strong>📅 Due:</strong> ${dueText}
+        </div>
+        
+        <div class="submission-info">
+            <strong>📤 Submit to:</strong> The <strong>Assignment ${formData.submissionFolderNumber || formData.assignmentNumber || 'X'}</strong> submission folder. 
+            Submission folders can be accessed by selecting <strong>Course Tools</strong> and then <strong>Assignments</strong> on the course navigation bar.
+        </div>
+
+        <h2>📋 Description</h2>
+        ${formatRichTextForStudentHTML(formData.assignmentDescription, 'Please provide a short description of the assignment')}
+
+        <h2>🎯 Rationale</h2>
+        ${formatRichTextForStudentHTML(formData.rationale, 'This assignment will evaluate the following Course Learning Outcomes:')}
+        
+        <ul>
+${closHTML || '            <li><strong>CLO1:</strong> [Learning outcome description]</li>\n            <li><strong>CLO2:</strong> [Learning outcome description]</li>\n            <li><strong>CLO3:</strong> [Learning outcome description]</li>\n            <li><strong>CLO4:</strong> [Learning outcome description]</li>'}
+        </ul>
+
+        <h2>📝 Directions</h2>
+        ${formatRichTextForStudentHTML(formData.directions, 'Provide step-by-step instructions if applicable')}
+
+        <h2>📊 How Your Assignment Will be Graded</h2>
+        ${formatRichTextForStudentHTML(formData.gradingDetails, 'A rubric has been created and can be found attached to the submission folder. Your work will be evaluated on [specify criteria].')}
+        
+        <p><strong>⚠️ Late Policy:</strong> See your Program Handbook for the late policy.</p>
+
+        <h2>💡 Tips for Success</h2>
+        ${formatRichTextForStudentHTML(formData.tipsForSuccess, 'Tips for completing this assignment successfully will be provided here.')}
+
+${formData.specialInstructions && formData.specialInstructions.trim() !== '' ? `        <h2>ℹ️ Additional Information</h2>
+        ${formatRichTextForStudentHTML(formData.specialInstructions, '')}
+` : ''}
+        <footer>
+            <p><strong>${formData.courseCode || 'Course Code'}</strong> | ${new Date().getFullYear()}</p>
+            <p>Last Updated: ${new Date().toLocaleDateString()}</p>
+            ${hasSchoolLogo() ? '<p>Generated with institutional branding</p>' : ''}
+>>>>>>> logo-insertion
         </footer>
     </div>
 </body>

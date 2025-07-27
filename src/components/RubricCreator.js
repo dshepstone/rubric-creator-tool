@@ -2,6 +2,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAssessment } from './SharedContext';
 import { ensureUniqueCriterionIds } from '../utils/ensureUniqueCriterionIds';
+<<<<<<< HEAD
+=======
+import { generateReportHeader, hasSchoolLogo } from './logoIntegrationUtility';
+>>>>>>> logo-insertion
 
 
 import {
@@ -652,10 +656,28 @@ const RubricCreator = () => {
     };
 
     // Export to HTML
+<<<<<<< HEAD
+=======
+    // Export to HTML
+>>>>>>> logo-insertion
     const exportToHTML = () => {
         const displayLevels = getDisplayLevels();
         const totalPoints = calculateTotalPoints();
 
+<<<<<<< HEAD
+=======
+        // Generate header with logo
+        const reportData = {
+            title: `${rubricData.assignmentInfo.title || 'Assessment Rubric'} - Rubric`,
+            courseCode: '',
+            courseName: '',
+            section: '',
+            rubricTitle: ''
+        };
+
+        const headerHtml = generateReportHeader(reportData, { maxHeight: 60 });
+
+>>>>>>> logo-insertion
         const htmlContent = `
 <!DOCTYPE html>
 <html>
@@ -664,6 +686,7 @@ const RubricCreator = () => {
     <title>${rubricData.assignmentInfo.title || 'Assessment Rubric'} - Rubric</title>
     <style>
         body { font-family: 'Arial', sans-serif; max-width: 1200px; margin: 0 auto; padding: 20px; line-height: 1.4; }
+<<<<<<< HEAD
         .header { text-align: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 3px solid #1e40af; }
         .header h1 { color: #1e40af; margin-bottom: 10px; }
         .assignment-info { background: #f8fafc; padding: 20px; border-radius: 8px; margin-bottom: 25px; border: 1px solid #e2e8f0; }
@@ -724,10 +747,82 @@ const RubricCreator = () => {
                             </div>
                         </td>
                     `).join('')}
+=======
+        .header { margin-bottom: 30px; }
+        .assignment-info { background: #f8fafc; padding: 20px; border-radius: 8px; margin-bottom: 25px; border: 1px solid #e2e8f0; }
+        .rubric-table { width: 100%; border-collapse: collapse; margin-bottom: 30px; font-size: 0.85rem; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .rubric-table th, .rubric-table td { border: 1px solid #cbd5e1; padding: 12px; text-align: left; vertical-align: top; }
+        .rubric-table th { background: linear-gradient(135deg, #1e40af, #3b82f6); color: white; font-weight: 600; }
+        .criterion-header { background: #f1f5f9; font-weight: 600; color: #334155; }
+        .level-exceptional { background: #dcfce7; border-left: 4px solid #16a34a; }
+        .level-proficient { background: #dbeafe; border-left: 4px solid #2563eb; }
+        .level-developing { background: #fef3c7; border-left: 4px solid #d97706; }
+        .level-inadequate { background: #fee2e2; border-left: 4px solid #dc2626; }
+        .points { font-weight: 600; color: #059669; text-align: center; }
+        .footer { margin-top: 30px; padding: 20px; background: #f8fafc; border-radius: 8px; text-align: center; font-size: 0.875rem; color: #64748b; }
+        .school-logo, .report-logo, .assignment-logo { max-height: 60px; max-width: 200px; object-fit: contain; }
+        
+        @media print {
+            body { font-size: 10pt; background: white; }
+            .school-logo, .report-logo, .assignment-logo { max-height: 40px !important; }
+            table { page-break-inside: auto; }
+            tr { page-break-inside: avoid; page-break-after: auto; }
+            thead { display: table-header-group; }
+        }
+    </style>
+</head>
+<body>
+    ${headerHtml}
+
+    <div class="assignment-info">
+        <h2 style="margin: 0 0 15px 0; color: #1e40af;">Assignment Information</h2>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; font-size: 0.95rem;">
+            <div><strong>Weight:</strong> ${rubricData.assignmentInfo.weight || 0}%</div>
+            <div><strong>Total Points:</strong> ${totalPoints}</div>
+            <div><strong>Passing Threshold:</strong> ${rubricData.assignmentInfo.passingThreshold || 60}%</div>
+        </div>
+        ${rubricData.assignmentInfo.description ? `<div style="margin-top: 15px;"><strong>Description:</strong><br>${rubricData.assignmentInfo.description}</div>` : ''}
+    </div>
+
+    <table class="rubric-table">
+        <thead>
+            <tr>
+                <th style="width: 15%;">Criterion</th>
+                ${displayLevels.map(level => `<th style="width: ${85 / displayLevels.length}%;">${level.name} (${level.level})</th>`).join('')}
+            </tr>
+        </thead>
+        <tbody>
+            ${rubricData.criteria.map((criterion, index) => `
+                <tr>
+                    <td class="criterion-header">
+                        <strong>${criterion.name || `Criterion ${index + 1}`}</strong>
+                        <div style="font-size: 0.8em; color: #64748b; margin-top: 5px;">
+                            ${criterion.weight || 0} points
+                        </div>
+                        ${criterion.description ? `<div style="font-size: 0.85em; margin-top: 8px; color: #475569;">${criterion.description}</div>` : ''}
+                    </td>
+                    ${displayLevels.map(level => {
+            const levelData = criterion.levels[level.level] || {};
+            const points = calculatePointRange(criterion, level.level);
+            const levelClass = `level-${level.level.toLowerCase()}`;
+
+            return `
+                            <td class="${levelClass}">
+                                <div class="points" style="margin-bottom: 8px; font-size: 1.1em;">
+                                    ${points} pts
+                                </div>
+                                <div style="font-size: 0.9em; line-height: 1.4;">
+                                    ${levelData.description || `No description provided for ${level.name} level.`}
+                                </div>
+                            </td>
+                        `;
+        }).join('')}
+>>>>>>> logo-insertion
                 </tr>
             `).join('')}
         </tbody>
     </table>
+<<<<<<< HEAD
     
     <div class="overall-score">
         <h3 style="color: #1e40af; margin-bottom: 15px;">Overall Achievement Levels</h3>
@@ -755,15 +850,30 @@ const RubricCreator = () => {
             minute: '2-digit'
         })}</p>
         <p>Total Possible Points: <strong>${totalPoints}</strong> | Criteria: <strong>${rubricData.criteria.length}</strong> | Levels: <strong>${rubricData.rubricLevels.length}</strong></p>
+=======
+
+    <div class="footer">
+        <p><strong>Assessment Rubric</strong></p>
+        <p>Generated on ${new Date().toLocaleDateString('en-CA')} at ${new Date().toLocaleTimeString('en-CA')}</p>
+        ${hasSchoolLogo() ? '<p>Generated with institutional branding</p>' : ''}
+>>>>>>> logo-insertion
     </div>
 </body>
 </html>`;
 
+<<<<<<< HEAD
         const htmlBlob = new Blob([htmlContent], { type: 'text/html' });
         const url = URL.createObjectURL(htmlBlob);
         const link = document.createElement('a');
         link.href = url;
         link.download = `rubric_${rubricData.assignmentInfo.title.replace(/\s+/g, '_') || 'display'}_${new Date().toISOString().split('T')[0]}.html`;
+=======
+        const blob = new Blob([htmlContent], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `rubric_${(rubricData.assignmentInfo.title || 'assessment').replace(/\s+/g, '_').toLowerCase()}_${new Date().toISOString().split('T')[0]}.html`;
+>>>>>>> logo-insertion
         link.click();
         URL.revokeObjectURL(url);
     };
