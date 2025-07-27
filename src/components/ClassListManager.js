@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useMemo } from 'react';
 import {
     Upload,
     Users,
@@ -28,7 +28,8 @@ import {
     useGradeCalculation,
     useGradingPolicyManager
 } from '../hooks/useGradingPolicies';
-
+// Add gradebook utilities import for letter grade calculation
+import { percentageToLetterGrade } from '../utils/gradebookUtilis';
 /**
  * Enhanced getLetterGrade function with dynamic policy support
  * Falls back to original hardcoded scales if policy service fails
@@ -133,6 +134,8 @@ const ClassListManager = () => {
         rubricFormData,
         currentLatePolicy,
     } = useAssessment();
+
+    
 
     // Load current program type from class metadata and update policy
     useEffect(() => {
@@ -269,6 +272,9 @@ const ClassListManager = () => {
     };
 
     // **ENHANCED**: This function now uses dynamic grading with fallback to legacy calculation
+    // ENHANCED calculateStudentGrade function for ClassListManager.js
+    // Replace the existing calculateStudentGrade function (around lines 200-280)
+
     const calculateStudentGrade = async (studentId) => {
         const gradeStatus = getGradeStatus(studentId);
         let gradeData = null;
@@ -279,55 +285,135 @@ const ClassListManager = () => {
             gradeData = loadDraft(studentId);
         }
 
-        // The grade calculation relies on having the student's saved grade data AND the rubric structure.
-        // If any part is missing, we can't calculate the grade.
-        if (!gradeData || !gradeData.rubricGrading || !sharedRubric || !sharedRubric.criteria || !sharedRubric.rubricLevels) {
-            return { score: 'N/A', maxPossible: 'N/A', percentage: 'N/A', letterGrade: 'N/A' };
+        // If no grade data, return empty result
+        if (!gradeData || !sharedRubric || !sharedRubric.criteria) {
+            return {
+                score: 'N/A',
+                maxPossible: sharedRubric?.assignmentInfo?.totalPoints || 100,
+                percentage: 'N/A',
+                letterGrade: 'N/A'
+            };
         }
 
+        // Calculate raw score from rubric grading
         let totalScore = 0;
-        let maxPossible = 0;
+        let maxScore = sharedRubric.assignmentInfo?.totalPoints || 0;
 
-        // Correctly calculate score based on criterion points and level multipliers
-        sharedRubric.criteria.forEach(criterion => {
-            const gradingSelection = gradeData.rubricGrading[criterion.id];
-            const criterionMaxPoints = Number(criterion.maxPoints) || 0;
-            maxPossible += criterionMaxPoints;
+        if (gradeData.rubricGrading) {
+            sharedRubric.criteria.forEach(criterion => {
+                const rubricGrading = gradeData.rubricGrading[criterion.id];
+                if (rubricGrading && rubricGrading.selectedLevel) {
+                    const level = sharedRubric.rubricLevels.find(l => l.level === rubricGrading.selectedLevel);
+                    if (level) {
+                        totalScore += criterion.maxPoints * level.multiplier;
+                    }
+                }
+            });
+        }
 
-            if (gradingSelection && gradingSelection.selectedLevel) {
-                const levelData = sharedRubric.rubricLevels.find(l => l.level === gradingSelection.selectedLevel);
-                if (levelData) {
-                    const levelMultiplier = Number(levelData.multiplier) || 0;
-                    totalScore += criterionMaxPoints * levelMultiplier;
+        // Apply late policy if applicable
+        const activeLevels = currentLatePolicy?.levels || DEFAULT_LATE_POLICY.levels;
+        let finalScore = totalScore;
+
+        if (gradeData.latePolicy && gradeData.latePolicy.level !== 'none') {
+            const latePolicyLevel = activeLevels[gradeData.latePolicy.level] || activeLevels.none;
+            finalScore = totalScore * latePolicyLevel.multiplier;
+        }
+
+        // Calculate percentage
+        const percentage = maxScore > 0 ? Math.round((finalScore / maxScore) * 100) : 0;
+
+        // ENHANCED: Determine program type from student and class data
+        const student = classList.students.find(s => s.id === studentId);
+        const programType = student?.program?.toLowerCase() ||
+            classList.courseMetadata?.programType?.toLowerCase() ||
+            'degree'; // default fallback
+
+        // ENHANCED: Use dynamic letter grade calculation with proper program type detection
+        let letterGrade = 'N/A';
+
+        try {
+            // First try using the grading policy service
+            if (gradingPolicyService) {
+                const gradeResult = await gradingPolicyService.calculateGrade(
+                    percentage,
+                    null, // policyId - let it auto-select
+                    programType,
+                    classList.courseMetadata?.customProgramId
+                );
+
+                if (gradeResult.success && gradeResult.data?.letter) {
+                    letterGrade = gradeResult.data.letter;
                 }
             }
-        });
 
-        // Apply late penalty if applicable
-        if (gradeData.latePolicy && gradeData.latePolicy.level !== 'none') {
-            const latePenalties = { within24: 0.8, after24: 0.0 };
-            const multiplier = latePenalties[gradeData.latePolicy.level] || 1.0;
-            totalScore *= multiplier;
+            // Fallback to gradebook utilities if grading service fails
+            if (letterGrade === 'N/A') {
+                // Import the utility function if not already imported from '../utils/gradebookUtilis'
+                if (typeof percentageToLetterGrade === 'function') {
+                    letterGrade = percentageToLetterGrade(percentage, programType);
+                } else {
+                    // Manual fallback calculation
+                    letterGrade = getLetterGradeFallback(percentage, programType);
+                }
+            }
+        } catch (error) {
+            console.warn('Error calculating letter grade, using fallback:', error);
+            letterGrade = getLetterGradeFallback(percentage, programType);
         }
 
-        const numericScore = Math.round(totalScore * 10) / 10;
-        const maxScore = Math.round(maxPossible * 10) / 10;
-        const percentage = maxScore > 0 ? Math.round((numericScore / maxScore) * 100) : 0;
-
-        // Use enhanced getLetterGrade with dynamic policy support
-        const letterGrade = await getLetterGrade(
-            percentage,
-            classList.courseMetadata?.programType || 'degree',
-            classList.courseMetadata?.customProgramId,
-            selectedPolicy
-        );
-
         return {
-            score: numericScore,
+            score: Math.round(finalScore * 10) / 10,
             maxPossible: maxScore,
             percentage,
             letterGrade
         };
+    };
+
+    // ENHANCED: Fallback letter grade calculation function
+    const getLetterGradeFallback = (percentage, programType = 'degree') => {
+        // Define grading scales for different program types
+        const gradingScales = {
+            degree: [
+                { min: 90, grade: 'A+' },
+                { min: 85, grade: 'A' },
+                { min: 80, grade: 'A-' },
+                { min: 77, grade: 'B+' },
+                { min: 73, grade: 'B' },
+                { min: 70, grade: 'B-' },
+                { min: 67, grade: 'C+' },
+                { min: 63, grade: 'C' },
+                { min: 60, grade: 'C-' },
+                { min: 50, grade: 'D' },
+                { min: 0, grade: 'F' }
+            ],
+            diploma: [
+                { min: 90, grade: 'A+' },
+                { min: 80, grade: 'A' },
+                { min: 75, grade: 'B+' },
+                { min: 70, grade: 'B' },
+                { min: 65, grade: 'C+' },
+                { min: 60, grade: 'C' },
+                { min: 50, grade: 'D' },
+                { min: 0, grade: 'F' }
+            ],
+            certificate: [
+                { min: 80, grade: 'A' },
+                { min: 70, grade: 'B' },
+                { min: 60, grade: 'C' },
+                { min: 0, grade: 'F' }
+            ]
+        };
+
+        const scale = gradingScales[programType] || gradingScales.degree;
+
+        for (const { min, grade } of scale) {
+            if (percentage >= min) {
+                return grade;
+            }
+        }
+
+        return 'F';
     };
 
     // Helper function to load student for grading (preserved exactly from original)

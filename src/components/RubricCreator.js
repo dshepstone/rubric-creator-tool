@@ -19,7 +19,9 @@ import {
     Maximize2,
     ArrowRight,
     AlertTriangle,
-    CheckCircle
+    CheckCircle,
+    Code,       
+    Settings
 } from 'lucide-react';
 
 
@@ -80,7 +82,300 @@ const SimpleRichTextEditor = React.forwardRef(({ value, onChange, placeholder },
     );
 });
 
+
+
 SimpleRichTextEditor.displayName = 'SimpleRichTextEditor';
+
+// CORRECTED: Complete Components for RubricCreator.js
+// Insert these components before "const RubricCreator = () => {"
+
+// JSON Paste Panel Component
+const JSONPastePanel = ({ onImport, isOpen, onToggle }) => {
+    const [jsonInput, setJsonInput] = React.useState('');
+    const [error, setError] = React.useState('');
+
+    const handleImport = () => {
+        try {
+            const parsed = JSON.parse(jsonInput);
+
+            // Use the enhanced validation
+            const validation = validateRubricStructure(parsed);
+
+            if (!validation.isValid) {
+                setError('Invalid rubric structure:\n' + validation.errors.join('\n'));
+                return;
+            }
+
+            onImport(parsed);
+            setJsonInput('');
+            setError('');
+            onToggle(); // Close the panel
+
+        } catch (err) {
+            if (err instanceof SyntaxError) {
+                setError('Invalid JSON format. Please check your JSON syntax.');
+            } else {
+                setError(err.message);
+            }
+        }
+    };
+
+    const handleClear = () => {
+        setJsonInput('');
+        setError('');
+    };
+
+    return (
+        <div className="border border-gray-200 rounded-lg mb-6">
+            <button
+                onClick={onToggle}
+                className="w-full flex items-center justify-between p-4 bg-gradient-to-r from-purple-50 to-indigo-50 hover:from-purple-100 hover:to-indigo-100 transition-colors rounded-t-lg"
+            >
+                <div className="flex items-center gap-3">
+                    <Code className="text-purple-600" size={20} />
+                    <span className="font-semibold text-gray-800">📋 Paste JSON Rubric</span>
+                </div>
+                <ChevronDown
+                    className={`text-gray-600 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+                    size={20}
+                />
+            </button>
+
+            {isOpen && (
+                <div className="p-4 border-t border-gray-200">
+                    <p className="text-sm text-gray-600 mb-4">
+                        Paste a complete rubric JSON structure below. This is an alternative to file upload for quick importing.
+                    </p>
+
+                    <textarea
+                        value={jsonInput}
+                        onChange={(e) => setJsonInput(e.target.value)}
+                        placeholder={`Paste your rubric JSON here, for example:
+{
+  "assignmentInfo": {
+    "title": "Web Development Project",
+    "totalPoints": 100
+  },
+  "rubricLevels": [...],
+  "criteria": [...]
+}`}
+                        className="w-full h-48 p-3 border border-gray-300 rounded-lg font-mono text-sm resize-y"
+                    />
+
+                    {error && (
+                        <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
+                            {error}
+                        </div>
+                    )}
+
+                    <div className="flex gap-2 mt-4">
+                        <button
+                            onClick={handleImport}
+                            disabled={!jsonInput.trim()}
+                            className="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2"
+                        >
+                            <Upload size={14} />
+                            Import JSON
+                        </button>
+                        <button
+                            onClick={handleClear}
+                            className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg text-sm"
+                        >
+                            Clear
+                        </button>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+// Achievement Level Control Component
+const AchievementLevelControl = ({ rubricData, setRubricData }) => {
+    const [levelCount, setLevelCount] = React.useState(rubricData.rubricLevels.length);
+
+    // Predefined level templates for different counts
+    const levelTemplates = {
+        2: [
+            { level: 'unacceptable', name: 'Unacceptable', description: 'Does not meet standards', color: '#e74c3c', multiplier: 0 },
+            { level: 'acceptable', name: 'Acceptable', description: 'Meets standards', color: '#27ae60', multiplier: 1.0 }
+        ],
+        3: [
+            { level: 'unacceptable', name: 'Unacceptable', description: 'Does not meet standards', color: '#e74c3c', multiplier: 0 },
+            { level: 'developing', name: 'Developing', description: 'Approaching standards', color: '#f39c12', multiplier: 0.6 },
+            { level: 'acceptable', name: 'Acceptable', description: 'Meets standards', color: '#27ae60', multiplier: 1.0 }
+        ],
+        4: [
+            { level: 'incomplete', name: 'Incomplete', description: 'No submission', color: '#95a5a6', multiplier: 0 },
+            { level: 'developing', name: 'Developing', description: 'Needs improvement', color: '#f39c12', multiplier: 0.5 },
+            { level: 'acceptable', name: 'Acceptable', description: 'Meets standards', color: '#27ae60', multiplier: 0.75 },
+            { level: 'accomplished', name: 'Accomplished', description: 'Exceeds standards', color: '#2980b9', multiplier: 1.0 }
+        ],
+        5: [
+            { level: 'incomplete', name: 'Incomplete', description: 'No submission', color: '#95a5a6', multiplier: 0 },
+            { level: 'unacceptable', name: 'Unacceptable', description: 'Below standards', color: '#e74c3c', multiplier: 0.3 },
+            { level: 'developing', name: 'Developing', description: 'Approaching standards', color: '#f39c12', multiplier: 0.55 },
+            { level: 'acceptable', name: 'Acceptable', description: 'Meets standards', color: '#27ae60', multiplier: 0.75 },
+            { level: 'accomplished', name: 'Accomplished', description: 'Exceeds standards', color: '#2980b9', multiplier: 1.0 }
+        ],
+        6: [
+            { level: 'incomplete', name: 'Incomplete', description: 'No submission', color: '#95a5a6', multiplier: 0 },
+            { level: 'unacceptable', name: 'Unacceptable', description: 'Below standards', color: '#e74c3c', multiplier: 0.3 },
+            { level: 'developing', name: 'Developing', description: 'Approaching standards', color: '#f39c12', multiplier: 0.55 },
+            { level: 'acceptable', name: 'Acceptable', description: 'Meets standards', color: '#27ae60', multiplier: 0.7 },
+            { level: 'accomplished', name: 'Accomplished', description: 'Exceeds standards', color: '#2980b9', multiplier: 0.85 },
+            { level: 'exceptional', name: 'Exceptional', description: 'Outstanding quality', color: '#8e44ad', multiplier: 1.0 }
+        ],
+        7: [
+            { level: 'incomplete', name: 'Incomplete', description: 'No submission or unusable', color: '#95a5a6', multiplier: 0 },
+            { level: 'unacceptable', name: 'Unacceptable', description: 'Below minimum standards', color: '#e74c3c', multiplier: 0.3 },
+            { level: 'developing', name: 'Developing', description: 'Approaching standards', color: '#f39c12', multiplier: 0.55 },
+            { level: 'acceptable', name: 'Acceptable (PASS)', description: 'Meets minimum standards', color: '#27ae60', multiplier: 0.7 },
+            { level: 'emerging', name: 'Emerging', description: 'Above standard expectations', color: '#2980b9', multiplier: 0.82 },
+            { level: 'accomplished', name: 'Accomplished', description: 'Strong professional quality', color: '#16a085', multiplier: 0.92 },
+            { level: 'exceptional', name: 'Exceptional', description: 'Outstanding professional quality', color: '#8e44ad', multiplier: 1.0 }
+        ]
+    };
+
+    const handleLevelCountChange = (newCount) => {
+        if (newCount < 2 || newCount > 7) return;
+
+        const template = levelTemplates[newCount];
+        setLevelCount(newCount);
+
+        // Update rubric data with new levels
+        setRubricData(prev => ({
+            ...prev,
+            rubricLevels: [...template],
+            // Update criteria to remove any level references that no longer exist
+            criteria: prev.criteria.map(criterion => ({
+                ...criterion,
+                levels: Object.fromEntries(
+                    template.map(level => [level.level, criterion.levels[level.level] || { description: '', pointRange: '' }])
+                )
+            }))
+        }));
+    };
+
+    return (
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 p-4 rounded-lg mb-6">
+            <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                    <Settings className="text-blue-600" size={20} />
+                    Achievement Level Configuration
+                </h3>
+                <div className="text-sm text-gray-600">
+                    Current: {levelCount} levels
+                </div>
+            </div>
+
+            <div className="grid grid-cols-6 gap-2 mb-4">
+                {[2, 3, 4, 5, 6, 7].map(count => (
+                    <button
+                        key={count}
+                        onClick={() => handleLevelCountChange(count)}
+                        className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${levelCount === count
+                                ? 'bg-blue-600 text-white shadow-md'
+                                : 'bg-white text-gray-700 border border-gray-300 hover:bg-blue-50 hover:border-blue-300'
+                            }`}
+                    >
+                        {count} Levels
+                    </button>
+                ))}
+            </div>
+
+            <div className="text-sm text-gray-600 space-y-1">
+                <p><strong>2-3 Levels:</strong> Simple pass/fail or basic progression</p>
+                <p><strong>4-5 Levels:</strong> Standard rubric with clear progression</p>
+                <p><strong>6-7 Levels:</strong> Detailed assessment with fine-grained feedback</p>
+            </div>
+
+            {levelCount !== rubricData.rubricLevels.length && (
+                <div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded text-yellow-800 text-sm">
+                    ⚠️ Changing level count will reset level descriptions for all criteria
+                </div>
+            )}
+        </div>
+    );
+};
+
+
+// Enhanced JSON validation function
+const validateRubricStructure = (data) => {
+    const errors = [];
+
+    // Check assignmentInfo
+    if (!data.assignmentInfo || typeof data.assignmentInfo !== 'object') {
+        errors.push('Missing or invalid assignmentInfo object');
+    } else {
+        // Validate required assignmentInfo fields
+        if (!data.assignmentInfo.hasOwnProperty('title')) {
+            errors.push('assignmentInfo.title is required');
+        }
+        if (!data.assignmentInfo.hasOwnProperty('weight')) {
+            errors.push('assignmentInfo.weight is required');
+        }
+        if (!data.assignmentInfo.hasOwnProperty('totalPoints')) {
+            errors.push('assignmentInfo.totalPoints is required');
+        }
+    }
+
+    // Check criteria - must be an array
+    if (!Array.isArray(data.criteria)) {
+        errors.push('criteria must be an array');
+    } else if (data.criteria.length === 0) {
+        errors.push('criteria array cannot be empty');
+    } else {
+        // Validate each criterion
+        data.criteria.forEach((criterion, index) => {
+            if (!criterion.id) {
+                errors.push(`Criterion ${index + 1}: missing id`);
+            }
+            if (!criterion.hasOwnProperty('maxPoints') || typeof criterion.maxPoints !== 'number') {
+                errors.push(`Criterion ${index + 1}: maxPoints must be a number`);
+            }
+            if (!criterion.feedbackLibrary || typeof criterion.feedbackLibrary !== 'object') {
+                errors.push(`Criterion ${index + 1}: missing feedbackLibrary object`);
+            } else {
+                // Ensure feedbackLibrary has required arrays
+                ['strengths', 'improvements', 'general'].forEach(category => {
+                    if (!Array.isArray(criterion.feedbackLibrary[category])) {
+                        criterion.feedbackLibrary[category] = [];
+                    }
+                });
+            }
+            if (!criterion.levels || typeof criterion.levels !== 'object') {
+                criterion.levels = {};
+            }
+        });
+    }
+
+    // Check rubricLevels - must be an array
+    if (!Array.isArray(data.rubricLevels)) {
+        errors.push('rubricLevels must be an array');
+    } else if (data.rubricLevels.length === 0) {
+        errors.push('rubricLevels array cannot be empty');
+    } else {
+        // Validate each level
+        data.rubricLevels.forEach((level, index) => {
+            if (!level.level) {
+                errors.push(`Rubric level ${index + 1}: missing level identifier`);
+            }
+            if (!level.name) {
+                errors.push(`Rubric level ${index + 1}: missing name`);
+            }
+            if (!level.hasOwnProperty('multiplier') || typeof level.multiplier !== 'number') {
+                errors.push(`Rubric level ${index + 1}: multiplier must be a number`);
+            }
+        });
+    }
+
+    return {
+        isValid: errors.length === 0,
+        errors: errors,
+        data: data
+    };
+};
 
 const RubricCreator = () => {
     // ENHANCED: Get shared context functions and state with class list access
@@ -151,6 +446,8 @@ const RubricCreator = () => {
         type: null // 'assignment', 'criterion', 'level', or 'feedback'
     });
     const [autoSaveTimeout, setAutoSaveTimeout] = useState(null);
+
+    const [showJSONPaste, setShowJSONPaste] = useState(false);
 
     // Use refs to store editor content and DOM node
     const richTextContentRef = useRef('');
@@ -619,6 +916,134 @@ const RubricCreator = () => {
         // Reset file input
         event.target.value = '';
     };
+
+    // Enhanced JSON validation function
+    const validateRubricStructure = (data) => {
+        const errors = [];
+
+        // Check assignmentInfo
+        if (!data.assignmentInfo || typeof data.assignmentInfo !== 'object') {
+            errors.push('Missing or invalid assignmentInfo object');
+        } else {
+            // Validate required assignmentInfo fields
+            if (!data.assignmentInfo.hasOwnProperty('title')) {
+                errors.push('assignmentInfo.title is required');
+            }
+            if (!data.assignmentInfo.hasOwnProperty('weight')) {
+                errors.push('assignmentInfo.weight is required');
+            }
+            if (!data.assignmentInfo.hasOwnProperty('totalPoints')) {
+                errors.push('assignmentInfo.totalPoints is required');
+            }
+        }
+
+        // Check criteria - must be an array
+        if (!Array.isArray(data.criteria)) {
+            errors.push('criteria must be an array');
+        } else if (data.criteria.length === 0) {
+            errors.push('criteria array cannot be empty');
+        } else {
+            // Validate each criterion
+            data.criteria.forEach((criterion, index) => {
+                if (!criterion.id) {
+                    errors.push(`Criterion ${index + 1}: missing id`);
+                }
+                if (!criterion.hasOwnProperty('maxPoints') || typeof criterion.maxPoints !== 'number') {
+                    errors.push(`Criterion ${index + 1}: maxPoints must be a number`);
+                }
+                if (!criterion.feedbackLibrary || typeof criterion.feedbackLibrary !== 'object') {
+                    errors.push(`Criterion ${index + 1}: missing feedbackLibrary object`);
+                } else {
+                    // Ensure feedbackLibrary has required arrays
+                    ['strengths', 'improvements', 'general'].forEach(category => {
+                        if (!Array.isArray(criterion.feedbackLibrary[category])) {
+                            criterion.feedbackLibrary[category] = [];
+                        }
+                    });
+                }
+                if (!criterion.levels || typeof criterion.levels !== 'object') {
+                    criterion.levels = {};
+                }
+            });
+        }
+
+        // Check rubricLevels - must be an array
+        if (!Array.isArray(data.rubricLevels)) {
+            errors.push('rubricLevels must be an array');
+        } else if (data.rubricLevels.length === 0) {
+            errors.push('rubricLevels array cannot be empty');
+        } else {
+            // Validate each level
+            data.rubricLevels.forEach((level, index) => {
+                if (!level.level) {
+                    errors.push(`Rubric level ${index + 1}: missing level identifier`);
+                }
+                if (!level.name) {
+                    errors.push(`Rubric level ${index + 1}: missing name`);
+                }
+                if (!level.hasOwnProperty('multiplier') || typeof level.multiplier !== 'number') {
+                    errors.push(`Rubric level ${index + 1}: multiplier must be a number`);
+                }
+            });
+        }
+
+        return {
+            isValid: errors.length === 0,
+            errors: errors,
+            data: data
+        };
+    };
+
+    // Enhanced Import from JSON paste function
+    const importFromJSON = (jsonData) => {
+        try {
+            // Validate the structure
+            const validation = validateRubricStructure(jsonData);
+
+            if (!validation.isValid) {
+                const errorMessage = 'Invalid rubric structure:\n' + validation.errors.join('\n');
+                alert(errorMessage);
+                console.error('JSON validation errors:', validation.errors);
+                return;
+            }
+
+            // Ensure the data has default values for any missing optional fields
+            const processedData = {
+                assignmentInfo: {
+                    title: '',
+                    description: '',
+                    weight: 25,
+                    passingThreshold: 60,
+                    totalPoints: 100,
+                    ...jsonData.assignmentInfo
+                },
+                rubricLevels: [...jsonData.rubricLevels],
+                criteria: jsonData.criteria.map(criterion => ({
+                    id: criterion.id || `criterion-${Date.now()}-${Math.random()}`,
+                    name: criterion.name || '',
+                    description: criterion.description || '',
+                    maxPoints: criterion.maxPoints || 20,
+                    weight: criterion.weight || 20,
+                    levels: criterion.levels || {},
+                    feedbackLibrary: {
+                        strengths: [],
+                        improvements: [],
+                        general: [],
+                        ...criterion.feedbackLibrary
+                    }
+                }))
+            };
+
+            setRubricData(processedData);
+            console.log('✅ Rubric imported successfully from JSON paste');
+
+        } catch (error) {
+            alert('Error processing JSON data: ' + error.message);
+            console.error('JSON import error:', error);
+        }
+    };
+
+    
 
     // Reset to default rubric
     const resetRubric = () => {
@@ -1183,6 +1608,19 @@ const RubricCreator = () => {
                         </div>
                     </div>
 
+                    {/* JSON Paste Panel */}
+                    <JSONPastePanel
+                        onImport={importFromJSON}
+                        isOpen={showJSONPaste}
+                        onToggle={() => setShowJSONPaste(!showJSONPaste)}
+                    />
+
+                    {/* Achievement Level Configuration */}
+                    <AchievementLevelControl
+                        rubricData={rubricData}
+                        setRubricData={setRubricData}
+                    />
+
                     {/* Rubric Table */}
                     <div className="bg-white border rounded-lg overflow-hidden mb-6">
                         <div className="bg-gray-50 p-4 border-b flex justify-between items-center">
@@ -1618,10 +2056,17 @@ const RubricCreator = () => {
                     <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 p-6 rounded-lg">
                         <h3 className="text-lg font-semibold text-gray-800 mb-3">📊 Achievement Level Preview</h3>
                         <p className="text-gray-600 mb-4">
-                            Shows how total rubric scores map to achievement levels. Each submission receives a level based on its total points.
+                            Shows how total rubric scores map to achievement levels.
+                            Currently using {rubricData.rubricLevels.length} levels.
+                            Each submission receives a level based on its total points.
                         </p>
 
-                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+                        <div className={`grid gap-3 ${rubricData.rubricLevels.length <= 4
+                                ? `grid-cols-${rubricData.rubricLevels.length}`
+                                : rubricData.rubricLevels.length <= 6
+                                    ? 'grid-cols-3 md:grid-cols-6'
+                                    : 'grid-cols-2 md:grid-cols-4 lg:grid-cols-7'
+                            }`}>
                             {getDisplayLevels().map((level) => {
                                 const totalPoints = calculateTotalPoints();
                                 const pointsForLevel = Math.round(totalPoints * level.multiplier);

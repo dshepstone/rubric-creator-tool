@@ -2169,10 +2169,13 @@ Write the feedback now, making it sound personal and genuine while keeping it co
                       </button>
                     </div>
 
-                    {/* Level Selection */}
                     <div style={{
                       display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+                      gridTemplateColumns: sharedRubric.rubricLevels.length <= 4
+                        ? `repeat(${sharedRubric.rubricLevels.length}, 1fr)`
+                        : sharedRubric.rubricLevels.length <= 6
+                          ? 'repeat(auto-fit, minmax(120px, 1fr))'
+                          : 'repeat(auto-fit, minmax(100px, 1fr))',
                       gap: '0.5rem',
                       marginBottom: '1rem'
                     }}>
@@ -2222,7 +2225,11 @@ Write the feedback now, making it sound personal and genuine while keeping it co
                         </h5>
                         <div style={{
                           display: 'grid',
-                          gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                          gridTemplateColumns: sharedRubric.rubricLevels.length <= 4
+                            ? `repeat(${sharedRubric.rubricLevels.length}, 1fr)`
+                            : sharedRubric.rubricLevels.length <= 6
+                              ? 'repeat(3, 1fr)'
+                              : 'repeat(auto-fit, minmax(120px, 1fr))',
                           gap: '0.75rem'
                         }}>
                           {sharedRubric.rubricLevels.map((level) => (
