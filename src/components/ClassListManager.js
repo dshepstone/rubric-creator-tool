@@ -212,25 +212,45 @@ const ClassListManager = () => {
 
     // Helper function to finalize a draft grade (preserved exactly from original)
     const finalizeGrade = (studentId) => {
+        console.log('🔧 Finalizing grade for student:', studentId);
+
         const draftData = drafts[studentId];
         if (draftData) {
+            // Save the final grade
             saveFinalGrade(studentId, draftData);
 
-            // Update class list progress
+            // Update class list progress with better logging
             const studentIndex = classList.students.findIndex(s => s.id === studentId);
+            console.log('📍 Found student at index:', studentIndex);
+
             if (studentIndex >= 0) {
                 const updatedProgress = [...classList.gradingProgress];
+                const previousProgress = updatedProgress[studentIndex];
+
                 updatedProgress[studentIndex] = {
                     ...updatedProgress[studentIndex],
                     status: 'completed_final',
                     lastModified: new Date().toISOString(),
                     gradeType: 'final'
                 };
+
+                console.log('📊 Progress update:', {
+                    studentId,
+                    before: previousProgress,
+                    after: updatedProgress[studentIndex]
+                });
+
                 setClassList(prev => ({
                     ...prev,
                     gradingProgress: updatedProgress
                 }));
+
+                console.log('✅ Class list updated successfully');
+            } else {
+                console.error('❌ Student not found in class list:', studentId);
             }
+        } else {
+            console.error('❌ No draft data found for student:', studentId);
         }
     };
 
@@ -453,17 +473,66 @@ const ClassListManager = () => {
         // Note: The actual data loading happens in GradingTemplate's useEffect for currentStudent
     };
 
+
+    // Helper function to ensure grading progress is synchronized
+    const syncGradingProgress = () => {
+        if (!classList) return;
+
+        const updatedProgress = classList.gradingProgress.map((progress, index) => {
+            const student = classList.students[index];
+            const gradeStatus = getGradeStatus(student.id);
+
+            // Sync the progress with actual grade status
+            const syncedProgress = { ...progress };
+
+            if (gradeStatus === 'final' && progress.gradeType !== 'final') {
+                syncedProgress.gradeType = 'final';
+                syncedProgress.status = 'completed_final';
+                if (!syncedProgress.lastModified) {
+                    syncedProgress.lastModified = new Date().toISOString();
+                }
+            } else if (gradeStatus === 'draft' && progress.gradeType !== 'draft') {
+                syncedProgress.gradeType = 'draft';
+                syncedProgress.status = 'completed_draft';
+                if (!syncedProgress.lastModified) {
+                    syncedProgress.lastModified = new Date().toISOString();
+                }
+            }
+
+            return syncedProgress;
+        });
+
+        // Update the class list if changes were made
+        const hasChanges = updatedProgress.some((progress, index) =>
+            JSON.stringify(progress) !== JSON.stringify(classList.gradingProgress[index])
+        );
+
+        if (hasChanges) {
+            console.log('🔄 Syncing grading progress with actual grade status');
+            setClassList(prev => ({
+                ...prev,
+                gradingProgress: updatedProgress
+            }));
+        }
+    };
+
     // Helper function to get grading progress statistics (preserved exactly from original)
     const getGradingProgress = () => {
         if (!classList) return { completed: 0, total: 0, percentage: 0, final: 0, draft: 0 };
 
-        const final = classList.gradingProgress.filter(p =>
-            p.status?.startsWith('completed_final')
-        ).length;
+        let final = 0;
+        let draft = 0;
 
-        const draft = classList.gradingProgress.filter(p =>
-            p.status?.startsWith('completed_draft')
-        ).length;
+        // Use actual grade status instead of stored progress data
+        classList.students.forEach(student => {
+            const gradeStatus = getGradeStatus(student.id);
+
+            if (gradeStatus === 'final') {
+                final++;
+            } else if (gradeStatus === 'draft') {
+                draft++;
+            }
+        });
 
         const completed = final + draft;
         const total = classList.students.length;
@@ -476,13 +545,28 @@ const ClassListManager = () => {
     const exportClassGradesCSV = async () => {
         if (!classList) return;
 
+        // Ensure grading progress is synchronized before export
+        syncGradingProgress();
+        await new Promise(resolve => setTimeout(resolve, 100)); // Brief pause for state update
+
         console.log('🔄 Starting CSV export with async grade calculations...');
 
         // 1) Calculate grades for all students asynchronously
         const studentGrades = await Promise.all(
             classList.students.map(async (student, index) => {
                 const progress = classList.gradingProgress[index] || {};
+                const gradeStatus = getGradeStatus(student.id); // Use consistent status check
                 const gradeInfo = await calculateStudentGrade(student.id);
+
+                // Ensure gradeType is consistent with status
+                const actualGradeType = gradeStatus === 'final' ? 'final' :
+                    gradeStatus === 'draft' ? 'draft' :
+                        progress.gradeType || 'N/A';
+
+                const actualStatus = gradeStatus === 'final' ? 'completed_final' :
+                    gradeStatus === 'draft' ? 'completed_draft' :
+                        progress.status || 'pending';
+
                 const lm = progress.lastModified
                     ? new Date(progress.lastModified).toLocaleDateString()
                     : 'Never';
@@ -493,8 +577,8 @@ const ClassListManager = () => {
                     student.name,
                     student.email,
                     student.program || 'N/A',
-                    progress.status || 'pending',
-                    progress.gradeType || 'none',
+                    actualStatus,
+                    actualGradeType,
                     gradeInfo.score !== 'N/A'
                         ? `${gradeInfo.score}/${gradeInfo.maxPossible}`
                         : 'N/A',
@@ -540,14 +624,27 @@ const ClassListManager = () => {
         console.log('🔄 Generating class grades HTML with logo...');
 
         // Calculate grades for all students asynchronously (your existing logic)
+        // Calculate grades for all students asynchronously (your existing logic)
         const studentRows = await Promise.all(
             classList.students.map(async (student, idx) => {
+                const progress = classList.gradingProgress[idx] || {};
+                const gradeStatus = getGradeStatus(student.id);
                 const info = await calculateStudentGrade(student.id);
+
+                // Ensure consistent gradeType and status
+                const actualGradeType = gradeStatus === 'final' ? 'final' :
+                    gradeStatus === 'draft' ? 'draft' :
+                        progress.gradeType || 'N/A';
+
+                const actualStatus = gradeStatus === 'final' ? 'completed_final' :
+                    gradeStatus === 'draft' ? 'completed_draft' :
+                        progress.status || 'pending';
+
                 const gradeDisplay = info.score !== 'N/A' ? `${info.score}%` : 'N/A';
                 const letterGrade = info.letterGrade || 'N/A';
                 const percentage = info.score !== 'N/A' ? `${info.score}%` : 'N/A';
-                const lastModified = classList.gradingProgress[idx]?.lastModified
-                    ? new Date(classList.gradingProgress[idx].lastModified).toLocaleDateString('en-CA')
+                const lastModified = progress.lastModified
+                    ? new Date(progress.lastModified).toLocaleDateString('en-CA')
                     : 'Not graded';
 
                 return `
@@ -557,8 +654,8 @@ const ClassListManager = () => {
           <td>${student.name}</td>
           <td>${student.email}</td>
           <td>${student.program}</td>
-          <td>${classList.gradingProgress[idx]?.status || 'pending'}</td>
-          <td>${classList.gradingProgress[idx]?.gradeType || 'N/A'}</td>
+          <td>${actualStatus}</td>
+          <td>${actualGradeType}</td>
           <td>${gradeDisplay}</td>
           <td>${letterGrade}</td>
           <td>${percentage}</td>
@@ -616,6 +713,10 @@ const ClassListManager = () => {
     const exportClassGradesHTML = async () => {
         if (!classList) return;
 
+        // Ensure grading progress is synchronized before export
+        syncGradingProgress();
+        await new Promise(resolve => setTimeout(resolve, 100)); // Brief pause for state update
+
         console.log('🔄 Exporting HTML with async grade calculations...');
 
         // Use the logo-enhanced version
@@ -645,10 +746,18 @@ const ClassListManager = () => {
 
         console.log('🔄 Generating portrait report with logo and async grade calculations...');
 
-        // Calculate grades for all students asynchronously (your existing logic)
+        // Calculate grades for all students asynchronously (FIXED: Added Promise.all and stored result)
         const studentRows = await Promise.all(
             classList.students.map(async (student, idx) => {
+                const progress = classList.gradingProgress[idx] || {};
+                const gradeStatus = getGradeStatus(student.id);
                 const info = await calculateStudentGrade(student.id);
+
+                // Ensure status consistency
+                const actualStatus = gradeStatus === 'final' ? 'completed_final' :
+                    gradeStatus === 'draft' ? 'completed_draft' :
+                        progress.status || 'pending';
+
                 const num = info.score !== 'N/A'
                     ? parseFloat(info.score)
                     : null;
@@ -757,6 +866,10 @@ const ClassListManager = () => {
     // FIXED: Export portrait PDF with async/await properly handled
     const exportClassGradesPortraitPDF = async () => {
         if (!classList) return;
+
+        // Ensure grading progress is synchronized before export
+        syncGradingProgress();
+        await new Promise(resolve => setTimeout(resolve, 100)); // Brief pause for state update
 
         console.log('🔄 Generating PDF with async grade calculations and logo...');
 

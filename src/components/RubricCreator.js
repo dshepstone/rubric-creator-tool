@@ -1081,8 +1081,9 @@ const RubricCreator = () => {
         }
     };
 
-    // Export to HTML
-    // Export to HTML
+    // Fixed exportToHTML function for RubricCreator.js
+    // Replace the existing exportToHTML function with this corrected version
+
     const exportToHTML = () => {
         const displayLevels = getDisplayLevels();
         const totalPoints = calculateTotalPoints();
@@ -1098,6 +1099,32 @@ const RubricCreator = () => {
 
         const headerHtml = generateReportHeader(reportData, { maxHeight: 60 });
 
+        // FIXED: Generate dynamic CSS based on actual level colors instead of hardcoded classes
+        const generateLevelCSS = () => {
+            return displayLevels.map(level => {
+                // Convert hex color to RGB for transparency
+                const hexToRgb = (hex) => {
+                    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+                    return result ? {
+                        r: parseInt(result[1], 16),
+                        g: parseInt(result[2], 16),
+                        b: parseInt(result[3], 16)
+                    } : null;
+                };
+
+                const rgb = hexToRgb(level.color);
+                const backgroundColor = rgb ?
+                    `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.1)` :
+                    `${level.color}20`;
+
+                return `
+        .level-${level.level} { 
+            background: ${backgroundColor}; 
+            border-left: 4px solid ${level.color}; 
+        }`;
+            }).join('');
+        };
+
         const htmlContent = `
 <!DOCTYPE html>
 <html>
@@ -1112,10 +1139,10 @@ const RubricCreator = () => {
         .rubric-table th, .rubric-table td { border: 1px solid #cbd5e1; padding: 12px; text-align: left; vertical-align: top; }
         .rubric-table th { background: linear-gradient(135deg, #1e40af, #3b82f6); color: white; font-weight: 600; }
         .criterion-header { background: #f1f5f9; font-weight: 600; color: #334155; }
-        .level-exceptional { background: #dcfce7; border-left: 4px solid #16a34a; }
-        .level-proficient { background: #dbeafe; border-left: 4px solid #2563eb; }
-        .level-developing { background: #fef3c7; border-left: 4px solid #d97706; }
-        .level-inadequate { background: #fee2e2; border-left: 4px solid #dc2626; }
+        
+        /* FIXED: Dynamic level-specific CSS based on actual rubric data */
+        ${generateLevelCSS()}
+        
         .points { font-weight: 600; color: #059669; text-align: center; }
         .footer { margin-top: 30px; padding: 20px; background: #f8fafc; border-radius: 8px; text-align: center; font-size: 0.875rem; color: #64748b; }
         .school-logo, .report-logo, .assignment-logo { max-height: 60px; max-width: 200px; object-fit: contain; }
@@ -1155,14 +1182,15 @@ const RubricCreator = () => {
                     <td class="criterion-header">
                         <strong>${criterion.name || `Criterion ${index + 1}`}</strong>
                         <div style="font-size: 0.8em; color: #64748b; margin-top: 5px;">
-                            ${criterion.weight || 0} points
+                            ${criterion.maxPoints || 0} points
                         </div>
                         ${criterion.description ? `<div style="font-size: 0.85em; margin-top: 8px; color: #475569;">${criterion.description}</div>` : ''}
                     </td>
                     ${displayLevels.map(level => {
             const levelData = criterion.levels[level.level] || {};
             const points = calculatePointRange(criterion, level.level);
-            const levelClass = `level-${level.level.toLowerCase()}`;
+            // FIXED: Use the actual level identifier from the rubric data
+            const levelClass = `level-${level.level}`;
 
             return `
                             <td class="${levelClass}">

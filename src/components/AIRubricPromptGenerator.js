@@ -434,18 +434,21 @@ const AIRubricPromptGenerator = () => {
   };
 
   // Use shared form data, fallback to defaults if not available
-  const formData = aiPromptFormData || {
+  const formData = aiPromptFormData ? {
+    ...aiPromptFormData,
+    achievementLevels: aiPromptFormData.achievementLevels || '7'
+  } : {
     assignmentType: '',
     programType: '',
     programLevel: '',
     subjectArea: '',
     assignmentDescription: '',
     totalPoints: '100',
-    weightPercentage: '', // NEW: Add weight percentage field
+    weightPercentage: '',
     numCriteria: '4',
     criteriaType: 'ai-suggested',
     userCriteria: '',
-    learningObjectives: [ // Changed from string to array of CLO objects
+    learningObjectives: [
       { id: 1, number: '1', text: '', type: 'CLO' },
       { id: 2, number: '2', text: '', type: 'CLO' },
       { id: 3, number: '3', text: '', type: 'CLO' },
@@ -455,7 +458,7 @@ const AIRubricPromptGenerator = () => {
     timeFrameNumber: '',
     timeFrameUnit: 'weeks',
     specialConsiderations: '',
-    achievementLevels: '7' // NEW: Add achievement levels field with default 7
+    achievementLevels: '7'
   };
 
   // Force re-render when aiPromptFormData changes to ensure validation updates
@@ -679,19 +682,25 @@ ${template.map(level => `        "${level.level}": {
         }`).join(',\n')}
       },
       "feedbackLibrary": {
-        "strengths": [
-          "Strong example feedback for good performance",
-          "Another positive feedback option"
-        ],
-        "improvements": [
-          "Suggestion for improvement",
-          "Another improvement suggestion"
-        ],
-        "specific": [
-          "Specific technical feedback",
-          "Another specific comment"
-        ]
-      }
+          "strengths": [
+            "Strong example feedback for good performance",
+            "Another positive feedback option",
+            "Excellent demonstration of understanding",
+            "Shows mastery of key concepts"
+          ],
+          "improvements": [
+            "Suggestion for improvement",
+            "Another improvement suggestion", 
+            "Consider strengthening this area",
+            "Focus on developing this skill further"
+          ],
+          "general": [
+            "General feedback comment",
+            "Overall observation about the work",
+            "Additional contextual feedback", 
+            "Note about assignment completion"
+          ]
+        }
     }
   ]
 }
@@ -707,6 +716,9 @@ ${formData.criteriaType === 'user-provided' ?
 - The "levels" object must contain objects with "pointRange" and "description" properties
 - Calculate appropriate point ranges for each level based on the criterion's maxPoints
 - Each level (${template.map(l => l.level).join(', ')}) should be an object with pointRange and description
+- IMPORTANT: Include all three feedback categories in feedbackLibrary: "strengths", "improvements", and "general"
+- Provide 3-5 sample feedback comments for each category to give instructors a comprehensive starting point
+- The "general" category should include neutral observations and contextual comments
 - Ensure the JSON is valid and complete - test it in a JSON validator before providing
 - The output must be importable directly into the Rubric Creator tool
 
@@ -716,7 +728,12 @@ ${formData.criteriaType === 'user-provided' ?
 - Time frame: ${timeFrame}
 - Special considerations: ${renderFormattedContent(formData.specialConsiderations) || 'None specified'}
 
-Please generate a complete, ready-to-import, downloadable JSON file that matches the structure exactly and can be directly imported into the Rubric Creator tool.`;
+Please generate a complete, ready-to-import, downloadable JSON file that matches the structure exactly and can be directly imported into the Rubric Creator tool. Ensure that each criterion includes comprehensive feedback libraries with:
+- **Strengths comments**: Positive feedback for good performance
+- **Improvements comments**: Constructive suggestions for enhancement  
+- **General comments**: Neutral observations and contextual feedback
+
+All three feedback categories (strengths, improvements, general) are required for the rubric to function properly in the assessment tool.`;
 
     setGeneratedPrompt(prompt);
     setShowPrompt(true);
